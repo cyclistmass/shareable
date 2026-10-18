@@ -38,7 +38,7 @@ applied); the art spec gives the base frames and file sizes they come from.
 | Capital (Age of Chivalry) | a town plus a central keep, about **0.85** across, dome top highest | Replaces a town |
 | Knight (Age of Chivalry) | frame **1.30** on the flat board, **0.64** on the 3D board (0.49 of flat) | Stands on a corner, base at the lower centre |
 | Bandit | frame **2.65** | Feet on the number plate; its base hides the plate |
-| Merchant (Age of Chivalry) | radius **0.20**, ring in the holder's colour | Lies flat on its tile at (−0.36, +0.30), lower LEFT, mirroring the number plate, so it never covers the number |
+| Merchant (Age of Chivalry) | a standing pawn about **0.5** tall, in the holder's colour | Stands on its tile at (−0.36, +0.30), lower LEFT, mirroring the number plate, so it never covers the number and shows on a tilted board. Each theme may replace the pawn |
 | Port buoy | radius about **0.39** | 0.80 out to sea from the middle of its coast edge |
 | Cliff strip | **1.16** along a coast edge × **0.55** deep | Along each coast edge |
 | Boat (sloop) | frame **1.08**, hull about 0.76 long | On the sea |

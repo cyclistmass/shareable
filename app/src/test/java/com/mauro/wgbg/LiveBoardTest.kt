@@ -128,6 +128,10 @@ class LiveBoardTest {
         assertEquals(listOf("pirate_knight_l2" to 1, "pirate_knight_l3_inactive" to 3), knights.map { it.model to it.owner })
         assertEquals(liveVertex(s.board, 4), knights[0].position)
         assertTrue(knights.all { liveStanding(it.model) }, "knights tip toward the camera like the buildings")
+        // Knights swapped on their own (the Inventory): Pirate buildings, Default knights.
+        val mixed = livePlacements(s, true, 0, knightsPirate = false) { true }
+        assertEquals(listOf("default_knight_l2", "default_knight_l3_inactive"), mixed.filter { "_knight_" in it.model }.map { it.model })
+        assertTrue(mixed.none { it.model.startsWith("default_") && "_knight_" !in it.model }, "the buildings stay Pirate")
     }
 
     @Test fun `legal placement taps pick the same move after a full orbit at every tilt`() {

@@ -151,12 +151,24 @@ class EnvSettings(private val store: FloatStore) {
         get() = tiles3dState.floatValue > 0.5f
         set(v) { tiles3dState.floatValue = if (v) 1f else 0f; store.put(TILES_3D, tiles3dState.floatValue) }
 
-    private val pirate = mutableFloatStateOf(store.get(THEME, 0f))
+    // The theme keeps the old Normal/Pirate key (0 Default, 1 Pirate) so saved choices carry over; -1 = follows the theme.
+    private val themeState = mutableFloatStateOf(store.get(THEME, 0f))
+    private val swapStates = ArtObject.entries.associateWith { mutableFloatStateOf(store.get(artKey(it), -1f)) }
 
-    /** Knight art: Normal (armoured knights) or Pirate themed (afro skeleton crew). Saved. */
+    /** The chosen theme and any pieces swapped to another set on the Inventory screen. Saved. */
+    var art: ArtChoice
+        get() = ArtChoice(ArtSet.entries.getOrElse(themeState.floatValue.roundToInt()) { ArtSet.DEFAULT },
+            swapStates.mapNotNull { (o, v) -> ArtSet.entries.getOrNull(v.floatValue.roundToInt())?.let { o to it } }.toMap()).tidy()
+        set(v) {
+            val tidy = v.tidy()
+            themeState.floatValue = tidy.theme.ordinal.toFloat(); store.put(THEME, themeState.floatValue)
+            for ((o, state) in swapStates) { state.floatValue = tidy.swaps[o]?.ordinal?.toFloat() ?: -1f; store.put(artKey(o), state.floatValue) }
+        }
+
+    /** Whether the whole theme is Pirate (the debug launch flag and the 3D view log). */
     var pirateTheme: Boolean
-        get() = pirate.floatValue > 0.5f
-        set(v) { pirate.floatValue = if (v) 1f else 0f; store.put(THEME, pirate.floatValue) }
+        get() = art.theme == ArtSet.PIRATE
+        set(v) { art = art.withTheme(if (v) ArtSet.PIRATE else ArtSet.DEFAULT) }
 
     enum class TileEdge(val label: String) { NONE("None"), THIN("Thin line"), CLASSIC("Classic frame") }
     private val edge = mutableFloatStateOf(store.get(EDGE, TileEdge.THIN.ordinal.toFloat()))
@@ -184,6 +196,7 @@ class EnvSettings(private val store: FloatStore) {
     companion object {
         const val DEFAULT = 0.5f
         const val THEME = "theme-pirate"
+        fun artKey(o: ArtObject) = "art-${o.name.lowercase()}"
         const val EDGE = "tile-edge"
         const val EVENT_DIE = "event-die-style"
         const val DENSITY = "env-density"
@@ -268,17 +281,25 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
         // menu not front page").
         for (item in EnvSettings.Item.entries)
             SliderRow(item.label, env[item], "env-${item.name.lowercase()}") { env[item] = it }
-        Text("Theme", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("Normal", selected = !env.pirateTheme, tag = "theme-normal", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.pirateTheme = false }
-            Choice("Pirate themed", selected = env.pirateTheme, tag = "theme-pirate", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.pirateTheme = true }
+        // Mauro: a theme groups every piece; single pieces swap by tapping them on the Inventory, and Reset undoes that.
+        Text("Theme (tap a piece on the Inventory to swap just that one)", fontSize = 13.sp, color = Color(0xFFD9B865))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            for (t in ArtChoice.themes) Choice(t.label, selected = env.art.theme == t, tag = "theme-${if (t == ArtSet.DEFAULT) "normal" else t.name.lowercase()}",
+                modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.art = env.art.withTheme(t) }
+            val swapped = ArtObject.entries.filter { env.art.swapped(it) }
+            if (swapped.isNotEmpty()) Choice("Reset pieces", selected = false, tag = "theme-reset", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) {
+                env.art = env.art.reset()
+            }
+        }
+        ArtObject.entries.filter { env.art.swapped(it) }.takeIf { it.isNotEmpty() }?.let { swapped ->
+            Text("Swapped: " + swapped.joinToString { "${it.label} (${env.art[it].label})" }, fontSize = 12.sp, color = Color(0xFFE8E2D6))
         }
         Text("Event die (Pirate theme)", fontSize = 13.sp, color = Color(0xFFD9B865))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (pair in DiceArt.EVENT_STYLES.indices.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (i in pair) Choice(DiceArt.EVENT_STYLES[i], selected = env.eventDieStyle == i, tag = "event-die-$i",
-                        modifier = Modifier.height(36.dp).width(122.dp), size = 12.sp) { env.eventDieStyle = i; env.pirateTheme = true }
+                        modifier = Modifier.height(36.dp).width(122.dp), size = 12.sp) { env.eventDieStyle = i; env.art = env.art.with(ArtObject.DICE, ArtSet.PIRATE) }
                 }
             }
             // A preview of the chosen style's ship face.

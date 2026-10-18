@@ -166,7 +166,8 @@ internal const val LIVE_ROAD_LIFT = 0.035f
  * Reads only real game state. No fixture pieces are added to the playing board. Knights are models when [hasModel]
  * has them; otherwise [drawLiveOverlay] still draws their sprites.
  */
-internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, hasModel: (String) -> Boolean = { false }): List<LivePlacement> = buildList {
+internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPirate: Boolean = pirate,
+                            hasModel: (String) -> Boolean = { false }): List<LivePlacement> = buildList {
     require(lod in 0..1)
     val b = s.board
     val theme = if (pirate) "pirate" else "default"
@@ -206,7 +207,7 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, hasModel: (
             BUILDING_SCALE * if (walled) 0.9f else 1f, owner = owner))
     }
     for (v in 0 until b.vertexCount) {
-        val model = liveKnightModel(s, v, pirate)?.takeIf(hasModel) ?: continue
+        val model = liveKnightModel(s, v, knightsPirate)?.takeIf(hasModel) ?: continue
         val owner = s.ck!!.knightOwner[v]
         add(LivePlacement(KNIGHT_RING, liveVertex(b, v), scale = KNIGHT_RING_SCALE, owner = owner))
         add(LivePlacement(KNIGHT_BAND, liveVertex(b, v), KNIGHT_BAND_HEIGHT, KNIGHT_BAND_SCALE))

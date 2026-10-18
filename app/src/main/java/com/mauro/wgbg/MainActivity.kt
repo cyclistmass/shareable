@@ -660,7 +660,7 @@ fun WatchGameScreen(
     val tileFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) framedFaces else plainFaces
     val tileLine = env.tileEdge == EnvSettings.TileEdge.THIN
     // Rendered buildings (#41) for the chosen theme; Age of Chivalry pieces only load in those games.
-    val buildings = remember(env.pirateTheme, state.ck != null) { BuildingSprites(oceanRes, env.pirateTheme, state.ck != null) }
+    val buildings = remember(env.art, state.ck != null) { BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null, env.art.pirate(ArtObject.KNIGHTS)) }
     // The V3 3D tiles (Settings › Tiles › 3D preview): loaded only when chosen.
     val tiles3d = remember(env.tiles3d) { if (env.tiles3d) Tile3dArt.TERRAINS.map { t -> t.map { ImageBitmap.imageResource(oceanRes, it) } } else null }
     val gullFlap = ImageBitmap.imageResource(R.drawable.gull_flap)
@@ -767,7 +767,7 @@ fun WatchGameScreen(
                 if (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
                     val snapshot = org.json.JSONObject().apply {
                         put("turn", state.turn); put("hash", state.stateHash().toString())
-                        put("placements", org.json.JSONArray(livePlacements(state, env.pirateTheme, env.liveLod) { it in liveModels }.map { p ->
+                        put("placements", org.json.JSONArray(livePlacements(state, env.art.pirate(ArtObject.BUILDINGS), env.liveLod, env.art.pirate(ArtObject.KNIGHTS)) { it in liveModels }.map { p ->
                             org.json.JSONObject().apply {
                                 put("model", p.model); put("x", p.position.x); put("z", p.position.y)
                                 put("height", p.height); put("scale", p.scale); put("heading", p.heading); put("owner", p.owner)
@@ -1060,8 +1060,8 @@ fun WatchGameScreen(
         val waterLayer = rememberGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen }
         val waterLayerKey = remember { arrayOfNulls<WaterLayerKey>(1) }
         if (liveBoard) {
-            val placements = remember(tick, state, env.pirateTheme, env.liveLod, inventory) {
-                if (inventory) liveInventoryPlacements() else livePlacements(state, env.pirateTheme, env.liveLod) { it in liveModels }
+            val placements = remember(tick, state, env.art, env.liveLod, inventory) {
+                if (inventory) liveInventoryPlacements() else livePlacements(state, env.art.pirate(ArtObject.BUILDINGS), env.liveLod, env.art.pirate(ArtObject.KNIGHTS)) { it in liveModels }
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
             LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces) { reason ->
@@ -1185,7 +1185,9 @@ fun WatchGameScreen(
                             !inventory && boardTapHint(boardNow, legalNow, stateNow.robberHex, p) != null -> tapHint = boardTapHint(boardNow, legalNow, stateNow.robberHex, p)
                             !inventory && seaNow.isWater(p) -> seaNow.splash(p)
                             // The 3D collection: tap a piece set to play with it (#119: "useless if I can't pick").
-                            inventory && liveBoardNow -> liveInventoryThemeAt(p)?.let { env.pirateTheme = it }
+                            inventory && liveBoardNow -> liveInventoryThemeAt(p)?.let { env.art = env.art.with(ArtObject.BUILDINGS, if (it) ArtSet.PIRATE else ArtSet.DEFAULT) }
+                            // The flat Inventory: tap a piece to swap its set (Mauro: "tap in inventory").
+                            inventory -> inventoryObjectAt(at, size.width.toFloat(), size.height.toFloat(), INVENTORY_CARDS_DP.dp.toPx())?.let { env.art = env.art.cycle(it) }
                         }
                     }, onDoubleTap = { at ->
                         val sz = Size(size.width.toFloat(), size.height.toFloat())
@@ -1204,23 +1206,23 @@ fun WatchGameScreen(
                     color = 0xFFF1D58A.toInt(); textSize = 16.dp.toPx(); textAlign = android.graphics.Paint.Align.CENTER
                     typeface = resources.getFont(R.font.alegreya_sans_regular)
                 }
-                fun set(name: String, pirate: Boolean) = if (env.pirateTheme == pirate) "$name pieces: in use" else "$name pieces: tap to use"
+                fun set(name: String, pirate: Boolean) = if (env.art.pirate(ArtObject.BUILDINGS) == pirate) "$name pieces: in use" else "$name pieces: tap to use"
                 for ((text, z) in listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
                         "Bandit and runtime plate" to 6.1f)) {
                     val at = projection.project(Offset(0f, z))
                     drawContext.canvas.nativeCanvas.drawText(text, at.x, at.y, paint)
                 }
             } else if (inventory) drawInventory(measurer, wood, banditSprites, tileFaces, tileLine,
-                InventoryArt(if (env.pirateTheme) knightsPirate else knightsNormal, raiders, cliff, boatSprites, gullGlide, buildings, sea.sprites3d),
-                bottomInset = INVENTORY_CARDS_DP.dp.toPx()) else if (liveBoard) {
+                InventoryArt(if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, raiders, cliff, boatSprites, gullGlide, buildings, sea.sprites3d),
+                bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
                 drawLivePorts(state.board, projection, measurer, wood, buildings)
-                drawLiveOverlay(state, projection, if (env.pirateTheme) knightsPirate else knightsNormal) { v ->
-                    liveKnightModel(state, v, env.pirateTheme) in liveModels }
+                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal) { v ->
+                    liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
                 if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
                 if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             } else {
-                val knights = if (env.pirateTheme) knightsPirate else knightsNormal
+                val knights = if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal
                 val layerDensity = androidx.compose.ui.unit.Density(density, fontScale)
                 val layerSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
                 val waterKey = WaterLayerKey(camera, size, (sea.time * 6f).toInt())
@@ -1259,13 +1261,15 @@ fun WatchGameScreen(
             for ((r, art) in CARD_ART.withIndex()) androidx.compose.foundation.Image(
                 androidx.compose.ui.res.painterResource(art), RESOURCE_NAMES[r], Modifier.size(width = 76.dp, height = 110.dp))
             // Knight cards in the chosen theme (Normal / Pirate themed).
+            // Tap a knight card or a die to swap that set on its own.
             for (lv in 1..3) androidx.compose.foundation.Image(
-                androidx.compose.ui.res.painterResource(GuideArt.knightCard(lv, env.pirateTheme)),
-                "Knight level $lv", Modifier.size(width = 76.dp, height = 110.dp))
+                androidx.compose.ui.res.painterResource(GuideArt.knightCard(lv, env.art.pirate(ArtObject.KNIGHTS))),
+                "Knight level $lv", Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-knight-$lv")
+                    .clickable { env.art = env.art.cycle(ArtObject.KNIGHTS) })
             // Dice in the chosen theme: yellow 1-6, red 1-6, the event die's six faces.
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val rows = listOf((1..6).map { DiceArt.face(false, env.pirateTheme, it) }, (1..6).map { DiceArt.face(true, env.pirateTheme, it) },
-                    (0..5).map { DiceArt.eventFace(env.pirateTheme, it, env.eventDieStyle) })
+            Column(Modifier.testTag("inventory-dice").clickable { env.art = env.art.cycle(ArtObject.DICE) }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val rows = listOf((1..6).map { DiceArt.face(false, env.art.pirate(ArtObject.DICE), it) }, (1..6).map { DiceArt.face(true, env.art.pirate(ArtObject.DICE), it) },
+                    (0..5).map { DiceArt.eventFace(env.art.pirate(ArtObject.DICE), it, env.eventDieStyle) })
                 for (row in rows) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     for (id in row) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(id), null, Modifier.size(32.dp))
                 }
@@ -1283,11 +1287,11 @@ fun WatchGameScreen(
             if (stripWidth > 0f) Box(Modifier.align(Alignment.TopStart).padding(8.dp).width(sideWidth).fillMaxHeight()
                 .brassEdgedWood(woodAlpha = if (env.seeThrough) 0.4f else 1f))
             if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
-                TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.pirateTheme, eventStyle = env.eventDieStyle,
+                TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
                     eventDie = state.ck != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
                     width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false })
             }
-            if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.pirateTheme, eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
+            if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
                 modifier = Modifier.fillMaxSize())
         }
         // Board A: players top-left; in Play mode the prompt across the top and your hand along the bottom.
@@ -1449,7 +1453,7 @@ fun WatchGameScreen(
                 shot = reportShot, onClose = { feedbackOpen = false; reportShot = null })
         }
         if (guideOpen) Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-            CardGuide(state.ck != null, env.pirateTheme, onClose = { guideOpen = false })
+            CardGuide(state.ck != null, env.art.pirate(ArtObject.KNIGHTS), onClose = { guideOpen = false })
         }
         // Pause, speed and Watch bots live under the gear (Mauro, 2026-10-12); local games only, not on Look & art.
         if (settingsOpen) SettingsPanel(env, sound,
@@ -2312,15 +2316,37 @@ private class InventoryArt(val knights: List<ImageBitmap>, val raiders: ImageBit
 private const val INVENTORY_CARDS_DP = 126
 
 /** Every game object side by side, for eyeballing the art. */
+/** [drawInventory]'s scale (px per unit) and left edge, shared with [inventoryObjectAt] so taps land on what's drawn. */
+private fun inventoryFrame(w: Float, h: Float, bottomInset: Float, full: Boolean = true): Pair<Float, Float> {
+    val scale = min(w / 13.5f, (h - bottomInset) / (if (full) 9.7f else 9.6f))
+    return scale to w / 2f - 5 * 2.05f * scale / 2f
+}
+
+/** The piece set under a tap at [at] on the flat Inventory: the players' buildings, the knights row or the Merchant. */
+internal fun inventoryObjectAt(at: Offset, w: Float, h: Float, bottomInset: Float): ArtObject? {
+    if (w < 2f || h - bottomInset < 2f) return null
+    val (scale, left) = inventoryFrame(w, h, bottomInset)
+    val u = (at.x - left) / scale; val v = at.y / scale
+    return when {
+        u in 10.15f..11.05f && v in 5.8f..7.45f -> ArtObject.MERCHANT
+        u in -1.4f..10.1f && v in 5.9f..7.4f -> ArtObject.BUILDINGS
+        u in -1.15f..4.6f && v in 8.1f..9.4f -> ArtObject.KNIGHTS
+        else -> null
+    }
+}
+
 private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, bandit: List<ImageBitmap>? = null,
-                                    faces: Map<Int, ImageBitmap>? = null, tileLine: Boolean = false, art: InventoryArt? = null, bottomInset: Float = 0f) {
+                                    faces: Map<Int, ImageBitmap>? = null, tileLine: Boolean = false, art: InventoryArt? = null, bottomInset: Float = 0f,
+                                    chosen: ArtChoice? = null) {
     if (size.minDimension < 2f) return
-    val scale = min(size.width / 13.5f, (size.height - bottomInset) / (if (art != null) 9.7f else 9.6f))
+    val (scale, left) = inventoryFrame(size.width, size.height, bottomInset, art != null)
     fun label(text: String, at: Offset) {
         val t = measurer.measure(text, TextStyle(fontSize = (0.2f * scale / density).sp, color = Color(0xFFE8E2D6)))
         drawText(t, topLeft = at - Offset(t.size.width / 2f, 0f))
     }
-    val left = size.width / 2f - 5 * 2.05f * scale / 2f
+    // Which set each piece is in, between the harbours and the players' pieces.
+    if (chosen != null) label("Tap a piece to swap its set:  " + ArtObject.entries.joinToString("  ·  ") { "${it.label} ${chosen[it].label}" },
+        Offset(size.width / 2f, 5.15f * scale))
     // Row 1: the six terrains with sample numbers.
     val terrains = listOf(Resource.WOOD to 5, Resource.BRICK to 6, Resource.SHEEP to 8, Resource.WHEAT to 9, Resource.ORE to 10, Resource.NONE to 0)
     val names = listOf("Forest", "Hills", "Pasture", "Fields", "Mountains", "Desert")
@@ -2361,6 +2387,10 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     }
     val robberAt = Offset(left + 5 * 2.05f * scale + 1.3f * scale, 7.0f * scale)
     if (bandit != null) drawBandit(bandit, robberAt - Offset(0f, 0.6f * scale), scale * 1.8f, 0.55f) else drawRobber(robberAt, scale * 1.5f)
+    // The Age of Chivalry Merchant, standing between the last town and the robber (#112).
+    val merchantAt = Offset(left + 10.6f * scale, 7.05f * scale)
+    drawMerchantToken(merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0])
+    label("Merchant", merchantAt + Offset(0f, 0.25f * scale))
     if (art == null) return
     /** Draws [b] [w] scale-units wide, centred on [c] (height from its aspect). */
     fun image(b: ImageBitmap, c: Offset, w: Float) {

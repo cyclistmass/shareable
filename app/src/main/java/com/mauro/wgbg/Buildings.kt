@@ -24,7 +24,7 @@ import kotlin.math.atan2
  * The rendered buildings (#41) loaded for one theme: per piece 8 tilt steps of a wood body (tinted to the
  * player's colour when drawn) and an untinted trim. Age of Chivalry pieces load only when [chivalry].
  */
-class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean) {
+class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean, knightsPirate: Boolean = pirate) {
     class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>)
 
     private fun load(res: Resources, p: BuildingArt.Piece) =
@@ -42,7 +42,7 @@ class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean) {
     /** The bell-buoy ports (PortArt.index order), 8 tilt steps each. */
     val ports: List<List<ImageBitmap>> = PortArt.TYPES.map { t -> t.map { ImageBitmap.imageResource(res, it) } }
     /** The 3D knights, levels 1 to 3 (Age of Chivalry only). */
-    val knights: List<Piece> = if (chivalry) KnightArt.levels(pirate).map { load(res, it) } else emptyList()
+    val knights: List<Piece> = if (chivalry) KnightArt.levels(knightsPirate).map { load(res, it) } else emptyList()
 
     /** The Capital for a metropolis on [track]: Guilds for trade, Crown for politics, Academy for science. */
     fun capital(track: Int): Piece? = capitals.getOrNull(capitalIndex(track))
