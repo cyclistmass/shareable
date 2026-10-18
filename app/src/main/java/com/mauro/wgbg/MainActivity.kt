@@ -996,7 +996,7 @@ fun WatchGameScreen(
     // A board card being aimed (Envoy, Abbot, Tinkerer...): its spots glow and a board tap picks one (Mauro, 2026-10-11).
     var cardPick by remember { mutableStateOf<List<Action>>(emptyList()) }
     var cardSecond by remember { mutableStateOf(false) }   // the Tinkerer's second tile
-    if (cardPick.isNotEmpty() && cardPick.any { it !in legal }) { cardPick = emptyList(); cardSecond = false } // the turn moved on
+    if (cardPick.isNotEmpty() && cardPick.any { asLegalPick(it) !in legal }) { cardPick = emptyList(); cardSecond = false } // the turn moved on
     val cardPickNow by rememberUpdatedState(cardPick)
     val cardSecondNow by rememberUpdatedState(cardSecond)
     // The build menu (right edge): a picked kind narrows the board to just its spots; it lets go when it can't be done.
@@ -1165,11 +1165,12 @@ fun WatchGameScreen(
                         val p = if (liveBoardNow && inventory) liveProjection(size.width.toFloat(), size.height.toFloat()).unproject(at)
                             else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at) else l.unproject(at)
                         val picking = cardPickNow.isNotEmpty()
-                        val moves = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow) else tapMoves(stateNow, boardLegalNow, legalNow, p, me, buildModeNow != null)
+                        val tapped = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow) else tapMoves(stateNow, boardLegalNow, legalNow, p, me, buildModeNow != null)
                         // The Tinkerer swaps two tiles: the first tap narrows to that tile's swaps, the second picks the other tile.
-                        if (picking && !cardSecondNow && moves.size > 1 && moves.all { it.a == wgbg.engine.Progress.INVENTOR }) {
-                            cardPick = moves; cardSecond = true; return@detectTapGestures
+                        if (picking && !cardSecondNow && tapped.size > 1 && tapped.all { it.a == wgbg.engine.Progress.INVENTOR }) {
+                            cardPick = tapped; cardSecond = true; return@detectTapGestures
                         }
+                        val moves = if (picking) tapped.map(::asLegalPick) else tapped   // a swap picked high tile first goes back to engine order
                         when {
                             moves.isNotEmpty() && moves == pending && moves.size == 1 -> {
                                 // The second tap places it: a firm confirm you can feel (#57).
@@ -1340,7 +1341,7 @@ fun WatchGameScreen(
                 ColorButton("Cancel", Color(0xFFC0392B), "card-pick-cancel") { cardPick = emptyList(); cardSecond = false }
             }
             else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
-                onBoardPick = { cardPick = it; cardSecond = false; pending = emptyList() },
+                onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
                 discardCause = tick.let {
                     if (tracker.turnCard == wgbg.engine.Progress.SABOTEUR && state.currentPlayer != me) "${names[state.currentPlayer]} played Wrecker against you" else null
                 },
@@ -1721,7 +1722,8 @@ internal data class PlayerInfo(
             val secret = me >= 0 && p != me && !s.isOver
             return PlayerInfo(
                 seat = p, turn = s.turn, active = !s.isOver && p == s.currentPlayer,
-                vp = if (secret) s.publicVictoryPoints(p) else s.victoryPoints(p), cards = s.handSize(p), dev = s.devCount(p),
+                vp = if (secret) s.publicVictoryPoints(p) else s.victoryPoints(p), cards = s.cardCount(p),   // commodities count too (report ALdrduT)
+                dev = s.devCount(p),
                 road = s.longestRoadOwner == p, army = s.largestArmyOwner == p, winner = s.winner == p,
                 hand = if (secret) emptyList() else List(RESOURCE_NAMES.size) { s.hand(p, it) },
             )

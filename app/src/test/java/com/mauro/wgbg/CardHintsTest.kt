@@ -36,11 +36,29 @@ class CardHintsTest {
     @Test
     fun `the Tinkerer picks two tiles - first tap narrows, second tap chooses`() {
         val swaps = listOf(Action.playProgress(Progress.INVENTOR, 2, 7), Action.playProgress(Progress.INVENTOR, 2, 11), Action.playProgress(Progress.INVENTOR, 4, 7))
-        assertEquals(setOf(2, 4), Targets.ofCards(swaps).hexes)
-        val first = movesAt(board, swaps, hexLattice(board, 2))
-        assertEquals(swaps.take(2), first)
+        val choices = pickChoices(swaps)
+        // Every tile in any swap glows for the first tap, the higher ones too (report 6akrzuq: "only highlights some").
+        assertEquals(setOf(2, 4, 7, 11), Targets.ofCards(choices).hexes)
+        val first = movesAt(board, choices, hexLattice(board, 2))
         assertEquals(setOf(7, 11), Targets.ofCards(first, second = true).hexes)
-        assertEquals(listOf(swaps[1]), movesAt(board, first, hexLattice(board, 11), second = true))
+        assertEquals(listOf(swaps[1]), movesAt(board, first, hexLattice(board, 11), second = true).map(::asLegalPick))
+        // Starting from the higher tile: 7 pairs with 2 and 4, and the pick comes back in the engine's order.
+        val fromSeven = movesAt(board, choices, hexLattice(board, 7))
+        assertEquals(setOf(2, 4), Targets.ofCards(fromSeven, second = true).hexes)
+        assertEquals(listOf(swaps[2]), movesAt(board, fromSeven, hexLattice(board, 4), second = true).map(::asLegalPick))
+    }
+
+    @Test
+    fun `a Tinkerer pick from a real game offers every movable tile and only legal swaps`() {
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 7)
+        val swaps = (0 until s.board.hexCount).flatMap { h1 -> (h1 + 1 until s.board.hexCount).map { h2 -> h1 to h2 } }
+            .filter { (h1, h2) -> s.numberAt(h1) != s.numberAt(h2) && Progress.inventorMovable(s.numberAt(h1)) && Progress.inventorMovable(s.numberAt(h2)) }
+            .map { (h1, h2) -> Action.playProgress(Progress.INVENTOR, h1, h2) }
+        val movable = (0 until s.board.hexCount).filter { Progress.inventorMovable(s.numberAt(it)) }.toSet()
+        assertEquals(movable, Targets.ofCards(pickChoices(swaps)).hexes)
+        // Whatever two tiles are tapped, in either order, the move sent is one the engine listed.
+        for (a in pickChoices(swaps)) assertTrue(asLegalPick(a) in swaps)
+        assertEquals(swaps, swaps.map(::asLegalPick))
     }
 
     @Test
