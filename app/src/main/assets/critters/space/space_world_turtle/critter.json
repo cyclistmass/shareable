@@ -1,0 +1,109 @@
+{
+  "id": "space_world_turtle",
+  "name": "World Turtle",
+  "model": "space_world_turtle.glb",
+  "length": 12.740000247955322,
+  "layer": "under",
+  "altitude": [
+    0,
+    0
+  ],
+  "zone": "anywhere",
+  "clear_of_coast": 0,
+  "movement": {
+    "speed": 0,
+    "turn": 0,
+    "bank": 0
+  },
+  "animations": [
+    {
+      "name": "idle",
+      "seconds": 4,
+      "mode": "loop"
+    },
+    {
+      "name": "move",
+      "seconds": 2,
+      "mode": "loop"
+    }
+  ],
+  "behavior": {
+    "pattern": "space-explicit",
+    "stages": [
+      {
+        "id": "idle",
+        "share": 70,
+        "seconds": [
+          8,
+          16
+        ],
+        "delta": [
+          0,
+          0,
+          0
+        ],
+        "anim": "idle",
+        "next": {
+          "idle": 1,
+          "move": 1
+        }
+      },
+      {
+        "id": "move",
+        "share": 30,
+        "seconds": [
+          4,
+          8
+        ],
+        "delta": [
+          0,
+          0,
+          0
+        ],
+        "anim": "move",
+        "next": {
+          "idle": 2,
+          "move": 1
+        }
+      }
+    ]
+  },
+  "count": [
+    1,
+    1
+  ],
+  "chance": 1,
+  "shadow": false,
+  "frames": {
+    "headings": 8,
+    "tilts": 8,
+    "size": 512,
+    "orthographic_scale": 16,
+    "tilt_formula": "55 * 0.96 * i / 7 degrees",
+    "heading_formula": "45 * h degrees; model faces +X",
+    "poses": [
+      {
+        "clip": "idle",
+        "count": 4,
+        "seconds": 4
+      },
+      {
+        "clip": "move",
+        "count": 4,
+        "seconds": 2
+      }
+    ],
+    "file": "{clip}{frame:02d}_h{heading}_t{tilt}.webp",
+    "layout": "individual square frames",
+    "anchor": [
+      256.0,
+      256.0
+    ],
+    "span": 16
+  },
+  "anchor": {
+    "at": "board-centre",
+    "heading": 0
+  },
+  "board_contact": "hold"
+}

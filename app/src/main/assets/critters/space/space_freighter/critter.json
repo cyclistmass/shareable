@@ -1,0 +1,104 @@
+{
+  "id": "space_freighter",
+  "name": "Deep Freighter",
+  "model": "space_freighter.glb",
+  "length": 1.1699999570846558,
+  "layer": "surface",
+  "altitude": [
+    0.04,
+    0.08
+  ],
+  "zone": "open-sea",
+  "clear_of_coast": 0.35,
+  "movement": {
+    "speed": 0.12,
+    "turn": 18,
+    "bank": 6
+  },
+  "animations": [
+    {
+      "name": "idle",
+      "seconds": 4,
+      "mode": "loop"
+    },
+    {
+      "name": "move",
+      "seconds": 2,
+      "mode": "loop"
+    }
+  ],
+  "behavior": {
+    "pattern": "space-explicit",
+    "stages": [
+      {
+        "id": "idle",
+        "share": 70,
+        "seconds": [
+          8,
+          16
+        ],
+        "delta": [
+          0,
+          0,
+          0
+        ],
+        "anim": "idle",
+        "next": {
+          "idle": 1,
+          "move": 1
+        }
+      },
+      {
+        "id": "move",
+        "share": 30,
+        "seconds": [
+          4,
+          8
+        ],
+        "delta": [
+          0.48,
+          0,
+          0
+        ],
+        "anim": "move",
+        "next": {
+          "idle": 2,
+          "move": 1
+        }
+      }
+    ]
+  },
+  "count": [
+    1,
+    2
+  ],
+  "chance": 1,
+  "shadow": true,
+  "frames": {
+    "headings": 8,
+    "tilts": 8,
+    "size": 192,
+    "orthographic_scale": 1.5,
+    "tilt_formula": "55 * 0.96 * i / 7 degrees",
+    "heading_formula": "45 * h degrees; model faces +X",
+    "poses": [
+      {
+        "clip": "idle",
+        "count": 4,
+        "seconds": 4
+      },
+      {
+        "clip": "move",
+        "count": 4,
+        "seconds": 2
+      }
+    ],
+    "file": "{clip}{frame:02d}_h{heading}_t{tilt}.webp",
+    "layout": "individual square frames",
+    "anchor": [
+      96.0,
+      96.0
+    ],
+    "span": 1.5
+  }
+}

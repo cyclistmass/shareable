@@ -9,7 +9,7 @@ Usage: py tools/import_tiles3d.py <folder with the V3 pngs>
 """
 import sys
 from pathlib import Path
-from PIL import Image
+from art_import import save_webp
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "app/src/main/res/drawable-nodpi"
@@ -28,7 +28,7 @@ for t in TERRAINS:
     names[t] = []
     for i in range(STEPS):
         name = f"t3d_{t}_tilt_{i}"
-        Image.open(SRC / f"{t}_V3_tilt_{i}.png").convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS).save(OUT / f"{name}.webp", quality=88, method=4)
+        save_webp(SRC / f"{t}_V3_tilt_{i}.png", OUT / f"{name}.webp", (SIZE, SIZE), quality=88)
         names[t].append(name)
 
 lines = [

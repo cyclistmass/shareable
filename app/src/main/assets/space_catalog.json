@@ -1,0 +1,2468 @@
+{
+  "source": "space-theme/manifest.json",
+  "tilts": 18,
+  "models": {
+    "tile_fleece": {
+      "path": "filament/space_tile_fleece.glb",
+      "source": "models3d/glb/algae_vats.glb",
+      "triangles": 1988,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 157044,
+      "sha256": "3a9e324e4bd0b072b9651317dc10aa9fa00e2b10d8eb4a22063f3ac32eb0df3e"
+    },
+    "tile_stone": {
+      "path": "filament/space_tile_stone.glb",
+      "source": "models3d/glb/asteroid_valley.glb",
+      "triangles": 1006,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 78412,
+      "sha256": "791b37098d5759d70a84e4c5471180915810bce000826420f1b1e61ef589afe8"
+    },
+    "card_card_back": {
+      "path": "filament/space_card_card_back.glb",
+      "source": "models3d/glb/card_card_back.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 45900,
+      "sha256": "535503fbc940a5d4a75a45a5ba9b5686bf764c97ade411ec87a6b7dc011e113a"
+    },
+    "card_cargo_audit": {
+      "path": "filament/space_card_cargo_audit.glb",
+      "source": "models3d/glb/card_cargo_audit.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 58248,
+      "sha256": "a45cff63c74c5df227a4b4586cb69e8f2ef234e60aec5f056172f6fbd273cac4"
+    },
+    "card_cargo_embargo": {
+      "path": "filament/space_card_cargo_embargo.glb",
+      "source": "models3d/glb/card_cargo_embargo.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 58360,
+      "sha256": "09fd2daf22d318f7f2a118610287809df8042c7b7208ae8dd6583ee5ae30d54e"
+    },
+    "card_core_cutters": {
+      "path": "filament/space_card_core_cutters.glb",
+      "source": "models3d/glb/card_core_cutters.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 48892,
+      "sha256": "7a74d5b1b55e389bde9f511ead7c54ea5ec969bb40548e94bd0133ed2aa773a3"
+    },
+    "card_crew_transfer": {
+      "path": "filament/space_card_crew_transfer.glb",
+      "source": "models3d/glb/card_crew_transfer.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 28928,
+      "sha256": "cca02c8e46d886669ab7442bfd57f9952a7f2d7425cce4508e992e0d9633e457"
+    },
+    "card_data_network_back": {
+      "path": "filament/space_card_data_network_back.glb",
+      "source": "models3d/glb/card_data_network_back.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 45500,
+      "sha256": "73cc6b596c7ae5ed928790ce28c3c0bc172a777bf021171da6f0a0316122fa29"
+    },
+    "card_data_slate": {
+      "path": "filament/space_card_data_slate.glb",
+      "source": "models3d/glb/card_data_slate.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 44008,
+      "sha256": "43cf85d4de01f27fdcb70a719244e0c7a1f8cf957b7e99325cfcbc9013a44253"
+    },
+    "card_dock_accord": {
+      "path": "filament/space_card_dock_accord.glb",
+      "source": "models3d/glb/card_dock_accord.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 37020,
+      "sha256": "2d76fcb716cc4a835069e2fd03ad62c18f01d9db49fa2385fa5392c6334e842b"
+    },
+    "card_drone_override": {
+      "path": "filament/space_card_drone_override.glb",
+      "source": "models3d/glb/card_drone_override.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 44328,
+      "sha256": "94462c99861931dc40a535712a00216dc18e472612d7297d45e542e342a52758"
+    },
+    "card_exchange_envoy": {
+      "path": "filament/space_card_exchange_envoy.glb",
+      "source": "models3d/glb/card_exchange_envoy.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 63840,
+      "sha256": "22e83f12d2edfc8325d0aac7a309cfe0b9df2e06502d7d3eb2cd9126cce51db1"
+    },
+    "card_ferry_lanes": {
+      "path": "filament/space_card_ferry_lanes.glb",
+      "source": "models3d/glb/card_ferry_lanes.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 26176,
+      "sha256": "5883949f581583036595b01d247c593eed5b1a247825c4f89f0d5656a4d989c6"
+    },
+    "card_field_promotion": {
+      "path": "filament/space_card_field_promotion.glb",
+      "source": "models3d/glb/card_field_promotion.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 28632,
+      "sha256": "62307a367d0d0a6449048fc34d219da4af414d820b8a1afaf865add5127ff7e1"
+    },
+    "card_free_orbits": {
+      "path": "filament/space_card_free_orbits.glb",
+      "source": "models3d/glb/card_free_orbits.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 61680,
+      "sha256": "d18314129e95ebb8a7dbf844c991eaf4058cf71446a8168b10387aa23ecd455a"
+    },
+    "card_full_hold": {
+      "path": "filament/space_card_full_hold.glb",
+      "source": "models3d/glb/card_full_hold.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 57036,
+      "sha256": "928aa08ff9bd8322ca7fe5b9eff4201c81a78007ac041db9ec036506bb853c63"
+    },
+    "card_glass_bamboo_fibre": {
+      "path": "filament/space_card_glass_bamboo_fibre.glb",
+      "source": "models3d/glb/card_glass_bamboo_fibre.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 61032,
+      "sha256": "ca352c26882c47b6a37a0377bfbe376b43f4ce585064cb80c1d8edbf2f378731"
+    },
+    "card_gravity_lift": {
+      "path": "filament/space_card_gravity_lift.glb",
+      "source": "models3d/glb/card_gravity_lift.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 32428,
+      "sha256": "02f4fe1084a61c1d6295909505babe4bc10e6195928004c7385b81063df4288f"
+    },
+    "card_habitat_upgrade": {
+      "path": "filament/space_card_habitat_upgrade.glb",
+      "source": "models3d/glb/card_habitat_upgrade.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 62168,
+      "sha256": "dcc712315589efbd8e5419c8c4e40a89fbf51edd8707bd462370ea2b3e700db8"
+    },
+    "card_jump_manifest": {
+      "path": "filament/space_card_jump_manifest.glb",
+      "source": "models3d/glb/card_jump_manifest.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 26608,
+      "sha256": "b65dd353b05202b0516a3eeb9f0d004894a9c6cd3321756d4748c1c27d0fd3f7"
+    },
+    "card_lane_redirect": {
+      "path": "filament/space_card_lane_redirect.glb",
+      "source": "models3d/glb/card_lane_redirect.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 26364,
+      "sha256": "60e311adda9214e7981413b161b456040a537ea7bb27029549f745c6dc3d7edd"
+    },
+    "card_lane_survey": {
+      "path": "filament/space_card_lane_survey.glb",
+      "source": "models3d/glb/card_lane_survey.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 26720,
+      "sha256": "11e4a21145fc05a2c6cb3f15bb369e5ad17b0f774c498a779789d414c6f94563"
+    },
+    "card_mushrooms": {
+      "path": "filament/space_card_mushrooms.glb",
+      "source": "models3d/glb/card_mushrooms.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 46060,
+      "sha256": "2d6f4bc22f73dcc17edeaef21f754a0086406b2314ba01bfa8cdf72016a3a45e"
+    },
+    "card_nano_alliance_back": {
+      "path": "filament/space_card_nano_alliance_back.glb",
+      "source": "models3d/glb/card_nano_alliance_back.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 57652,
+      "sha256": "4e8c351675b1751182ccd12e13824665513f4608ee33307125fd36cf87cc345d"
+    },
+    "card_nano_cloth": {
+      "path": "filament/space_card_nano_cloth.glb",
+      "source": "models3d/glb/card_nano_cloth.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 57164,
+      "sha256": "7e16822e564293990ecc6ce2e12faf267fdff322913ccc8a984cc01376df5767"
+    },
+    "card_new_horizon": {
+      "path": "filament/space_card_new_horizon.glb",
+      "source": "models3d/glb/card_new_horizon.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 61780,
+      "sha256": "850d55e7d72952d21a285f8adeee30b218dd541e75bd1378cf886a6a8024fcd1"
+    },
+    "card_nickel_iron": {
+      "path": "filament/space_card_nickel_iron.glb",
+      "source": "models3d/glb/card_nickel_iron.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 48764,
+      "sha256": "3ef31b0e8b7f1b31f13fc9842a6f0c9be90592e316b1ab2b1eaa4950e750a5d3"
+    },
+    "card_o2_canister": {
+      "path": "filament/space_card_o2_canister.glb",
+      "source": "models3d/glb/card_o2_canister.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 52072,
+      "sha256": "8537408e9efd04a14e26b84eaca253e55ef58e663e986e30b8e61ff2f028d30b"
+    },
+    "card_open_archive": {
+      "path": "filament/space_card_open_archive.glb",
+      "source": "models3d/glb/card_open_archive.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 44928,
+      "sha256": "6d0f73daa42fc720cd027c94a942d4cdb244c260109255e998f27b8111d701e0"
+    },
+    "card_orbit_calibrator": {
+      "path": "filament/space_card_orbit_calibrator.glb",
+      "source": "models3d/glb/card_orbit_calibrator.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 43780,
+      "sha256": "1580a52f57d494fbb0db3184dc20d7b4918097696809deec85cb3b61eb30adba"
+    },
+    "card_orbital_banquet": {
+      "path": "filament/space_card_orbital_banquet.glb",
+      "source": "models3d/glb/card_orbital_banquet.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 46500,
+      "sha256": "d391d2fad51adc259df025548f924b44883fdd86a18525ac6c8c18e94bc3e43e"
+    },
+    "card_platinum_coin": {
+      "path": "filament/space_card_platinum_coin.glb",
+      "source": "models3d/glb/card_platinum_coin.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 63256,
+      "sha256": "5cbdef329f5483dddf722256f9a69bbefeee5de4a9d3c43653b00a2286796f28"
+    },
+    "card_platinum_exchange_back": {
+      "path": "filament/space_card_platinum_exchange_back.glb",
+      "source": "models3d/glb/card_platinum_exchange_back.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 64176,
+      "sha256": "77985b59b833a62908b31a4e72a701455b602bb4c92db1241155059a49afd850"
+    },
+    "card_quiet_intercept": {
+      "path": "filament/space_card_quiet_intercept.glb",
+      "source": "models3d/glb/card_quiet_intercept.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 32504,
+      "sha256": "7a0e7fc2b5b788aedf6ec5c4dc5cff9ce3519e408f9eb238fbb075fe6f5a7aa0"
+    },
+    "card_ranger_rally": {
+      "path": "filament/space_card_ranger_rally.glb",
+      "source": "models3d/glb/card_ranger_rally.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 38504,
+      "sha256": "dc2fdd32562d6956485ddb523b646ad08e0f1964f6d5503673636879aae08441"
+    },
+    "card_rare_cargo": {
+      "path": "filament/space_card_rare_cargo.glb",
+      "source": "models3d/glb/card_rare_cargo.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 57420,
+      "sha256": "373415fa7b5042d362f8d916045f954eba274dc435caf6f11752e6d054c001e0"
+    },
+    "card_regolith_bricks": {
+      "path": "filament/space_card_regolith_bricks.glb",
+      "source": "models3d/glb/card_regolith_bricks.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 51036,
+      "sha256": "53f1b87198fb26c7afa28e6038a2217358893ef2d6a05e42651270ce81f908ae"
+    },
+    "card_shieldwright": {
+      "path": "filament/space_card_shieldwright.glb",
+      "source": "models3d/glb/card_shieldwright.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 47132,
+      "sha256": "262e7ac3335ee4e3a418ce8549ad3f0258e092cd234854bc9a9f271a3d326dcc"
+    },
+    "card_signal_listener": {
+      "path": "filament/space_card_signal_listener.glb",
+      "source": "models3d/glb/card_signal_listener.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 44544,
+      "sha256": "3942eb2fd72ab6c6a1e0d9acafafae049b2f9124a617793277e69529fcc607f6"
+    },
+    "card_signal_swap": {
+      "path": "filament/space_card_signal_swap.glb",
+      "source": "models3d/glb/card_signal_swap.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 36836,
+      "sha256": "b840965d241473e76769eec88dfa9a27f90414cbeca9f40e723460b94f83f130"
+    },
+    "card_space_marshal": {
+      "path": "filament/space_card_space_marshal.glb",
+      "source": "models3d/glb/card_space_marshal.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 28496,
+      "sha256": "529c5d4c06cd876c8fad70a1feb948c53159f77990449939dc0b9cd45bb666a6"
+    },
+    "card_spore_bloom": {
+      "path": "filament/space_card_spore_bloom.glb",
+      "source": "models3d/glb/card_spore_bloom.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 46332,
+      "sha256": "e5f02c38a6e554dfd036eaddd4eea36e140dbe7622168ce3fe8ffad1d23cd271"
+    },
+    "card_supply_signal": {
+      "path": "filament/space_card_supply_signal.glb",
+      "source": "models3d/glb/card_supply_signal.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 51752,
+      "sha256": "2a36cd924631f5405c8fb80dbe225b347d1127dd27d55f6679d979df1d66e4fc"
+    },
+    "card_trade_beacon": {
+      "path": "filament/space_card_trade_beacon.glb",
+      "source": "models3d/glb/card_trade_beacon.glb",
+      "triangles": 14,
+      "primitives": 2,
+      "textured": true,
+      "bytes": 43260,
+      "sha256": "cdfaef9e324d554592774d20745ab7e0eaaf1a6c397be33c4f9130521432a763"
+    },
+    "cliff": {
+      "path": "filament/space_cliff.glb",
+      "source": "models3d/glb/cliff_edge.glb",
+      "triangles": 144,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 11312,
+      "sha256": "1320bb1af81dcee920acbfe0f11a0866d0af768ae8aff2d56b37bf4e0875a5d2"
+    },
+    "tile_desert": {
+      "path": "filament/space_tile_desert.glb",
+      "source": "models3d/glb/dead_crater_field.glb",
+      "triangles": 956,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 69948,
+      "sha256": "15561a36b5f2e2048f25f6b67a6ee2090e3219dccb6fd6e3d613cb84c3d82055"
+    },
+    "die_coral": {
+      "path": "filament/space_die_coral.glb",
+      "source": "models3d/glb/die_coral.glb",
+      "triangles": 1632,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 111520,
+      "sha256": "e0cde3ac5fadca0b12ed76c0e2ec6036967acb851dc09cbc5d44c32d9a782887"
+    },
+    "die_coral_face_1": {
+      "path": "filament/space_die_coral_face_1.glb",
+      "source": "models3d/glb/die_coral_face_1.glb",
+      "triangles": 120,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 10856,
+      "sha256": "099d8d6f7b6e323a1ec0c4b6773e09ebd9509c62702cb1453f1d7a2ac5aaf8be"
+    },
+    "die_coral_face_2": {
+      "path": "filament/space_die_coral_face_2.glb",
+      "source": "models3d/glb/die_coral_face_2.glb",
+      "triangles": 180,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 14676,
+      "sha256": "a0b9deb5cdaad0532c5ad0e013fa1720054ce11490657124325ad9749238f1ff"
+    },
+    "die_coral_face_3": {
+      "path": "filament/space_die_coral_face_3.glb",
+      "source": "models3d/glb/die_coral_face_3.glb",
+      "triangles": 240,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 18492,
+      "sha256": "b591f55837c981931255f43420a4e5435c5365fd70ae6a83eed6573a3e7adc3e"
+    },
+    "die_coral_face_4": {
+      "path": "filament/space_die_coral_face_4.glb",
+      "source": "models3d/glb/die_coral_face_4.glb",
+      "triangles": 300,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 22308,
+      "sha256": "066d4b0a10ed1f50b2ffcf64b1db073e3d79cfe024b566e4d50b685ecdf733f2"
+    },
+    "die_coral_face_5": {
+      "path": "filament/space_die_coral_face_5.glb",
+      "source": "models3d/glb/die_coral_face_5.glb",
+      "triangles": 360,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 26124,
+      "sha256": "2658a2fe8c015131c1d3cc252212ba0cf0604b8d2dfdaa9862b52f40d8b923e1"
+    },
+    "die_coral_face_6": {
+      "path": "filament/space_die_coral_face_6.glb",
+      "source": "models3d/glb/die_coral_face_6.glb",
+      "triangles": 420,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 29944,
+      "sha256": "543f04fef618b80dbabe2182807f8848a8c41e367f387f3e4fff7768f93ad3a8"
+    },
+    "die_cream": {
+      "path": "filament/space_die_cream.glb",
+      "source": "models3d/glb/die_cream.glb",
+      "triangles": 1632,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 111520,
+      "sha256": "1ce1f96f67c03789712494f3c360a822fe64a42303a251d2c019b4585d15918f"
+    },
+    "die_cream_face_1": {
+      "path": "filament/space_die_cream_face_1.glb",
+      "source": "models3d/glb/die_cream_face_1.glb",
+      "triangles": 120,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 10856,
+      "sha256": "57a4c9cdd5538a0202352f1b0a8b78d3f455f3140b8016fc7d2948196a615493"
+    },
+    "die_cream_face_2": {
+      "path": "filament/space_die_cream_face_2.glb",
+      "source": "models3d/glb/die_cream_face_2.glb",
+      "triangles": 180,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 14676,
+      "sha256": "853c78cafae0cdab8375cc5b1e0833136b54d894993a3bbb910663c566c9ab3e"
+    },
+    "die_cream_face_3": {
+      "path": "filament/space_die_cream_face_3.glb",
+      "source": "models3d/glb/die_cream_face_3.glb",
+      "triangles": 240,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 18492,
+      "sha256": "090f196f345e13a39097979e53dcf102a4d1a6280516c09a72cbf9820272bdde"
+    },
+    "die_cream_face_4": {
+      "path": "filament/space_die_cream_face_4.glb",
+      "source": "models3d/glb/die_cream_face_4.glb",
+      "triangles": 300,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 22308,
+      "sha256": "b957b1df36bb14a71d8b48b7f848f3ade2f7068c5ec0555e6c85652ad41c8d29"
+    },
+    "die_cream_face_5": {
+      "path": "filament/space_die_cream_face_5.glb",
+      "source": "models3d/glb/die_cream_face_5.glb",
+      "triangles": 360,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 26124,
+      "sha256": "fe1561a5fe9b898c011da3a6894ea01a5bfcf24e7b3feed4d6256d7130196afb"
+    },
+    "die_cream_face_6": {
+      "path": "filament/space_die_cream_face_6.glb",
+      "source": "models3d/glb/die_cream_face_6.glb",
+      "triangles": 420,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 29944,
+      "sha256": "d40ff08610cdbb8794e720094ffb63b20ca50c81ef951764b70a9ec20ca321d6"
+    },
+    "die_event": {
+      "path": "filament/space_die_event.glb",
+      "source": "models3d/glb/die_event.glb",
+      "triangles": 926,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 73152,
+      "sha256": "a08226ad9281384088800df931edcf6621f933868bb99f9a6afc4432ebe63135"
+    },
+    "die_event_face_1": {
+      "path": "filament/space_die_event_face_1.glb",
+      "source": "models3d/glb/die_event_face_1.glb",
+      "triangles": 74,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 8128,
+      "sha256": "ba569eeb513ec2f713c3f6e22320be02d3cc96246fa7cdb0f2a33301b508be41"
+    },
+    "die_event_face_2": {
+      "path": "filament/space_die_event_face_2.glb",
+      "source": "models3d/glb/die_event_face_2.glb",
+      "triangles": 74,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 8128,
+      "sha256": "e192d8e251e3a951e611251859c7b9215739aca37c101c095c77fa28bdb60631"
+    },
+    "die_event_face_3": {
+      "path": "filament/space_die_event_face_3.glb",
+      "source": "models3d/glb/die_event_face_3.glb",
+      "triangles": 74,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 8128,
+      "sha256": "48932cce6b4d33e6424dac8b54fd07b7492680c141c16f71eca1fa700e768ebb"
+    },
+    "die_event_face_4": {
+      "path": "filament/space_die_event_face_4.glb",
+      "source": "models3d/glb/die_event_face_4.glb",
+      "triangles": 120,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 11720,
+      "sha256": "4f849856e7d7279994c3764fbe49158e2c2eefeb5145af595e298b5730f217e4"
+    },
+    "die_event_face_5": {
+      "path": "filament/space_die_event_face_5.glb",
+      "source": "models3d/glb/die_event_face_5.glb",
+      "triangles": 168,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 15468,
+      "sha256": "16241e8fd9597a05dd4dd323772ad9b4c3b30afa107d4692053205f504b70f6f"
+    },
+    "die_event_face_6": {
+      "path": "filament/space_die_event_face_6.glb",
+      "source": "models3d/glb/die_event_face_6.glb",
+      "triangles": 404,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 32440,
+      "sha256": "79359136b9427571136af9904d6f604fcbd79c7d6f34d464c28fe87ac2774c00"
+    },
+    "port_timber": {
+      "path": "filament/space_port_timber.glb",
+      "source": "models3d/glb/dock_glass_bamboo_fibre.glb",
+      "triangles": 1968,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 151952,
+      "sha256": "ecbe0068390251262ff27b308e374000297fb8d645f7090d36e593b6a6af2165"
+    },
+    "port_grain": {
+      "path": "filament/space_port_grain.glb",
+      "source": "models3d/glb/dock_mushrooms.glb",
+      "triangles": 936,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 74380,
+      "sha256": "ca7438013abbd43e20bfa56258c1f10aba1260ae21c2ca7e4b85b7903ab36622"
+    },
+    "port_stone": {
+      "path": "filament/space_port_stone.glb",
+      "source": "models3d/glb/dock_nickel_iron.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 42904,
+      "sha256": "b6a1302761e05d98d8ec456d932b6e480adadd5012a975f0c865670d085a2650"
+    },
+    "port_fleece": {
+      "path": "filament/space_port_fleece.glb",
+      "source": "models3d/glb/dock_o2_canister.glb",
+      "triangles": 952,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 75564,
+      "sha256": "65c09efd96222de452c9193627f0c18d2c4dccb38fa373ebae5423e42703a70f"
+    },
+    "port_clay": {
+      "path": "filament/space_port_clay.glb",
+      "source": "models3d/glb/dock_regolith_bricks.glb",
+      "triangles": 516,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 41840,
+      "sha256": "19af61f758138de4423887d664764dfbf7924b8636c042209d90174b1f0e887f"
+    },
+    "merchant": {
+      "path": "filament/space_merchant.glb",
+      "source": "models3d/glb/exchange_beacon.glb",
+      "triangles": 1332,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 97876,
+      "sha256": "9243afbe977439179403606d91c53512adf8515852edeaa7b6fd1850bf0e1fa8"
+    },
+    "freighter": {
+      "path": "filament/space_freighter.glb",
+      "source": "models3d/glb/freighter.glb",
+      "triangles": 364,
+      "primitives": 4,
+      "textured": false,
+      "bytes": 37816,
+      "sha256": "0168af2cb38213a9a7710efa72ec09e9a224dd57f82e936aae65fcc1658fe70a"
+    },
+    "tile_timber": {
+      "path": "filament/space_tile_timber.glb",
+      "source": "models3d/glb/glass_bamboo_grove.glb",
+      "triangles": 1460,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 106364,
+      "sha256": "80684c23014c106474abf92201abf4bc56f508a84b17c5f3c0aeb1d8c10c4dab"
+    },
+    "lantern_jellies": {
+      "path": "filament/space_lantern_jellies.glb",
+      "source": "models3d/glb/lantern_jellies.glb",
+      "triangles": 2280,
+      "primitives": 6,
+      "textured": false,
+      "bytes": 192012,
+      "sha256": "7a9f6fdfff34a5cb77a772e3e2738d6546f9ce4aa70a65fa2fe46e60c8b7a862"
+    },
+    "marker_corsair_advance": {
+      "path": "filament/space_marker_corsair_advance.glb",
+      "source": "models3d/glb/marker_corsair_advance.glb",
+      "triangles": 542,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 37832,
+      "sha256": "71db3fca1f1fbb413ab101385e8aafa9850f1262eb4a297d57679d8e8a89ff64"
+    },
+    "marker_ferry_network": {
+      "path": "filament/space_marker_ferry_network.glb",
+      "source": "models3d/glb/marker_ferry_network.glb",
+      "triangles": 512,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 35328,
+      "sha256": "f6bfd5b2b53aebe5625d35112e879ab62d7e7b0a6e6762fdd9cc13915ee2da2b"
+    },
+    "marker_flight_lead": {
+      "path": "filament/space_marker_flight_lead.glb",
+      "source": "models3d/glb/marker_flight_lead.glb",
+      "triangles": 471,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 32388,
+      "sha256": "af4dc6aa86d42c75ecb4513c282890b6ab279c9a614a6e1f08fff9b4a706bf15"
+    },
+    "marker_ranger_command": {
+      "path": "filament/space_marker_ranger_command.glb",
+      "source": "models3d/glb/marker_ranger_command.glb",
+      "triangles": 490,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 33628,
+      "sha256": "b8f80bd2d26dddcf03288cfa941c8282bacd74c58541f9ca82fe6c3fbdf5a921"
+    },
+    "tile_grain": {
+      "path": "filament/space_tile_grain.glb",
+      "source": "models3d/glb/mushroom_farm.glb",
+      "triangles": 2348,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 180256,
+      "sha256": "d87781cc259cd6eb1166c4ce045068235439c387851e9904c5908af7726f2710"
+    },
+    "mycelium_lane": {
+      "path": "filament/space_mycelium_lane.glb",
+      "source": "models3d/glb/mycelium_lane.glb",
+      "triangles": 76,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 7856,
+      "sha256": "ea52b4ce489c94a6c42f313d0d3a8da703db79732943e46df761cacff1f7f32b"
+    },
+    "number_10": {
+      "path": "filament/space_number_10.glb",
+      "source": "models3d/glb/number_10.glb",
+      "triangles": 604,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 40436,
+      "sha256": "6c934ae9a1e8235877632f4e08d4dc0a83c1b97ecab921025a4bcbc5eef15ea2"
+    },
+    "number_11": {
+      "path": "filament/space_number_11.glb",
+      "source": "models3d/glb/number_11.glb",
+      "triangles": 512,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33832,
+      "sha256": "ce6d82d77975416d67ae3a01202590aa936e83ede149090b496b1d9b80d71ce6"
+    },
+    "number_12": {
+      "path": "filament/space_number_12.glb",
+      "source": "models3d/glb/number_12.glb",
+      "triangles": 504,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33784,
+      "sha256": "e0e9c990a6261676370568d48f9ab58f6539e1f4852dc747d71146d79fb9e619"
+    },
+    "number_2": {
+      "path": "filament/space_number_2.glb",
+      "source": "models3d/glb/number_2.glb",
+      "triangles": 480,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 31912,
+      "sha256": "4c09c6813e772c452ae7ba6e8f6d3a931eb2445947809a2ebe14da76ce969f3e"
+    },
+    "number_3": {
+      "path": "filament/space_number_3.glb",
+      "source": "models3d/glb/number_3.glb",
+      "triangles": 524,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 34772,
+      "sha256": "c0a4ec5de50c07c227d05afda972ff29cf568dec76a0c8e1929e2250d0d62be9"
+    },
+    "number_4": {
+      "path": "filament/space_number_4.glb",
+      "source": "models3d/glb/number_4.glb",
+      "triangles": 556,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 36692,
+      "sha256": "c86fe33e3b8712b6647b7ebd21ce339674987d1d29d24238ffdfac89c54c60f2"
+    },
+    "number_5": {
+      "path": "filament/space_number_5.glb",
+      "source": "models3d/glb/number_5.glb",
+      "triangles": 612,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 40484,
+      "sha256": "6c8eeab7d412ff311175b4cfa97d9213fc8a0e4f7956355f7133b10ec29e486a"
+    },
+    "number_6": {
+      "path": "filament/space_number_6.glb",
+      "source": "models3d/glb/number_6.glb",
+      "triangles": 668,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 44276,
+      "sha256": "0812dbc7c9a5c1d2b875864fc15e09c93655e71f48877cefe5a25d6a1917dcd1"
+    },
+    "number_7": {
+      "path": "filament/space_number_7.glb",
+      "source": "models3d/glb/number_7.glb",
+      "triangles": 676,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 44324,
+      "sha256": "b92fe9dea8c72e3878b4084811e84d3f634c454b82f19ba711684cbb3ef2e8fd"
+    },
+    "number_8": {
+      "path": "filament/space_number_8.glb",
+      "source": "models3d/glb/number_8.glb",
+      "triangles": 680,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 45212,
+      "sha256": "20db52c95327acc018ebdaf1c97601067eb45422e9681a356960f8fab1c0392c"
+    },
+    "number_9": {
+      "path": "filament/space_number_9.glb",
+      "source": "models3d/glb/number_9.glb",
+      "triangles": 624,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 41420,
+      "sha256": "6b1015805d302296617e6e14bd6fe67d15b21942b3224c365b63cf5992e3ebbd"
+    },
+    "number_plate": {
+      "path": "filament/space_number_plate.glb",
+      "source": "models3d/glb/number_plate.glb",
+      "triangles": 376,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 24376,
+      "sha256": "61533be8a3cd957c8e3598634b0a9d670f03716a0f643dd1c10beb34736ad1cb"
+    },
+    "tile_clay": {
+      "path": "filament/space_tile_clay.glb",
+      "source": "models3d/glb/regolith_kilns.glb",
+      "triangles": 968,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 71620,
+      "sha256": "48041cfd2855a82e1592c7ae9bff24b65b56af0daeaa21fee515d913ccd3e0ed"
+    },
+    "raiders_ship": {
+      "path": "filament/space_raiders_ship.glb",
+      "source": "models3d/glb/rift_corsair.glb",
+      "triangles": 86,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 10104,
+      "sha256": "f037c7dfefa9b8bdda5cf3f329d6150fe733920d96b610579bcd04a82fee68f9"
+    },
+    "scene_card_back": {
+      "path": "filament/space_scene_card_back.glb",
+      "source": "models3d/glb/scene_card_back.glb",
+      "triangles": 1136,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 95012,
+      "sha256": "d8ce97c6fed35022becd3f06091f02d9f199a92993a34644f6087cf4a60f05c9"
+    },
+    "scene_cargo_audit": {
+      "path": "filament/space_scene_cargo_audit.glb",
+      "source": "models3d/glb/scene_cargo_audit.glb",
+      "triangles": 2690,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 208824,
+      "sha256": "3cec942925b07370b33e7eccc40ce0d3c128e1f4506ce02de60dc7e131afd346"
+    },
+    "scene_cargo_embargo": {
+      "path": "filament/space_scene_cargo_embargo.glb",
+      "source": "models3d/glb/scene_cargo_embargo.glb",
+      "triangles": 2690,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 208824,
+      "sha256": "01754687431cddb019ec23dcc0b128e3529ea5e03174d999f518fb86691eba22"
+    },
+    "scene_core_cutters": {
+      "path": "filament/space_scene_core_cutters.glb",
+      "source": "models3d/glb/scene_core_cutters.glb",
+      "triangles": 82,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 8068,
+      "sha256": "dcc60010a59278ad2d632d6f2cc5b78da9dabe71fb0f501855f38864bbeebd67"
+    },
+    "scene_crew_transfer": {
+      "path": "filament/space_scene_crew_transfer.glb",
+      "source": "models3d/glb/scene_crew_transfer.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 44360,
+      "sha256": "f9aa918261f7664c655fead8ad9067b080bc76fdefbeb0602f93454dfd38cf1c"
+    },
+    "scene_data_network_back": {
+      "path": "filament/space_scene_data_network_back.glb",
+      "source": "models3d/glb/scene_data_network_back.glb",
+      "triangles": 408,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33796,
+      "sha256": "554702bb632b29edb80aecc9ff696376aeade7e65ace2f9ee60fc68348469053"
+    },
+    "scene_data_slate": {
+      "path": "filament/space_scene_data_slate.glb",
+      "source": "models3d/glb/scene_data_slate.glb",
+      "triangles": 408,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33788,
+      "sha256": "e0886c52e7e2f149af4479bc131f90ad574fd785bba2c72ef809c21f5aff721e"
+    },
+    "scene_dock_accord": {
+      "path": "filament/space_scene_dock_accord.glb",
+      "source": "models3d/glb/scene_dock_accord.glb",
+      "triangles": 464,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 38068,
+      "sha256": "f0e8064f74190a292620143e269e2ea49d003329fcc4b26c5049654229555f63"
+    },
+    "scene_drone_override": {
+      "path": "filament/space_scene_drone_override.glb",
+      "source": "models3d/glb/scene_drone_override.glb",
+      "triangles": 1636,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 127192,
+      "sha256": "7b0cf1e27b6a18f4f5c53dff650d1612e42c7746a9eabd0389f691b59f1dae1e"
+    },
+    "scene_exchange_envoy": {
+      "path": "filament/space_scene_exchange_envoy.glb",
+      "source": "models3d/glb/scene_exchange_envoy.glb",
+      "triangles": 864,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 68184,
+      "sha256": "fc6a63768a5eef984de6d946e32be11f24250f5ebaf75643b38dea0b8087f675"
+    },
+    "scene_ferry_lanes": {
+      "path": "filament/space_scene_ferry_lanes.glb",
+      "source": "models3d/glb/scene_ferry_lanes.glb",
+      "triangles": 808,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 65200,
+      "sha256": "395803a61dfa5a0ac27e114c81f331ae110a511ad389276326eb7b7214ae51c7"
+    },
+    "scene_field_promotion": {
+      "path": "filament/space_scene_field_promotion.glb",
+      "source": "models3d/glb/scene_field_promotion.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 44364,
+      "sha256": "9be943ad24697cbcb8604ce7b03a2d203d5e532ba9e54588ef1661bc9c1021ba"
+    },
+    "scene_free_orbits": {
+      "path": "filament/space_scene_free_orbits.glb",
+      "source": "models3d/glb/scene_free_orbits.glb",
+      "triangles": 696,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 55888,
+      "sha256": "48e4571cdf615c2d22b61dc1fa14dc184527f514cd2cf90c26c8b9dce9364584"
+    },
+    "scene_full_hold": {
+      "path": "filament/space_scene_full_hold.glb",
+      "source": "models3d/glb/scene_full_hold.glb",
+      "triangles": 2690,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 208820,
+      "sha256": "a0404e717e8ff51fa4331e67216c58f4c9ea186187693ab06cdc4d2e4461c726"
+    },
+    "scene_glass_bamboo_fibre": {
+      "path": "filament/space_scene_glass_bamboo_fibre.glb",
+      "source": "models3d/glb/scene_glass_bamboo_fibre.glb",
+      "triangles": 1524,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 118088,
+      "sha256": "673083fd5d480d81c8674c09dffda5be9350d2dbdfa1b5be67c7cbac2e0ae657"
+    },
+    "scene_gravity_lift": {
+      "path": "filament/space_scene_gravity_lift.glb",
+      "source": "models3d/glb/scene_gravity_lift.glb",
+      "triangles": 116,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 11252,
+      "sha256": "56a694f045e5b168a5298f229f0d77561b1b58b1be77028b0bce87c0b5c290ec"
+    },
+    "scene_habitat_upgrade": {
+      "path": "filament/space_scene_habitat_upgrade.glb",
+      "source": "models3d/glb/scene_habitat_upgrade.glb",
+      "triangles": 696,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 55892,
+      "sha256": "617dc6bc6baa354935f2b600a995ab452952a70729482bc696893b524c7c0611"
+    },
+    "scene_jump_manifest": {
+      "path": "filament/space_scene_jump_manifest.glb",
+      "source": "models3d/glb/scene_jump_manifest.glb",
+      "triangles": 808,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 65200,
+      "sha256": "7feb40ea7d0858139ae6f02a59cdd0a93eec0bcdf14afe041cfe720aa694d8f6"
+    },
+    "scene_lane_redirect": {
+      "path": "filament/space_scene_lane_redirect.glb",
+      "source": "models3d/glb/scene_lane_redirect.glb",
+      "triangles": 808,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 65200,
+      "sha256": "8f2aa762fb6336024679c66f88aa2bfbc9d9bd8f1f44dc31ff478eaf2b5a0b34"
+    },
+    "scene_lane_survey": {
+      "path": "filament/space_scene_lane_survey.glb",
+      "source": "models3d/glb/scene_lane_survey.glb",
+      "triangles": 808,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 65200,
+      "sha256": "a88293ce85875c0e9d1cce54f559299e2b7f6cf74aa1038a2af537fc64b849ea"
+    },
+    "scene_mushrooms": {
+      "path": "filament/space_scene_mushrooms.glb",
+      "source": "models3d/glb/scene_mushrooms.glb",
+      "triangles": 492,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 40504,
+      "sha256": "ad0c4b096034d835dd67f4ed8becfdaddd5fae9e74450172acf49065c6cf7a62"
+    },
+    "scene_nano_alliance_back": {
+      "path": "filament/space_scene_nano_alliance_back.glb",
+      "source": "models3d/glb/scene_nano_alliance_back.glb",
+      "triangles": 948,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 73604,
+      "sha256": "b57c7401522c9f145c9f1a1b24f2f794fd442ea7df5db24547b238858d43ef71"
+    },
+    "scene_nano_cloth": {
+      "path": "filament/space_scene_nano_cloth.glb",
+      "source": "models3d/glb/scene_nano_cloth.glb",
+      "triangles": 948,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 73596,
+      "sha256": "25041480200a3b2775da28483dd06d01e47bef0c8884a5dc671dc74f880cadfa"
+    },
+    "scene_new_horizon": {
+      "path": "filament/space_scene_new_horizon.glb",
+      "source": "models3d/glb/scene_new_horizon.glb",
+      "triangles": 696,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 55888,
+      "sha256": "5ad7cd6854f95603b0fd1e9ac4125224343335ec36f198ddeb755ef17b77b5cc"
+    },
+    "scene_nickel_iron": {
+      "path": "filament/space_scene_nickel_iron.glb",
+      "source": "models3d/glb/scene_nickel_iron.glb",
+      "triangles": 82,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 8068,
+      "sha256": "cd2e445dd7bd8c46be629f02dfb9c584b45d4964272b8b28159dbcc86c1398ac"
+    },
+    "scene_o2_canister": {
+      "path": "filament/space_scene_o2_canister.glb",
+      "source": "models3d/glb/scene_o2_canister.glb",
+      "triangles": 508,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 41700,
+      "sha256": "90e23aa7eab7e65a5027d0f74e54a0d5c899a48bba2acca662cbd73960d07351"
+    },
+    "scene_open_archive": {
+      "path": "filament/space_scene_open_archive.glb",
+      "source": "models3d/glb/scene_open_archive.glb",
+      "triangles": 408,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33792,
+      "sha256": "b51989bb2f8894e0556f987452259585f99e2a47580b190044e94fd0d93b1f02"
+    },
+    "scene_orbit_calibrator": {
+      "path": "filament/space_scene_orbit_calibrator.glb",
+      "source": "models3d/glb/scene_orbit_calibrator.glb",
+      "triangles": 3264,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 220696,
+      "sha256": "73aae1307413506ba37a6f70dbb9cddcc1a9de4f3124b27e107ff3aa26be3c2d"
+    },
+    "scene_orbital_banquet": {
+      "path": "filament/space_scene_orbital_banquet.glb",
+      "source": "models3d/glb/scene_orbital_banquet.glb",
+      "triangles": 492,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 40508,
+      "sha256": "5576fe771049dc3c82f28df712d13380253bee994e7c0bdf74f78ca772b98dee"
+    },
+    "scene_platinum_coin": {
+      "path": "filament/space_scene_platinum_coin.glb",
+      "source": "models3d/glb/scene_platinum_coin.glb",
+      "triangles": 864,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 68184,
+      "sha256": "452b5b3583d70ca799649227704fcb6e5c16911a70acc62fbd812872866c5501"
+    },
+    "scene_platinum_exchange_back": {
+      "path": "filament/space_scene_platinum_exchange_back.glb",
+      "source": "models3d/glb/scene_platinum_exchange_back.glb",
+      "triangles": 864,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 68192,
+      "sha256": "022499e2847926f7862f10807ece34d9c3c96658c677fcf8a0eefe46cc013644"
+    },
+    "scene_quiet_intercept": {
+      "path": "filament/space_scene_quiet_intercept.glb",
+      "source": "models3d/glb/scene_quiet_intercept.glb",
+      "triangles": 86,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 10116,
+      "sha256": "c8e422a62d7fb5793d42d8a9db8deb8de63fec83c44ee49c4fea855082bd522f"
+    },
+    "scene_ranger_rally": {
+      "path": "filament/space_scene_ranger_rally.glb",
+      "source": "models3d/glb/scene_ranger_rally.glb",
+      "triangles": 1722,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 137664,
+      "sha256": "da557aeb2c9c711c55555dfdb08e1e976e33ea8edee061d6b62089dc32bf60e9"
+    },
+    "scene_rare_cargo": {
+      "path": "filament/space_scene_rare_cargo.glb",
+      "source": "models3d/glb/scene_rare_cargo.glb",
+      "triangles": 948,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 73596,
+      "sha256": "d1623e02701a6fe363fe323c0111478d95b52665005bd11e561fc4066e6b04d1"
+    },
+    "scene_regolith_bricks": {
+      "path": "filament/space_scene_regolith_bricks.glb",
+      "source": "models3d/glb/scene_regolith_bricks.glb",
+      "triangles": 72,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 7004,
+      "sha256": "ce807b9f1b4b2a41333813ae4cd5c564a2836aaddb033d96a19b9f3f7b3c5f24"
+    },
+    "scene_shieldwright": {
+      "path": "filament/space_scene_shieldwright.glb",
+      "source": "models3d/glb/scene_shieldwright.glb",
+      "triangles": 1200,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 96932,
+      "sha256": "86497e04d0f9ff23f79d0c2f66c922a134ed564348135a41150ce32f3ecf0ede"
+    },
+    "scene_signal_listener": {
+      "path": "filament/space_scene_signal_listener.glb",
+      "source": "models3d/glb/scene_signal_listener.glb",
+      "triangles": 408,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 33796,
+      "sha256": "0902466319b911c0d40924df5bf7d70d4236b3a0bc5c187f1cda503c477a67d3"
+    },
+    "scene_signal_swap": {
+      "path": "filament/space_scene_signal_swap.glb",
+      "source": "models3d/glb/scene_signal_swap.glb",
+      "triangles": 1236,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 80524,
+      "sha256": "d447de84408036229484b3f3cdca050e31d95cfdcb6a0ef48dc4dde077638b53"
+    },
+    "scene_space_marshal": {
+      "path": "filament/space_scene_space_marshal.glb",
+      "source": "models3d/glb/scene_space_marshal.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 44360,
+      "sha256": "314cbfafe36a02d1449a4ad0f5e9d02bc72138d4d137c0cfc2e8eb424c919397"
+    },
+    "scene_spore_bloom": {
+      "path": "filament/space_scene_spore_bloom.glb",
+      "source": "models3d/glb/scene_spore_bloom.glb",
+      "triangles": 492,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 40504,
+      "sha256": "1b4c493495f0ed9d25bfe151bc4b0952bac5691be794a08f27aad2590fc25c6a"
+    },
+    "scene_supply_signal": {
+      "path": "filament/space_scene_supply_signal.glb",
+      "source": "models3d/glb/scene_supply_signal.glb",
+      "triangles": 508,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 41704,
+      "sha256": "554b0276acf4c429277f46da7bdc5b194654ff93ff89392203da74f3c6981fc6"
+    },
+    "scene_trade_beacon": {
+      "path": "filament/space_scene_trade_beacon.glb",
+      "source": "models3d/glb/scene_trade_beacon.glb",
+      "triangles": 3006,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 233180,
+      "sha256": "f12e38b3d1599eabcbcb1e228ef9240f95f544a098ddb82bd0a9d14d43bbfa93"
+    },
+    "ramparts_h1": {
+      "path": "filament/space_ramparts_h1.glb",
+      "source": "models3d/glb/shield_pylon_1.glb",
+      "triangles": 624,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 51996,
+      "sha256": "5c499c1da63a176531cf57683577703e94370028a76535be617030a5beddf90b"
+    },
+    "ramparts_h2": {
+      "path": "filament/space_ramparts_h2.glb",
+      "source": "models3d/glb/shield_pylon_2.glb",
+      "triangles": 912,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 74464,
+      "sha256": "d81ba927deb20e7e745ff1fd07f410f6266c52347b6dfbc8149865e45035eddb"
+    },
+    "ramparts_h3": {
+      "path": "filament/space_ramparts_h3.glb",
+      "source": "models3d/glb/shield_pylon_3.glb",
+      "triangles": 1200,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 96928,
+      "sha256": "f08c4d2163c61f2ee225306ab21fbaf704eaf9fc0bf609533b472798c6a98213"
+    },
+    "shuttle": {
+      "path": "filament/space_shuttle.glb",
+      "source": "models3d/glb/shuttle.glb",
+      "triangles": 148,
+      "primitives": 2,
+      "textured": false,
+      "bytes": 20444,
+      "sha256": "caca0ea945ef08a2303b12cba339755da705468c6133cb9a061186390723ac64"
+    },
+    "bandit": {
+      "path": "filament/space_bandit.glb",
+      "source": "models3d/glb/space_bandit.glb",
+      "triangles": 1636,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 127444,
+      "sha256": "e2331c20c317f9362e1803406a124434ba618547a6a902a21ccaca74fd762267"
+    },
+    "boat": {
+      "path": "filament/space_boat.glb",
+      "source": "models3d/glb/space_boat.glb",
+      "triangles": 494,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 39676,
+      "sha256": "9f137e214c166fbf478a6a7ae5ae95adb28ce54d00a85840d04fe049350cf3ec"
+    },
+    "capital_academy": {
+      "path": "filament/space_capital_academy.glb",
+      "source": "models3d/glb/space_capital_academy.glb",
+      "triangles": 696,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 56188,
+      "sha256": "56725d8ddf5cb643f7cbab4fb4ff1e193dda5ad045fe940d5e71d1c7a230220c"
+    },
+    "capital_crown": {
+      "path": "filament/space_capital_crown.glb",
+      "source": "models3d/glb/space_capital_crown.glb",
+      "triangles": 736,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 59880,
+      "sha256": "369a6a56f5e1d07c0ea2f9d8804a41b371d72bec94a96c5f15b46df1e19a76ff"
+    },
+    "capital_guilds": {
+      "path": "filament/space_capital_guilds.glb",
+      "source": "models3d/glb/space_capital_guilds.glb",
+      "triangles": 640,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 52392,
+      "sha256": "fc84a35fa511c8d01504250e87405ffde488a158a241f79c759abec59be193ce"
+    },
+    "homestead": {
+      "path": "filament/space_homestead.glb",
+      "source": "models3d/glb/space_homestead.glb",
+      "triangles": 194,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 17812,
+      "sha256": "b503f83e3c67ba2b3553121e35dae4991aa20305183649b149f7d1786339d96b"
+    },
+    "knight_l1_active": {
+      "path": "filament/space_knight_l1_active.glb",
+      "source": "models3d/glb/space_knight_l1.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 44356,
+      "sha256": "0143713070ad37a6579195dfd3c74cf74e361e25ef57d53ace2c1ea9703ce9d9"
+    },
+    "knight_l1_inactive": {
+      "path": "filament/space_knight_l1_inactive.glb",
+      "source": "models3d/glb/space_knight_l1_inactive.glb",
+      "triangles": 526,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 44368,
+      "sha256": "6e6b42b550714f1e945d52df37881b359219110105f9257288d161fffa81d5b1"
+    },
+    "knight_l2_active": {
+      "path": "filament/space_knight_l2_active.glb",
+      "source": "models3d/glb/space_knight_l2.glb",
+      "triangles": 1100,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 89136,
+      "sha256": "e5bdb88fabe34a71123f92ae8c90e077e7e6893c37f13e62b9630486b563f99b"
+    },
+    "knight_l2_inactive": {
+      "path": "filament/space_knight_l2_inactive.glb",
+      "source": "models3d/glb/space_knight_l2_inactive.glb",
+      "triangles": 1100,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 89148,
+      "sha256": "55d6e006818b95cabfaa9fb3d6026dd7582ef4f3978ff7299f21362eb2776ab7"
+    },
+    "knight_l3_active": {
+      "path": "filament/space_knight_l3_active.glb",
+      "source": "models3d/glb/space_knight_l3.glb",
+      "triangles": 1722,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 137664,
+      "sha256": "91502f1e5245b745c6149150f33a42c2c62a65df05b30bbf89925e426718d08f"
+    },
+    "knight_l3_inactive": {
+      "path": "filament/space_knight_l3_inactive.glb",
+      "source": "models3d/glb/space_knight_l3_inactive.glb",
+      "triangles": 1722,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 137676,
+      "sha256": "8cf1a53993272009228286da1aaa73dbf8ef6d5a83b7606b4c8ca44428c9ef1d"
+    },
+    "port_2to1": {
+      "path": "filament/space_port_2to1.glb",
+      "source": "models3d/glb/space_port_2to1.glb",
+      "triangles": 444,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 36324,
+      "sha256": "ea88891cedb44a501e950047767f9eee2012dc2320ea31abe2f6438fe316ce4b"
+    },
+    "port_3to1": {
+      "path": "filament/space_port_3to1.glb",
+      "source": "models3d/glb/space_port_3to1.glb",
+      "triangles": 464,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 38192,
+      "sha256": "6e34b5902154649fe78520143ab2760b506dee4cea0178f790f3cba07d13e808"
+    },
+    "ramparts": {
+      "path": "filament/space_ramparts.glb",
+      "source": "models3d/glb/space_ramparts.glb",
+      "triangles": 976,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 79724,
+      "sha256": "159d75735435b7572e547314f56b11933345df4793d2137b87e21e100061c4b7"
+    },
+    "road_m30": {
+      "path": "filament/space_road_m30.glb",
+      "source": "models3d/glb/space_road_m30.glb",
+      "triangles": 384,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 33104,
+      "sha256": "46c4c892af380cae83f49c4d00fd173adeaac9d3247727857614b9e79a14758c"
+    },
+    "road_p30": {
+      "path": "filament/space_road_p30.glb",
+      "source": "models3d/glb/space_road_p30.glb",
+      "triangles": 384,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 33104,
+      "sha256": "422741641b366e62a84b63d6858198425cc7d01840dcf71c8036030cbb473a93"
+    },
+    "road_v": {
+      "path": "filament/space_road_v.glb",
+      "source": "models3d/glb/space_road_v.glb",
+      "triangles": 384,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 33108,
+      "sha256": "1d7b3570346d5e99fa820636dddd4709d3041f1773a5e4b4913dd38a6e84bd08"
+    },
+    "town": {
+      "path": "filament/space_town.glb",
+      "source": "models3d/glb/space_town.glb",
+      "triangles": 492,
+      "primitives": 3,
+      "textured": false,
+      "bytes": 40252,
+      "sha256": "26e8c51e455b7496e00500e74847e4ddf4f7f0bc791035a6f6cd2d4818a2ffc8"
+    },
+    "star_whale": {
+      "path": "filament/space_star_whale.glb",
+      "source": "models3d/glb/star_whale.glb",
+      "triangles": 1558,
+      "primitives": 4,
+      "textured": false,
+      "bytes": 139208,
+      "sha256": "20a10964c642170bbaf8198c039af5595c6ff97b6a016e002c8afbeef0ee26c4"
+    },
+    "sea": {
+      "path": "filament/space_sea.glb",
+      "source": "models3d/glb/starfield.glb",
+      "triangles": 652,
+      "primitives": 1,
+      "textured": false,
+      "bytes": 52176,
+      "sha256": "5d9c7f80aab4ade56ea071795db11c9ad4eca7858d4eed7b695acf2e9d422cd1"
+    },
+    "world_turtle": {
+      "path": "filament/space_world_turtle.glb",
+      "source": "models3d/glb/world_turtle.glb",
+      "triangles": 1996,
+      "primitives": 6,
+      "textured": false,
+      "bytes": 162004,
+      "sha256": "5e47917adc8983f213b5fe30a2293e82c904300e8234057d9fb8266c52cc99f8"
+    }
+  },
+  "sprites": [
+    {
+      "role": "tile_fleece",
+      "prefix": "space_tile_fleece",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "tile_stone",
+      "prefix": "space_tile_stone",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "cliff",
+      "prefix": "space_cliff",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "tile_desert",
+      "prefix": "space_tile_desert",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral",
+      "prefix": "space_die_coral",
+      "frame": 1.65,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_1",
+      "prefix": "space_die_coral_face_1",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_2",
+      "prefix": "space_die_coral_face_2",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_3",
+      "prefix": "space_die_coral_face_3",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_4",
+      "prefix": "space_die_coral_face_4",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_5",
+      "prefix": "space_die_coral_face_5",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_coral_face_6",
+      "prefix": "space_die_coral_face_6",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream",
+      "prefix": "space_die_cream",
+      "frame": 1.65,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_1",
+      "prefix": "space_die_cream_face_1",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_2",
+      "prefix": "space_die_cream_face_2",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_3",
+      "prefix": "space_die_cream_face_3",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_4",
+      "prefix": "space_die_cream_face_4",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_5",
+      "prefix": "space_die_cream_face_5",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_cream_face_6",
+      "prefix": "space_die_cream_face_6",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event",
+      "prefix": "space_die_event",
+      "frame": 1.65,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_1",
+      "prefix": "space_die_event_face_1",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_2",
+      "prefix": "space_die_event_face_2",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_3",
+      "prefix": "space_die_event_face_3",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_4",
+      "prefix": "space_die_event_face_4",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_5",
+      "prefix": "space_die_event_face_5",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "die_event_face_6",
+      "prefix": "space_die_event_face_6",
+      "frame": 0.72,
+      "contact": 0,
+      "tintable": false,
+      "size": 192,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_timber",
+      "prefix": "space_port_timber",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_grain",
+      "prefix": "space_port_grain",
+      "frame": 1.5,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_stone",
+      "prefix": "space_port_stone",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_fleece",
+      "prefix": "space_port_fleece",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_clay",
+      "prefix": "space_port_clay",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "merchant",
+      "prefix": "space_merchant",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "tile_timber",
+      "prefix": "space_tile_timber",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "marker_corsair_advance",
+      "prefix": "space_marker_corsair_advance",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "marker_ferry_network",
+      "prefix": "space_marker_ferry_network",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "marker_flight_lead",
+      "prefix": "space_marker_flight_lead",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "marker_ranger_command",
+      "prefix": "space_marker_ranger_command",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "tile_grain",
+      "prefix": "space_tile_grain",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "mycelium_lane",
+      "prefix": "space_mycelium_lane",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_10",
+      "prefix": "space_number_10",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_11",
+      "prefix": "space_number_11",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_12",
+      "prefix": "space_number_12",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_2",
+      "prefix": "space_number_2",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_3",
+      "prefix": "space_number_3",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_4",
+      "prefix": "space_number_4",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_5",
+      "prefix": "space_number_5",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_6",
+      "prefix": "space_number_6",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_7",
+      "prefix": "space_number_7",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_8",
+      "prefix": "space_number_8",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_9",
+      "prefix": "space_number_9",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "number_plate",
+      "prefix": "space_number_plate",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": false,
+      "size": 256,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "tile_clay",
+      "prefix": "space_tile_clay",
+      "frame": 2.65,
+      "contact": 0.22,
+      "tintable": false,
+      "size": 384,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    },
+    {
+      "role": "raiders_ship",
+      "prefix": "space_raiders_ship",
+      "frame": 1.4,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "ramparts_h1",
+      "prefix": "space_ramparts_h1",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "ramparts_h2",
+      "prefix": "space_ramparts_h2",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "ramparts_h3",
+      "prefix": "space_ramparts_h3",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "bandit",
+      "prefix": "space_bandit",
+      "frame": 2.65,
+      "contact": 0,
+      "tintable": true,
+      "size": 384,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "boat",
+      "prefix": "space_boat",
+      "frame": 1.08,
+      "contact": 0,
+      "tintable": true,
+      "size": 192,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "capital_academy",
+      "prefix": "space_capital_academy",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "capital_crown",
+      "prefix": "space_capital_crown",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "capital_guilds",
+      "prefix": "space_capital_guilds",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "homestead",
+      "prefix": "space_homestead",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l1_active",
+      "prefix": "space_knight_l1_active",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l1_inactive",
+      "prefix": "space_knight_l1_inactive",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l2_active",
+      "prefix": "space_knight_l2_active",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l2_inactive",
+      "prefix": "space_knight_l2_inactive",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l3_active",
+      "prefix": "space_knight_l3_active",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "knight_l3_inactive",
+      "prefix": "space_knight_l3_inactive",
+      "frame": 1.3,
+      "contact": 0,
+      "tintable": true,
+      "size": 512,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_2to1",
+      "prefix": "space_port_2to1",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "port_3to1",
+      "prefix": "space_port_3to1",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "ramparts",
+      "prefix": "space_ramparts",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "road_m30",
+      "prefix": "space_road_m30",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "road_p30",
+      "prefix": "space_road_p30",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "road_v",
+      "prefix": "space_road_v",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "town",
+      "prefix": "space_town",
+      "frame": 1.325,
+      "contact": 0,
+      "tintable": true,
+      "size": 256,
+      "layers": [
+        "body",
+        "trim",
+        "shadow"
+      ]
+    },
+    {
+      "role": "sea",
+      "prefix": "space_sea",
+      "frame": 12,
+      "contact": 0,
+      "tintable": false,
+      "size": 768,
+      "layers": [
+        "full",
+        "shadow"
+      ]
+    }
+  ],
+  "cards": {
+    "o2_canister": "space_card_o2_canister",
+    "mushrooms": "space_card_mushrooms",
+    "nickel_iron": "space_card_nickel_iron",
+    "glass_bamboo_fibre": "space_card_glass_bamboo_fibre",
+    "regolith_bricks": "space_card_regolith_bricks",
+    "data_slate": "space_card_data_slate",
+    "nano_cloth": "space_card_nano_cloth",
+    "platinum_coin": "space_card_platinum_coin",
+    "data_network_back": "space_card_data_network_back",
+    "nano_alliance_back": "space_card_nano_alliance_back",
+    "platinum_exchange_back": "space_card_platinum_exchange_back",
+    "space_marshal": "space_card_space_marshal",
+    "new_horizon": "space_card_new_horizon",
+    "ferry_lanes": "space_card_ferry_lanes",
+    "full_hold": "space_card_full_hold",
+    "trade_beacon": "space_card_trade_beacon",
+    "card_back": "space_card_card_back",
+    "orbit_calibrator": "space_card_orbit_calibrator",
+    "gravity_lift": "space_card_gravity_lift",
+    "shieldwright": "space_card_shieldwright",
+    "signal_swap": "space_card_signal_swap",
+    "spore_bloom": "space_card_spore_bloom",
+    "habitat_upgrade": "space_card_habitat_upgrade",
+    "core_cutters": "space_card_core_cutters",
+    "open_archive": "space_card_open_archive",
+    "lane_survey": "space_card_lane_survey",
+    "field_promotion": "space_card_field_promotion",
+    "dock_accord": "space_card_dock_accord",
+    "cargo_audit": "space_card_cargo_audit",
+    "exchange_envoy": "space_card_exchange_envoy",
+    "jump_manifest": "space_card_jump_manifest",
+    "supply_signal": "space_card_supply_signal",
+    "rare_cargo": "space_card_rare_cargo",
+    "drone_override": "space_card_drone_override",
+    "free_orbits": "space_card_free_orbits",
+    "crew_transfer": "space_card_crew_transfer",
+    "lane_redirect": "space_card_lane_redirect",
+    "quiet_intercept": "space_card_quiet_intercept",
+    "cargo_embargo": "space_card_cargo_embargo",
+    "signal_listener": "space_card_signal_listener",
+    "ranger_rally": "space_card_ranger_rally",
+    "orbital_banquet": "space_card_orbital_banquet"
+  },
+  "critters": [
+    "critters/space/space_freighter",
+    "critters/space/space_lantern_jellies",
+    "critters/space/space_shuttle",
+    "critters/space/space_star_whale",
+    "critters/space/space_world_turtle"
+  ]
+}
