@@ -65,8 +65,11 @@ private fun dicePixels(density: androidx.compose.ui.unit.Density, sideDp: Int) =
 internal fun rememberDiceBitmap(id: Int, sideDp: Int): ImageBitmap? {
     val resources = LocalContext.current.resources
     val pixels = dicePixels(androidx.compose.ui.platform.LocalDensity.current, sideDp)
-    val image = androidx.compose.runtime.produceState(DiceImages.cached(id, pixels), resources, id, pixels) {
-        if (value == null) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { DiceImages.load(resources, id, pixels) }
+    // Keyed state, not produceState: produceState keeps its old value when the key changes, so a new roll's die showed
+    // the last roll's face, and with a non-null old face it never loaded the new one (report Q8MX2, 0.3.0).
+    val image = androidx.compose.runtime.remember(resources, id, pixels) { androidx.compose.runtime.mutableStateOf(DiceImages.cached(id, pixels)) }
+    androidx.compose.runtime.LaunchedEffect(image) {
+        if (image.value == null) image.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { DiceImages.load(resources, id, pixels) }
     }
     return image.value
 }
@@ -77,8 +80,10 @@ internal fun rememberDiceFrames(ids: List<Int>, sideDp: Int): List<ImageBitmap> 
     val resources = LocalContext.current.resources
     val pixels = dicePixels(androidx.compose.ui.platform.LocalDensity.current, sideDp)
     fun ready() = ids.map { DiceImages.cached(it, pixels) }.takeIf { l -> l.all { it != null } }?.map { it!! } ?: emptyList()
-    val frames = androidx.compose.runtime.produceState(ready(), resources, ids, pixels) {
-        if (value.isEmpty() && ids.isNotEmpty()) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+    // Keyed like rememberDiceBitmap, so a theme change never tumbles the old theme's frames.
+    val frames = androidx.compose.runtime.remember(resources, ids, pixels) { androidx.compose.runtime.mutableStateOf(ready()) }
+    androidx.compose.runtime.LaunchedEffect(frames) {
+        if (frames.value.isEmpty() && ids.isNotEmpty()) frames.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val loaded = ids.map { DiceImages.load(resources, it, pixels) }
             if (loaded.all { it != null }) loaded.map { it!! } else emptyList()
         }

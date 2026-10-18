@@ -17,7 +17,7 @@ while [ $SECONDS -lt $end ]; do
     [[ $line == *WGBG-TURN* && $line != "$last" ]] && { last=$line; moved=$SECONDS; }
   fi
   if [ $((SECONDS-moved)) -ge $stall ]; then
-    shot="${TMPDIR:-/tmp}/play_to_end_stuck.png"
+    shot="${OUT:-.}/play_to_end_stuck.png" # the working dir, like turnstream.sh: CI uploads *.png from there
     echo "STUCK: no new turn for ${stall}s. device=$($A get-state 2>&1) app_pid=$($A shell pidof com.mauro.wgbg)"
     echo "last line: ${last:0:300}"
     $A shell screencap -p /sdcard/stuck.png && $A pull /sdcard/stuck.png "$shot" >/dev/null && echo "screenshot: $shot"

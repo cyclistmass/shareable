@@ -86,7 +86,6 @@ class TurnTracker(private val names: List<String>) {
         }
         val owner = s.currentPlayer
         val held = holdings(s)
-        val before = s.hands.copyOf()
         val phaseBefore = s.phase
         var d1 = 0
         var d2 = 0
@@ -107,8 +106,12 @@ class TurnTracker(private val names: List<String>) {
             ev = s.rng.copy().nextInt(6)
         }
         applyFn()
-        noteHits(s, owner, who, action, held, holdings(s), phaseBefore)
-        val gained = Array(s.numPlayers) { p -> IntArray(CARD_TYPES) { r -> s.hands[p * CARD_TYPES + r] - before[p * CARD_TYPES + r] } }
+        val heldAfter = holdings(s)
+        noteHits(s, owner, who, action, held, heldAfter, phaseBefore)
+        // Every card kind the hand holds, commodities too: with resources only, a discarded, stolen or traded commodity
+        // never showed (reports Mnmfs73, jpRLBzr, 0.3.0: "not showing Commodities that were discarded").
+        val kinds = if (s.ck != null) wgbg.engine.CK_CARD_TYPES else CARD_TYPES
+        val gained = Array(s.numPlayers) { p -> IntArray(kinds) { c -> heldAfter[p][c] - held[p][c] } }
         val r = current!!
         val n = names[who]
         if ((action.type == ActionType.ROLL || alchemist) && d1 > 0) { rollCounts[(d1 + d2).coerceIn(2, 12)]++; if (ev in 0..5) eventCounts[ev]++ }
@@ -116,7 +119,7 @@ class TurnTracker(private val names: List<String>) {
             alchemist || action.type == ActionType.ROLL -> r.copy(
                 die1 = d1, die2 = d2, event = ev,
                 rollIn = gained.map { g -> IntArray(g.size) { maxOf(0, g[it]) } },
-                rollOut = List(s.numPlayers) { IntArray(CARD_TYPES) },
+                rollOut = List(s.numPlayers) { IntArray(kinds) },
                 production = if (d1 + d2 == 7) listOf("Bandit! Players over the limit must discard.")
                 else (0 until s.numPlayers).mapNotNull { p -> changes(gained[p])?.let { "${names[p]} $it" } }
                     .ifEmpty { listOf("Nobody produced anything.") },
@@ -130,7 +133,7 @@ class TurnTracker(private val names: List<String>) {
                 r.plus(if (victim >= 0) "$n moved the bandit and took a card from ${names[victim]}" else "$n moved the bandit")
                     .let { if (victim >= 0 && card >= 0) it.copy(steal = Steal(who, victim, card)) else it }
             }
-            action.type == ActionType.DISCARD -> r.plus("$n discarded " + gained[who].withIndex().filter { it.value < 0 }.joinToString(", ") { "${-it.value} ${RESOURCE_NAMES[it.index]}" })
+            action.type == ActionType.DISCARD -> r.plus("$n discarded " + gained[who].withIndex().filter { it.value < 0 }.joinToString(", ") { "${-it.value} ${ALL_CARD_NAMES[it.index]}" })
                 .let { rep -> if (rep.rollOut.size > who) rep.copy(rollOut = rep.rollOut.mapIndexed { p, out -> if (p != who) out else IntArray(out.size) { out[it] + maxOf(0, -gained[who][it]) } }) else rep }
             action.type == ActionType.MARITIME_TRADE -> r.plus("$n traded with the bank: ${tradeText(gained[who])}")
             action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.CkActionType.OFFER_TRADE_CK -> r.plus("$n offered a trade")
@@ -186,11 +189,11 @@ class TurnTracker(private val names: List<String>) {
 
     /** "+2 Timber, +1 Grain" for the positive entries, null if none. */
     private fun changes(delta: IntArray): String? =
-        delta.withIndex().filter { it.value > 0 }.joinToString(", ") { "+${it.value} ${RESOURCE_NAMES[it.index]}" }.ifEmpty { null }
+        delta.withIndex().filter { it.value > 0 }.joinToString(", ") { "+${it.value} ${ALL_CARD_NAMES[it.index]}" }.ifEmpty { null }
 
     private fun tradeText(delta: IntArray): String {
-        val gave = delta.withIndex().filter { it.value < 0 }.joinToString(", ") { "${-it.value} ${RESOURCE_NAMES[it.index]}" }
-        val got = delta.withIndex().filter { it.value > 0 }.joinToString(", ") { "${it.value} ${RESOURCE_NAMES[it.index]}" }
+        val gave = delta.withIndex().filter { it.value < 0 }.joinToString(", ") { "${-it.value} ${ALL_CARD_NAMES[it.index]}" }
+        val got = delta.withIndex().filter { it.value > 0 }.joinToString(", ") { "${it.value} ${ALL_CARD_NAMES[it.index]}" }
         return "gave $gave, got $got"
     }
 

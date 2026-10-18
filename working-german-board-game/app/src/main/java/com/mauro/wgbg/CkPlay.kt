@@ -73,6 +73,17 @@ fun isBoardCard(acts: List<Action>) = acts.isNotEmpty() && acts.all { it.type ==
  */
 fun cardSpotIndex(a: Action, second: Boolean = false): Int = if (second && a.a == Progress.INVENTOR) a.c else a.b
 
+/**
+ * The engine lists each Tinkerer swap once, lower tile first, so a first tap could only pick a swap's lower tile
+ * and a second tap only a higher one (report 6akrzuq, 0.3.0: "it only highlights some"). While picking, every
+ * swap is offered both ways round; [asLegalPick] turns the chosen one back into the engine's order.
+ */
+fun pickChoices(acts: List<Action>): List<Action> = acts + acts.filter { it.a == Progress.INVENTOR && it.b != it.c }
+    .map { Action.playProgress(Progress.INVENTOR, it.c, it.b) }
+
+fun asLegalPick(a: Action): Action =
+    if (a.type == CkActionType.PLAY_PROGRESS && a.a == Progress.INVENTOR && a.b > a.c) Action.playProgress(Progress.INVENTOR, a.c, a.b) else a
+
 /** The hint for progress card [i], or empty. */
 fun progressHint(i: Int) = PROGRESS_HINTS.getOrElse(i) { "" }
 

@@ -134,6 +134,9 @@ fun prompt(s: GameState, legal: List<Action>, names: List<String>): String =
     // Age of Chivalry: the second piece placed is a town, straight onto an empty corner.
     s.phase == Phase.BUILD_INITIAL_SETTLEMENT -> "Tap a glowing corner to place a ${if (legal.any { it.type == ActionType.BUILD_CITY }) "town" else "homestead"}"
     s.phase == Phase.BUILD_INITIAL_ROAD -> "Tap a glowing edge to place a road"
+    // After a 7 the bandit comes first and nothing else can be played, which read as the Merchant asking about the
+    // bandit (report rZghe3G, 0.2.8: the game was waiting on the bandit after a 7). Say why.
+    s.phase == Phase.MOVE_ROBBER && s.hasRolled && s.lastRoll == 7 -> "You rolled 7: move the bandit first, then you can play cards"
     s.phase == Phase.MOVE_ROBBER -> "Tap a tile to move the bandit"
     s.phase == Phase.DISCARD -> "Too many cards on a 7: discard ${s.discardOwed[s.actingPlayer]}"
     s.phase == Phase.DECIDE_TRADE && s.tradeOffer.sum() > 0 && (0 until CARD_TYPES).all { s.tradeOffer[it] == 0 } ->

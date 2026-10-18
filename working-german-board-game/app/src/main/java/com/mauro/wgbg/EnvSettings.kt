@@ -258,20 +258,16 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
             Slider(env.aiPace, { env.aiPace = Math.round(it * 2) / 2f }, Modifier.width(220.dp).height(32.dp).testTag("ai-pace"),
                 valueRange = EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7, colors = brassSlider())
         }
-        Text("Animations (off, or Density at 0: nothing moves)", fontSize = 13.sp, color = Color(0xFFD9B865))
+        Text("Animations (off, or Density at 0 in the game Menu: nothing moves)", fontSize = 13.sp, color = Color(0xFFD9B865))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Choice("On", selected = env.animations, tag = "animations-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = true }
             Choice("Off", selected = !env.animations, tag = "animations-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = false }
         }
         Text("Scenery", fontSize = 13.sp, color = Color(0xFFD9B865))
-        // The four kinds on the left; the upright Density bar beside them scales them all together.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                for (item in EnvSettings.Item.entries)
-                    SliderRow(item.label, env[item], "env-${item.name.lowercase()}", sliderWidth = 170.dp) { env[item] = it }
-            }
-            BrassBar("Density", env.density, "env-density", height = 120.dp) { env.density = it }
-        }
+        // The four kinds; Density, which scales them all together, is in the game's Menu (Mauro, 2026-10-18: "in the game
+        // menu not front page").
+        for (item in EnvSettings.Item.entries)
+            SliderRow(item.label, env[item], "env-${item.name.lowercase()}") { env[item] = it }
         Text("Theme", fontSize = 13.sp, color = Color(0xFFD9B865))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Choice("Normal", selected = !env.pirateTheme, tag = "theme-normal", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.pirateTheme = false }
@@ -451,6 +447,13 @@ class SoundSettings(private val store: FloatStore) {
     }
 }
 
+/** Scenery density in the game's Menu: how much moves and lives on the board, all kinds together (0 = nothing). */
+@Composable
+fun DensityControl(env: EnvSettings) {
+    Text("Scenery density (boats, birds, sea life)", fontSize = 13.sp, color = Color(0xFFD9B865))
+    SliderRow("Density", env.density, "env-density") { env.density = it }
+}
+
 /** Sound in the menu: a header with a ^ that opens Music and Game sounds sliders and the song list. */
 @Composable
 fun SoundControls(sound: SoundSettings) {
@@ -461,7 +464,7 @@ fun SoundControls(sound: SoundSettings) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Sound", fontSize = 14.sp)
+            Text("Sound and songs", fontSize = 14.sp)
             Text(if (open) "^" else "v", fontSize = 18.sp, color = Color(0xFFD9B865), modifier = Modifier.width(24.dp))
         }
         if (open) {
