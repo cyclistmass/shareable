@@ -134,7 +134,7 @@ internal fun liveStandingMatrix(p: LivePlacement, lift: Float, rotation: Float, 
 
 /** Pieces that stand up (buildings, the Bandit): tipped toward the camera like the flat board's sprites. */
 internal fun liveStanding(model: String): Boolean =
-    model == "bandit" || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
+    model == "bandit" || model.endsWith("_merchant") || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
         "_knight_" in model
 
 /** Standing pieces are seen from this far above the table (Mauro picked 10°, 2026-10-12): side-on, fronts showing. */
@@ -155,6 +155,9 @@ internal fun liveKnightModel(s: GameState, v: Int, pirate: Boolean): String? {
     if (ck.knightOwner[v] < 0) return null
     return "${if (pirate) "pirate" else "default"}_knight_l${ck.knightLevel[v].coerceIn(1, 3)}" + if (ck.isActive(v)) "" else "_inactive"
 }
+
+/** The Merchant pawn's model (the only one so far; a theme adds its own `<theme>_merchant`). */
+internal const val LIVE_MERCHANT = "default_merchant"
 
 /** Knights as models at this size (hex sides), until Crest gives the final on-board scale. */
 internal const val LIVE_KNIGHT_MODEL_SCALE = 1f
@@ -182,6 +185,10 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         }
     }
     if (s.robberHex >= 0) add(LivePlacement("bandit", liveHex(b, s.robberHex) + LIVE_PLATE, 0.012f))
+    // The Merchant pawn (#112), lower left on its tile, at the buildings' scale; the overlay draws it without the model.
+    s.ck?.takeIf { it.merchantHex >= 0 && it.merchantOwner >= 0 && hasModel(LIVE_MERCHANT) }?.let { ck ->
+        add(LivePlacement(LIVE_MERCHANT, liveHex(b, ck.merchantHex) + MERCHANT_SPOT, scale = BUILDING_SCALE, owner = ck.merchantOwner))
+    }
     for (e in 0 until b.edgeCount) {
         val owner = s.edgeOwner[e]
         if (owner < 0) continue

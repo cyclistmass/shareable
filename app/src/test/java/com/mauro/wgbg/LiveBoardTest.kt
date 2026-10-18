@@ -113,6 +113,17 @@ class LiveBoardTest {
         }
     }
 
+    @Test fun `the merchant stands as a tinted model on its tile when the model is there`() {
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        assertTrue(livePlacements(s, false, 0) { true }.none { it.model == LIVE_MERCHANT }, "nobody holds it yet")
+        s.ck!!.merchantHex = 7; s.ck!!.merchantOwner = 2
+        assertTrue(livePlacements(s, false, 0).none { it.model == LIVE_MERCHANT }, "no model file: the overlay draws it")
+        val m = livePlacements(s, true, 0) { true }.single { it.model == LIVE_MERCHANT }
+        assertEquals(2, m.owner)
+        assertEquals(liveHex(s.board, 7) + MERCHANT_SPOT, m.position)
+        assertTrue(liveStanding(m.model), "it tips toward the camera like the Bandit")
+    }
+
     @Test fun `knights become tinted standing models by theme, level and active, and stay sprites without a model`() {
         val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
         val ck = s.ck!!

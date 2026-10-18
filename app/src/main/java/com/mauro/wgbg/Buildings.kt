@@ -41,6 +41,8 @@ class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean, knight
     private val capitals = if (chivalry) BuildingArt.capitals(pirate).map { load(res, it) } else emptyList()
     /** The bell-buoy ports (PortArt.index order), 8 tilt steps each. */
     val ports: List<List<ImageBitmap>> = PortArt.TYPES.map { t -> t.map { ImageBitmap.imageResource(res, it) } }
+    /** The Merchant pawn (#112), rendered like the buildings so it stands at their (and the Bandit's) angle. */
+    val merchant = load(res, MerchantArt.DEFAULT)
     /** The 3D knights, levels 1 to 3 (Age of Chivalry only). */
     val knights: List<Piece> = if (chivalry) KnightArt.levels(knightsPirate).map { load(res, it) } else emptyList()
 

@@ -1217,7 +1217,7 @@ fun WatchGameScreen(
                 bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
                 drawLivePorts(state.board, projection, measurer, wood, buildings)
-                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal) { v ->
+                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, LIVE_MERCHANT in liveModels) { v ->
                     liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
                 if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
                 if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
@@ -2088,8 +2088,10 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
     s.ck?.let { ck ->
         if (ck.merchantHex >= 0 && ck.merchantOwner >= 0) {
             val hs = scale * l.hexK(ck.merchantHex)
-            drawMerchantToken(l.hexCenter(ck.merchantHex) + Offset(MERCHANT_SPOT.x * hs, MERCHANT_SPOT.y * hs * l.squash), hs, l.squash,
-                PLAYER_COLORS[ck.merchantOwner])
+            val at = l.hexCenter(ck.merchantHex) + Offset(MERCHANT_SPOT.x * hs, MERCHANT_SPOT.y * hs * l.squash)
+            // The rendered pawn, at the buildings' size and tilt step (Mauro: "same angle as robber", "needs to be 3d").
+            if (buildings != null) drawPieceSprite(buildings.merchant, at, hs * BUILDING_SCALE, l.tilt, PLAYER_COLORS[ck.merchantOwner])
+            else drawMerchantToken(at, hs, l.squash, PLAYER_COLORS[ck.merchantOwner])
         }
     }
 
@@ -2389,7 +2391,8 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     if (bandit != null) drawBandit(bandit, robberAt - Offset(0f, 0.6f * scale), scale * 1.8f, 0.55f) else drawRobber(robberAt, scale * 1.5f)
     // The Age of Chivalry Merchant, standing between the last town and the robber (#112).
     val merchantAt = Offset(left + 10.6f * scale, 7.05f * scale)
-    drawMerchantToken(merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0])
+    art?.buildings?.let { drawPieceSprite(it.merchant, merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0]) }
+        ?: drawMerchantToken(merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0])
     label("Merchant", merchantAt + Offset(0f, 0.25f * scale))
     if (art == null) return
     /** Draws [b] [w] scale-units wide, centred on [c] (height from its aspect). */
