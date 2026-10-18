@@ -38,13 +38,19 @@ Trades between players aren't compared (Catanatron has none); discards are rando
 
 ## Device tests (emulator), run by CI
 
-| Test or script | What it does | Fails on |
+One CI shard per row (`device` job matrix), all running side by side; CI runs on pushes to main and on pull
+requests, and skips changes that only touch Markdown or `docs/`.
+
+| Shard: test or script | What it does | Fails on |
 |---|---|---|
-| `tools/ci_monkey.sh` (twice: plain, and in an Age of Chivalry game) | Android `monkey` random taps | crash, ANR, monkey abort |
-| `tools/ci_selfplay.sh 60 3` | bots play back-to-back games at Max speed in both rulesets | crash, ANR, fewer than 3 games finished per ruleset |
-| `tools/ci_touchplay.sh 100 10` | a human seat played with taps in base and Age of Chivalry, 3 and 4 players | crash, ANR, stuck, fewer than 10 moves |
-| `tools/ci_online.sh`: `OnlineTwoClientTest` | two clients host and join a room on the Firebase emulators; bots play a whole game | the two end states differ |
-| `tools/ci_online.sh`: `LiveBoardDeviceTest` | real touch on the 3D board: twist, pinch, tilt, pan, place a homestead and a road | gesture or placement not taken |
+| monkey: `tools/ci_monkey.sh` (twice: plain, and in an Age of Chivalry game) | Android `monkey` random taps | crash, ANR, monkey abort |
+| selfplay: `tools/ci_selfplay.sh 120 3` | bots play back-to-back games at Max speed in both rulesets, stopping once 3 finish | crash, ANR, fewer than 3 games finished per ruleset in 120 s |
+| touch-base, touch-chivalry: `tools/ci_touchplay.sh 100 10` | a human seat played with taps, 3 and 4 players, one shard per ruleset | crash, ANR, stuck, fewer than 10 moves |
+| play-to-end: `tools/play_to_end.sh chivalry 4 900` | a whole 4-player Age of Chivalry game to the end screen | stuck for 60 s, no end in 900 s |
+| trade: `tools/ci_trade.sh` | bank and player trades by touch | a trade not taken |
+| withdraw: `tools/ci_withdraw.sh` | withdrawing an open offer by touch, both rulesets | the offer stays open |
+| online: `tools/ci_online.sh`: `OnlineTwoClientTest` | two clients host and join a room on the Firebase emulators; bots play a whole game | the two end states differ |
+| online: `tools/ci_online.sh`: `LiveBoardDeviceTest` | real touch on the 3D board: twist, pinch, tilt, pan, place a homestead and a road | gesture or placement not taken |
 | `firebase/rules-test` | Firestore security rules and push delivery | a rule lets the wrong player write |
 
 ## Scripts not run by CI
