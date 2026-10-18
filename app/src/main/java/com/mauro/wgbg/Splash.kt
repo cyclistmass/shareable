@@ -109,6 +109,8 @@ fun SplashScreen(
     onResumeGame: () -> Unit,
     onResumeRoom: () -> Unit,
     onNewGame: () -> Unit,
+    /** Ends the saved local game for good (asks first); the menu then offers only New game. */
+    onEndGame: () -> Unit = {},
     env: EnvSettings,
     sound: SoundSettings,
 ) {
@@ -117,6 +119,7 @@ fun SplashScreen(
     val account = remember { runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { GoogleAccount.webClientId(context) != null } }
     var panel by remember { mutableStateOf<Splash.Action?>(null) }
     var about by remember { mutableStateOf(false) }
+    var confirmEnd by remember { mutableStateOf(false) }
     // Re-read who is signed in each time the Log in panel closes.
     var accountSeen by remember { mutableIntStateOf(0) }
     val signedIn = remember(accountSeen) { account?.let { GoogleAccount.status(it.account).signedIn } ?: false }
@@ -137,6 +140,10 @@ fun SplashScreen(
                     }
                     if (b.go) GoButton(b.label, b.tag, true, Modifier.fillMaxWidth().height(48.dp)) { tap() }
                     else BrassButton(b.label, b.tag, Modifier.fillMaxWidth().height(44.dp), size = 16.sp) { tap() }
+                    // A resumed game could only be left for now, never ended (Mauro, 2026-10-18: "i cant quit it").
+                    if (b.action == Splash.Action.RESUME_GAME) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        BottomLink("End saved game", "end-saved-game") { confirmEnd = true }
+                    }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -147,6 +154,14 @@ fun SplashScreen(
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     if (Splash.kofiReady()) BottomLink("Support the game", "support") { openLink(context, Splash.KOFI_URL) }
                 }
+            }
+        }
+        if (confirmEnd) {
+            BackHandler { confirmEnd = false }
+            Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(remember { MutableInteractionSource() }, null) { confirmEnd = false },
+                contentAlignment = Alignment.Center) {
+                EndGameConfirm(onKeep = { confirmEnd = false }, onEnd = { confirmEnd = false; onEndGame() },
+                    Modifier.clickable(remember { MutableInteractionSource() }, null) { })
             }
         }
         panel?.let { open ->
@@ -167,6 +182,20 @@ fun SplashScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** "End this game for good?": the one place a saved local game is thrown away, from the start menu or in the game. */
+@Composable
+fun EndGameConfirm(onKeep: () -> Unit, onEnd: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.width(320.dp).brassEdgedWood().padding(18.dp).testTag("end-game-confirm"),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("End this game for good?", style = Wood.title(20.sp, Color(0xFFF1D58A)))
+        Text("It can't be resumed after this.", style = Wood.sans(13.sp, color = Color(0xFFEDE6D8)))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            WoodButton("Keep it", "end-game-no") { onKeep() }
+            ColorButton("End game", Color(0xFFC0392B), "end-game-yes") { onEnd() }
         }
     }
 }

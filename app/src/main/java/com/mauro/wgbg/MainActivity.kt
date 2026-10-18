@@ -418,6 +418,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                 onResumeGame = { localSave?.let { setup = it.setup; resuming = it; gameNo++; screen = Screen.GAME } },
                 onResumeRoom = { resumeCode?.let { rejoin(it) } },
                 onNewGame = { screen = Screen.SETUP },
+                onEndGame = { localStore.clear(); localSave = null },
                 env = splashEnv, sound = splashSound,
             )
             Screen.SETUP -> { BackHandler { screen = Screen.START }; NewGameScreen(
@@ -912,6 +913,7 @@ fun WatchGameScreen(
     val pileOffsetsNow by rememberUpdatedState(pileOffsets)
     var panelOpen by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
+    var confirmEnd by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(lookAndArt) }
     var guideOpen by remember { mutableStateOf(false) }
     var feedbackOpen by remember { mutableStateOf(false) }
@@ -1401,7 +1403,11 @@ fun WatchGameScreen(
                 // A bug or an idea, typed or spoken, with this whole game attached (Mauro, 2026-10-12).
                 WoodButton("Report a bug or idea", "menu-feedback") { panelOpen = false; settingsOpen = false; reportCapture = true }
                 if (online != null) Text("Online · room ${online.id}", fontWeight = FontWeight.Bold, modifier = Modifier.testTag("menu-room"))
+                // Sound, 3D and Density near the top, where a phone shows them without scrolling (reports kIkrdfU, KZ5kmoV:
+                // the sound and playlist were there but below the fold).
+                SoundControls(sound)
                 if (!lookAndArt) LiveBoardChoice(env)
+                DensityControl(env)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
  // Inventory lives on the Look & art page before the game now (#71, Mauro: clean up the menu).
                     WoodButton("Fit", "menu-fit") { camera = Camera.FIT }
@@ -1410,8 +1416,6 @@ fun WatchGameScreen(
                         diceSetting = (diceSetting + 1) % 5
                     }
                 }
-                // Music under Menu (Mauro, #131): volumes, Pause / Next, and the songs with a tick each.
-                SoundControls(sound)
                 PlayerPanel(players, names)
                 Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
                     style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
@@ -1465,6 +1469,10 @@ fun WatchGameScreen(
                 }
             } else null,
             liveBoardChoice = lookAndArt)
+        if (confirmEnd) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
+            BackHandler { confirmEnd = false }
+            EndGameConfirm(onKeep = { confirmEnd = false }, onEnd = { confirmEnd = false; saveStore?.clear(); onExit() })
+        }
         if (confirmExit) Column(
             Modifier.align(Alignment.Center).brassEdgedWood().padding(18.dp).testTag("exit-confirm"),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1473,11 +1481,13 @@ fun WatchGameScreen(
             Text("Leave this game?", color = Color(0xFFF1D58A), fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(if (online != null) "Leave for now: Resume from the start screen any time, until the host deletes the game. " +
                     (if (net?.isHost == true) "Delete game ends it for everyone." else "Quit: leave for good.")
-                else if (saveStore != null && human) "Leave for now: Resume it from the start screen any time." else "It won't be saved.",
+                else if (saveStore != null && human) "Leave for now: Resume it from the start screen any time. Quit game: end it for good." else "It won't be saved.",
                 color = Color(0xFFEDE6D8), fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 WoodButton("Keep playing", "exit-no") { confirmExit = false }
-                ColorButton(if (online != null) "Leave for now" else "Leave", Color(0xFFC0392B), "exit-yes") { confirmExit = false; onExit() }
+                ColorButton(if (online != null || (saveStore != null && human)) "Leave for now" else "Leave", Color(0xFFC0392B), "exit-yes") { confirmExit = false; onExit() }
+                // A saved local game can be ended too, not only left for now (Mauro, 2026-10-18: resumed it, "i cant quit it").
+                if (online == null && saveStore != null && human) ColorButton("Quit game", Color(0xFFC0392B), "exit-quit-local") { confirmExit = false; confirmEnd = true }
                 if (online != null && onDeleteRoom != null && net?.isHost == true)
                     ColorButton("Delete game", Color(0xFFC0392B), "exit-delete") { confirmExit = false; onDeleteRoom() }
                 if (online != null && onQuitRoom != null && net?.isHost != true)
