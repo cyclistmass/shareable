@@ -63,4 +63,25 @@ class CardPickTest {
             assertFalse(tradeButtonVisible(s), "$p")
         }
     }
+
+    @Test
+    fun `after a 7 the prompt says the bandit comes first, other bandit moves keep the plain line`() {
+        var sevens = 0; var others = 0
+        for (seed in 1L..40L) {
+            val s = Rules.newGame(GameConfig(numPlayers = 3), seed)
+            val bots = List(3) { wgbg.ai.GreedyBot(it.toLong() + seed) }
+            val buf = wgbg.engine.ActionBuffer()
+            while (!s.isOver && s.turn < 120) {
+                Rules.legalActions(s, buf)
+                val legal = (0 until buf.size).map { buf[it] }
+                if (s.phase == Phase.MOVE_ROBBER) {
+                    val line = prompt(s, legal, names)
+                    if (s.hasRolled && s.lastRoll == 7) { sevens++; assertEquals("You rolled 7: move the bandit first, then you can play cards", line) }
+                    else { others++; assertEquals("Tap a tile to move the bandit", line) }
+                }
+                Rules.apply(s, bots[s.actingPlayer].choose(s, buf))
+            }
+        }
+        assertTrue(sevens > 20, "sevens $sevens, other bandit moves $others")
+    }
 }
