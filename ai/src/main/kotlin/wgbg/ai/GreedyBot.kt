@@ -246,7 +246,7 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
             val weight = if (s.vertexBuilding[v] == Piece.CITY) 2 else 1
             score += if (owner == me) -3 * number * weight else number * weight * (1 + s.publicVictoryPoints(owner) / 4.0)
         }
-        if (victim >= 0) score += s.handSize(victim) / 2.0
+        if (victim >= 0) score += s.cardCount(victim) / 2.0   // the bandit can take a commodity too
         return score
     }
 

@@ -412,8 +412,8 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
 @Composable
 private fun MiniRollCard(m: RollMini) {
     Box(Modifier.size(width = 21.dp, height = 30.dp), contentAlignment = Alignment.Center) {
-        if (m.card in CARD_ART.indices) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(CARD_ART[m.card]),
-            RESOURCE_NAMES[m.card], Modifier.fillMaxSize())
+        if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(ALL_CARD_ART[m.card]),
+            ALL_CARD_NAMES[m.card], Modifier.fillMaxSize())
         else Box(Modifier.fillMaxSize().background(Color(0xFF5A4030), RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(2.dp)),
             contentAlignment = Alignment.Center) { Text("?", color = Color(0xFFEFE3C8), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
         // A slim badge on the card's left foot (the next card covers its right half), so the count stays readable.

@@ -54,4 +54,37 @@ class TurnHistoryTest {
         }
         assertTrue(byCard > 10 && byBandit > 10, "cards $byCard, bandit $byBandit of $hits")
     }
+
+    @Test
+    fun `discards, robberies and card counts include commodities`() {
+        // Reports Mnmfs73 / jpRLBzr / ALdrduT (0.3.0): discarded commodities were missing from the list, and a
+        // hand of 4 resources + 2 commodities showed 4 cards.
+        var discards = 0; var commodityDiscards = 0; var commoditySteals = 0
+        for (seed in 1L..30L) {
+            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), seed)
+            val tracker = TurnTracker(listOf("You", "Blue", "Orange"))
+            val bots = List(3) { GreedyBot(it.toLong() + seed) }
+            val buf = ActionBuffer()
+            while (!s.isOver && s.turn < 300) {
+                Rules.legalActions(s, buf)
+                val who = s.actingPlayer
+                val a = bots[who].choose(s, buf)
+                val had = s.cardCount(who)
+                tracker.apply(s, who, a) { Rules.apply(s, a) }
+                if (a.type == wgbg.engine.ActionType.DISCARD) {
+                    discards++
+                    val line = tracker.current!!.events.last { it.startsWith("You discarded") || it.contains(" discarded ") }
+                    val listed = Regex("""(\d+) (\w+)""").findAll(line.substringAfter("discarded ")).sumOf { it.groupValues[1].toInt() }
+                    assertEquals(had - s.cardCount(who), listed, "every card that left the hand is listed: $line")
+                    if (listOf("Parchment", "Fabric", "Silver").any { it in line }) commodityDiscards++
+                }
+                tracker.current?.steal?.let { st ->
+                    assertTrue(st.card in ALL_CARD_NAMES.indices, "a real card: $st")
+                    if (st.card >= wgbg.engine.CARD_TYPES) commoditySteals++
+                }
+            }
+            for (p in 0 until 3) assertEquals(s.cardCount(p), PlayerInfo.of(s, p).cards, "the panel counts commodities")
+        }
+        assertTrue(discards > 20 && commodityDiscards > 0, "discards $discards, with commodities $commodityDiscards, commodity steals $commoditySteals")
+    }
 }
