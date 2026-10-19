@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -30,6 +31,16 @@ internal class SpaceSprites(private val resources: Resources, val choice: ArtCho
         layer(sprite.shadow)
         if (owner != null && sprite.tintable) { layer(sprite.body, pieceTint(owner)); layer(sprite.trim) }
         else layer(sprite.full)
+    }
+    /** The starfield repeated over the whole canvas (one 12-unit frame left the edges bare beside the side panel). */
+    fun fillSea(scope: DrawScope, unit: Float): Unit = with(scope) {
+        val img = image(SpaceArt.sea.full[0])
+        val side = (SpaceArt.sea.frameUnits * unit).coerceAtLeast(64f)
+        val k = side / img.width
+        val shader = ImageShader(img, TileMode.Repeated, TileMode.Repeated)
+        withTransform({ scale(k, k, Offset.Zero) }) {
+            drawRect(ShaderBrush(shader), size = androidx.compose.ui.geometry.Size(size.width / k, size.height / k))
+        }
     }
 }
 

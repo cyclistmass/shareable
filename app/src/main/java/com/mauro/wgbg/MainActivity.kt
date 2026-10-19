@@ -1975,8 +1975,7 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
     }
     val spaceBoard = space?.choice?.space(ArtObject.BOARD) == true
     if (spaceBoard && part == BoardPart.WATER) {
-        drawRect(Color(0xFF080C20))
-        space!!.draw(this, SpaceArt.sea, l.project(0f, 0f), scale, l.tilt)
+        space!!.fillSea(this, scale)
         return
     }
     if (!spaceBoard) when (part) {
