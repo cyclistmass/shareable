@@ -4,11 +4,15 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.PixelCopy
+import android.view.SurfaceView
+import android.view.View
+import android.view.ViewGroup
 import java.io.ByteArrayOutputStream
 
 /**
@@ -21,16 +25,48 @@ object Screenshot {
     const val MAX_CHARS = 450_000
 
     /**
-     * The whole window, the 3D board's surface included (a view snapshot would leave it black), or null when the
-     * copy fails. [done] runs on the main thread.
+     * The whole window with the 3D board's surface underneath, or null when the copy fails. [done] runs on the main
+     * thread. A window copy alone leaves the 3D board black: its SurfaceView is a separate layer (player reports on
+     * 0.3.1 showed only the ports and road hints), so each visible SurfaceView is copied too and drawn first.
      */
     fun capture(activity: Activity, done: (Bitmap?) -> Unit) {
         val view = activity.window.decorView
         if (view.width <= 0 || view.height <= 0) return done(null)
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val surfaces = surfaceViews(view).filter { it.isShown && it.width > 0 && it.height > 0 && it.holder.surface.isValid }
         runCatching {
-            PixelCopy.request(activity.window, bmp, { r -> done(if (r == PixelCopy.SUCCESS) bmp else null) }, Handler(Looper.getMainLooper()))
+            PixelCopy.request(activity.window, bmp, { r ->
+                when {
+                    r != PixelCopy.SUCCESS -> done(null)
+                    surfaces.isEmpty() -> done(bmp)
+                    else -> underlay(bmp, surfaces, done)
+                }
+            }, Handler(Looper.getMainLooper()))
         }.onFailure { done(null) }
+    }
+
+    /** [window] drawn over copies of [surfaces] at their places in it; a surface that fails to copy is left out. */
+    private fun underlay(window: Bitmap, surfaces: List<SurfaceView>, done: (Bitmap?) -> Unit) {
+        val out = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        var left = surfaces.size
+        fun one() { if (--left == 0) { canvas.drawBitmap(window, 0f, 0f, null); done(out) } }
+        for (s in surfaces) {
+            val shot = Bitmap.createBitmap(s.width, s.height, Bitmap.Config.ARGB_8888)
+            val at = IntArray(2).also { s.getLocationInWindow(it) }
+            runCatching {
+                PixelCopy.request(s, shot, { r ->
+                    if (r == PixelCopy.SUCCESS) canvas.drawBitmap(shot, at[0].toFloat(), at[1].toFloat(), null)
+                    one()
+                }, Handler(Looper.getMainLooper()))
+            }.onFailure { one() }
+        }
+    }
+
+    private fun surfaceViews(v: View): List<SurfaceView> = when (v) {
+        is SurfaceView -> listOf(v)
+        is ViewGroup -> (0 until v.childCount).flatMap { surfaceViews(v.getChildAt(it)) }
+        else -> emptyList()
     }
 
     /** A picture from the gallery, decoded at about [MAX_EDGE] on its long side, or null. */
