@@ -197,7 +197,7 @@ fun EndGameConfirm(onKeep: () -> Unit, onEnd: () -> Unit, modifier: Modifier = M
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             // The safe choice is the green one; only the one that ends the game is red (Fable review W2).
             GoButton("Keep it", "end-game-no", true, Modifier.heightIn(min = 44.dp)) { onKeep() }
-            StopButton("End game", "end-game-yes") { onEnd() }
+            StopButton("End game", "end-game-yes", Modifier.heightIn(min = 44.dp)) { onEnd() }
         }
     }
 }

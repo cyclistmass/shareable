@@ -22,7 +22,7 @@ class BoardColourTest {
         val full = apply(saturationMatrix(1f), red); val board = apply(boardMatrix(BOARD_SATURATION), red); val tile = apply(boardMatrix(TILE_SATURATION), red)
         fun spread(c: FloatArray) = c.max() - c.min()
         assertTrue(spread(board) < spread(full)); assertTrue(spread(tile) < spread(board))
-        assertEquals(0.85f, BOARD_SATURATION); assertEquals(0.72f * 0.85f, TILE_SATURATION, 1e-6f)
+        assertEquals(0.85f, BOARD_SATURATION); assertEquals(0.72f * 0.85f, TILE_SATURATION, 1e-6f); assertEquals(0.72f * 0.85f * 1.08f, PAINTED_TILE_SATURATION, 1e-6f)
     }
 
     @Test

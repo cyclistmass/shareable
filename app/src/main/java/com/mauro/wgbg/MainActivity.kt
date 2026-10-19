@@ -2252,7 +2252,7 @@ private fun DrawScope.drawTile(
         val w = sqrt(3f) * r
         val hgt = 2 * r * squash
         drawImage(face, dstOffset = IntOffset((c.x - w / 2).toInt(), (c.y - hgt / 2).toInt()), dstSize = IntSize(w.toInt(), hgt.toInt()),
-            filterQuality = FilterQuality.Medium, colorFilter = TILE_FILTER)   // a little greyer, so the pieces stand out
+            filterQuality = FilterQuality.Medium, colorFilter = PAINTED_TILE_FILTER)   // a little greyer, so the pieces stand out
         // Tile edges: Thin line = a fine dark outline in a deeper shade of the terrain.
         if (line) drawPath(polygon(top), base.shade(0.55f).copy(alpha = 0.75f), style = Stroke(0.025f * scale))
         if (number != 0) drawNumberToken(number, c + Offset(NUMBER_TOKEN_X * scale, NUMBER_TOKEN_Y * scale * squash), scale, measurer, wood)

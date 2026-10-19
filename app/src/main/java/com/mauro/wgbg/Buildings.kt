@@ -143,6 +143,8 @@ internal const val PIECE_BRIGHTNESS = 1.15f
  */
 internal const val BOARD_SATURATION = 0.85f
 internal const val TILE_SATURATION = 0.72f * BOARD_SATURATION // 0.9, then 20% less ("20% less sat on the tiles"), then the board's 85%
+/** The painted tiles 8% more vivid than [TILE_SATURATION] (Mauro, 2026-10-19: "add 8% saturation back to the painted board, its looking a little dead"). */
+internal const val PAINTED_TILE_SATURATION = TILE_SATURATION * 1.08f
 /** The board's art a touch warmer: red up, blue down by this share (Mauro, 2026-10-12: "a little more warmth - 3%"). */
 internal const val BOARD_WARMTH = 0.03f
 /** [saturationMatrix] at [sat], then warmed by [BOARD_WARMTH]. */
@@ -150,6 +152,8 @@ internal fun boardMatrix(sat: Float): FloatArray = saturationMatrix(sat).also { 
     for (c in 0 until 3) { m[c] *= 1f + BOARD_WARMTH; m[10 + c] *= 1f - BOARD_WARMTH }
 }
 internal val TILE_FILTER: ColorFilter by lazy { ColorFilter.colorMatrix(ColorMatrix(boardMatrix(TILE_SATURATION))) }
+/** The painted (2D) tiles at [PAINTED_TILE_SATURATION]; the 3D tiles keep [TILE_FILTER]. */
+internal val PAINTED_TILE_FILTER: ColorFilter by lazy { ColorFilter.colorMatrix(ColorMatrix(boardMatrix(PAINTED_TILE_SATURATION))) }
 /** The sea and cliffs at [BOARD_SATURATION], warmed like the tiles. */
 internal val BOARD_FILTER: ColorFilter by lazy { ColorFilter.colorMatrix(ColorMatrix(boardMatrix(BOARD_SATURATION))) }
 
