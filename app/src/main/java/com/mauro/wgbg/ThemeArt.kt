@@ -3,6 +3,8 @@ package com.mauro.wgbg
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
@@ -47,12 +49,22 @@ internal fun artPainter(id: Int): Painter {
     return remember(source, card, font) { object : Painter() {
         override val intrinsicSize: Size get() = source.intrinsicSize
         override fun DrawScope.onDraw() {
-            with(source) { draw(size) }
+            // The Space renders are bare objects on clear ground: the game draws the card around them (a night-blue
+            // face with a brass edge, the object inset, the rules' name on a band), so they read as cards in the hand.
+            val w = size.width; val h = size.height; val r = w * .08f; val edge = w * .035f
+            val c = drawContext.canvas.nativeCanvas
             val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { typeface = font }
+            p.shader = android.graphics.LinearGradient(0f, 0f, 0f, h, 0xFF34405F.toInt(), 0xFF151B2C.toInt(), android.graphics.Shader.TileMode.CLAMP)
+            c.drawRoundRect(0f, 0f, w, h, r, r, p)
+            p.shader = null
+            withTransform({ translate(w * .09f, h * .07f) }) { with(source) { draw(Size(w * .82f, h * .66f)) } }
             p.color = if (card < 5) 0xFFEFE3C8.toInt() else 0xFFD5C39C.toInt()
-            drawContext.canvas.nativeCanvas.drawRect(0f, size.height * .80f, size.width, size.height, p)
-            p.color = 0xFF30251B.toInt(); p.textSize = size.width * .14f; p.textAlign = android.graphics.Paint.Align.CENTER
-            drawContext.canvas.nativeCanvas.drawText(ALL_CARD_NAMES[card], size.width / 2, size.height * .93f, p)
+            c.drawRoundRect(edge, h * .78f, w - edge, h - edge, r * .6f, r * .6f, p)
+            p.style = android.graphics.Paint.Style.STROKE; p.strokeWidth = edge; p.color = 0xFFC9A25A.toInt()
+            c.drawRoundRect(edge / 2, edge / 2, w - edge / 2, h - edge / 2, r, r, p)
+            p.style = android.graphics.Paint.Style.FILL
+            p.color = 0xFF30251B.toInt(); p.textSize = w * .14f; p.textAlign = android.graphics.Paint.Align.CENTER
+            c.drawText(ALL_CARD_NAMES[card], w / 2, h * .915f, p)
         }
     } }
 }

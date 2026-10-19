@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -195,10 +196,14 @@ fun cardNameSp(name: String, w: Int): Float {
  */
 @Composable
 fun ProgressCardFace(name: String, edge: Color, art: Int?, small: String? = null, w: Int = 56, h: Int = 78, modifier: Modifier = Modifier) {
-    Box(modifier.size(width = w.dp, height = h.dp).background(Color(0xFFEFE3C8), RoundedCornerShape(5.dp))
+    // Space renders are bare objects: they sit inset on a night-blue face instead of filling a cream one (as the hand's resource cards).
+    val space = LocalArtChoice.current.space(ArtObject.CARDS)
+    Box(modifier.size(width = w.dp, height = h.dp).then(if (space) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF34405F), Color(0xFF151B2C))), RoundedCornerShape(5.dp))
+            else Modifier.background(Color(0xFFEFE3C8), RoundedCornerShape(5.dp)))
         .clip(RoundedCornerShape(5.dp)).border(2.dp, edge, RoundedCornerShape(5.dp))) {
         val selectedArt = ThemeArt.namedCard(LocalArtChoice.current, name, art)
-        if (selectedArt != null) Image(artPainter(selectedArt), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        if (selectedArt != null) Image(artPainter(selectedArt), null, if (space) Modifier.fillMaxWidth().fillMaxHeight(.72f).padding(4.dp) else Modifier.fillMaxSize(),
+            contentScale = if (space) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(3.dp)
             .background(Color(0xE6EFE3C8), RoundedCornerShape(3.dp)).padding(2.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
