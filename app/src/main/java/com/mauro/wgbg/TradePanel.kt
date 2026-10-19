@@ -512,7 +512,7 @@ private fun CardRow(counts: IntArray, editable: Boolean, single: Boolean, badge:
             Box(Modifier.height(15.dp), contentAlignment = Alignment.Center) {
                 if (editable && lit && !single) Text("−", color = INK, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { change(r, -1) }.padding(horizontal = 10.dp))
-                else badge(r)?.let { Text(it, color = INK.copy(alpha = 0.6f), fontSize = 9.sp) }
+                else badge(r)?.let { Text(it, color = INK.copy(alpha = 0.7f), fontSize = 10.sp) }
             }
         }
     }

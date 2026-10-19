@@ -100,7 +100,7 @@ fun NewGameScreen(
     }
 
     Row(
-        modifier.fillMaxSize().background(Wood.NIGHT).padding(14.dp).testTag("new-game"),
+        modifier.fillMaxSize().tableTop().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Panel(Modifier.weight(1f)) {

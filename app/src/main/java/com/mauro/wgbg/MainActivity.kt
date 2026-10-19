@@ -468,7 +468,8 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                         onDeleteRoom = { deleteRoom() }, onQuitRoom = { leaveRoom() }, onGameOver = { roomOver = true; forgetRoom() })
                 }
             } ?: RejoiningOr(savedRoom) { screen = Screen.START }
-            Screen.LOOK -> WatchGameScreen(Modifier.fillMaxSize().background(Color.Black), Camera.FIT, setup, onExit = { screen = Screen.SETUP }, lookAndArt = true)
+            Screen.LOOK -> WatchGameScreen(Modifier.fillMaxSize().tableTop(), Camera.FIT,   // wood, not a black box (Fable T6)
+                setup, onExit = { screen = Screen.SETUP }, lookAndArt = true)
             Screen.GAME -> key(gameNo) {
                 // Back asks "Leave this game?" inside the game screen (same as Exit).
                 WatchGameScreen(Modifier.fillMaxSize().background(Color.Black), initialCamera, setup, onExit = { screen = Screen.START }, autoplay = autoplay, autoSetup = autoSetup, startWatching = watch, quickBots = quickBots,
@@ -914,6 +915,8 @@ fun WatchGameScreen(
     val pileOffsetsNow by rememberUpdatedState(pileOffsets)
     var panelOpen by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
+    // A Fortune card tapped in the hand row, handed to HumanControls to play.
+    var fortuneAsk by remember { mutableStateOf<Int?>(null) }
     var confirmEnd by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(lookAndArt) }
     var guideOpen by remember { mutableStateOf(false) }
@@ -1321,7 +1324,9 @@ fun WatchGameScreen(
             val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.CkActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
             if (!tradeOpen && !tradeNeedsMe(state, me) && !cardSheet) HandRow(state, me, tick,
                 // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 384.dp, end = 196.dp, bottom = 6.dp))
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 384.dp, end = 196.dp, bottom = 6.dp),
+                fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { fortuneAsk = it },
+                fortuneArt = { GuideArt.fortuneArt(it, env.art.pirate(ArtObject.KNIGHTS)) })
         }
         if (me >= 0 && !inventory) {
             val send: (Action) -> Unit = { a -> pending = emptyList(); humanMoves.trySend(a) }
@@ -1349,6 +1354,7 @@ fun WatchGameScreen(
             }
             else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
                 onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
+                fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
                 discardCause = tick.let {
                     if (tracker.turnCard == wgbg.engine.Progress.SABOTEUR && state.currentPlayer != me) "${names[state.currentPlayer]} played Wrecker against you" else null
                 },

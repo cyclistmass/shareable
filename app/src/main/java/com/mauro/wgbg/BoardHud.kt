@@ -216,7 +216,9 @@ fun ProgressCardFace(name: String, edge: Color, art: Int?, small: String? = null
  * Chivalry also your commodities and your progress cards (named, edged in their deck's colour) (#4).
  */
 @Composable
-fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, pace: Float = 1f) {
+fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, pace: Float = 1f,
+            /** Fortune cards [me] may play now ([fortunePlayable]): a tap plays one (Fable review: cards, not worded buttons). */
+            fortunePlayable: Set<Int> = emptySet(), onFortune: ((Int) -> Unit)? = null, fortuneArt: (Int) -> Int = { GuideArt.fortuneArt(it, false) }) {
     version // see PlayerStrip
     @Composable
     fun count(n: Int) = Text("$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
@@ -268,6 +270,24 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.ck != null))) {
                 Image(painterResource(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
+            }
+        }
+        // Fortune cards (base game) as cards in the hand, dimmed when they can't be played; a tap plays one, a long press
+        // shows it large. They were worded buttons beside the move buttons before (Fable review 2.5).
+        if (s.ck == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
+            val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
+            if (n == 0) continue
+            val now = c in fortunePlayable && onFortune != null
+            Box(Modifier.zIndex(-(z++).toFloat()).alpha(if (now || c == wgbg.engine.DevCard.VICTORY_POINT) 1f else 0.45f)) {
+                namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70, art = fortuneArt(c),
+                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c]))) {
+                    if (now) { hint = null; onFortune?.invoke(c) }
+                    else hint = "${FORTUNE[c]}: " + when {
+                        c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]
+                        s.currentPlayer != me -> "only on your turn."
+                        else -> "not now (one Fortune card a turn, never one you bought this turn)."
+                    }
+                }
             }
         }
         val ck = s.ck ?: return@Row
