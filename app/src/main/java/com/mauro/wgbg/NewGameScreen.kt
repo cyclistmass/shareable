@@ -27,10 +27,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -251,6 +255,22 @@ private fun DiceChoice(title: String, note: String, selected: Boolean, tag: Stri
 @Composable
 private fun NameField(name: String, onChange: (String) -> Unit) = ParchmentField(name, onChange, "name")
 
+/**
+ * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
+ * left the screen, closing the app from the start screen. While the box has focus, Back lets go of it; where the
+ * keyboard eats that Back itself (Android 16), focus goes once the keyboard hides, or leaving takes a third Back.
+ */
+@Composable
+internal fun Modifier.backPutsKeyboardAway(): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    androidx.activity.compose.BackHandler(enabled = focused) { focus.clearFocus() }
+    val ime = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+    var imeSeen by remember { mutableStateOf(false) }
+    LaunchedEffect(ime, focused) { if (ime) imeSeen = true else if (imeSeen && focused) { imeSeen = false; focus.clearFocus() } }
+    return onFocusChanged { focused = it.isFocused }
+}
+
 /** A one-line parchment text box with a brass edge (name, room code). */
 @Composable
 internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: String,
@@ -262,7 +282,8 @@ internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: Stri
         textStyle = Wood.sans(15.sp, FontWeight.SemiBold, Wood.PARCHMENT_INK),
         cursorBrush = SolidColor(Wood.PARCHMENT_INK),
         keyboardOptions = KeyboardOptions(capitalization = caps, imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth().height(32.dp).testTag(tag),
+        modifier = Modifier.fillMaxWidth().height(32.dp).testTag(tag)
+            .backPutsKeyboardAway(),
         decorationBox = { inner ->
             Box(
                 Modifier.fillMaxSize().background(Wood.PARCHMENT, RoundedCornerShape(8.dp))

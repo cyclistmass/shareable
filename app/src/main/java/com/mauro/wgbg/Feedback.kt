@@ -155,7 +155,8 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
                 textStyle = Wood.sans(15.sp, FontWeight.Medium, Wood.PARCHMENT_INK),
                 cursorBrush = SolidColor(Wood.PARCHMENT_INK),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth().height(110.dp).testTag("feedback-note"),
+                // Back with the keyboard up must not close the sheet and lose the note (#121).
+                modifier = Modifier.fillMaxWidth().height(110.dp).testTag("feedback-note").backPutsKeyboardAway(),
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxSize().background(Wood.PARCHMENT, RoundedCornerShape(8.dp))
                         .border(2.dp, Wood.BRASS, RoundedCornerShape(8.dp)).padding(10.dp)) {
