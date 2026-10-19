@@ -32,6 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
@@ -284,7 +286,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
             if (n == 0) continue
             val now = c in fortunePlayable && onFortune != null
-            Box(Modifier.zIndex(-(z++).toFloat()).alpha(if (now || c == wgbg.engine.DevCard.VICTORY_POINT) 1f else 0.45f)) {
+            Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now && c != wgbg.engine.DevCard.VICTORY_POINT)) {
                 namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70, art = fortuneArt(c),
                     long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c]))) {
                     if (now) { hint = null; onFortune?.invoke(c) }
@@ -310,7 +312,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         for (c in 0 until wgbg.engine.Progress.COUNT) {
             val n = ck.progressHand[me * wgbg.engine.Progress.COUNT + c]
             val now = c in playable
-            if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).alpha(if (now) 1f else 0.45f)) {
+            if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now)) {
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
                     small = null,
                     art = progressArt(c), long = progressDetail(c)) {
@@ -321,6 +323,16 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     }
     }
 }
+
+/**
+ * A card that can't be played now, darkened but solid: at 45% alpha the board (a harbour, a road) showed through the
+ * card. SrcAtop in its own layer darkens only the card's pixels, so its rounded corners stay clear.
+ */
+private fun Modifier.dimmed(dim: Boolean): Modifier = if (!dim) this else
+    graphicsLayer(compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen).drawWithContent {
+        drawContent()
+        drawRect(Color(0xA6140E08), blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop)
+    }
 
 /** Progress cards [me] may play right now: the engine's legal plays (none when it isn't their move). */
 fun playableProgress(s: GameState, me: Int): Set<Int> =
