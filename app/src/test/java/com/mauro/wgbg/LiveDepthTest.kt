@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** 3D board (#95): pieces draw over the terrain in front of them without moving on screen. */
+/** 3D board (#95): pieces draw over the terrain in front of them, and numbers over roads, without moving on screen. */
 class LiveDepthTest {
     /** Screen x, screen y and distance toward the eye of world point [p] under the renderer's lookAt camera. */
     private fun view(p: FloatArray, tilt: Float, rotation: Float): FloatArray {
@@ -42,9 +42,28 @@ class LiveDepthTest {
     }
 
     @Test
-    fun `pieces move, the board does not`() {
+    fun `pieces and numbers move, the board does not`() {
         for (m in listOf("default_homestead", "pirate_town", "default_road_v", "space_road_v", "default_ramparts", "default_capital_crown",
             "default_knight_l2", "default_merchant", "bandit", "space_bandit")) assertTrue(livePiece(m), m)
         for (m in listOf("sea", "tile_stone_lod0", "number_plate", "digit_8", "space_number_8")) assertFalse(livePiece(m), m)
+        for (m in listOf("number_plate", "digit_8", "digit_12", "space_number_8")) assertEquals(LIVE_NUMBER_DEPTH_BIAS, liveDepthBias(m), m)
+        for (m in listOf("default_road_v", "pirate_road_v", "space_road_v")) assertEquals(LIVE_PIECE_DEPTH_BIAS, liveDepthBias(m), m)
+        for (m in listOf("default_homestead", "space_town", "default_knight_l2", "bandit", "space_bandit", "default_merchant"))
+            assertEquals(LIVE_STANDING_DEPTH_BIAS, liveDepthBias(m), m)
+        for (m in listOf("sea", "tile_stone_lod0", "space_tile_grain", KNIGHT_RING, KNIGHT_BAND)) assertEquals(0f, liveDepthBias(m), m)
+    }
+
+    /**
+     * Along one view ray, a point [h] higher is h / cos(tilt) nearer the eye. So a layer drawn over the one below it
+     * needs a bias gap bigger than the lower layer's tallest point over that, at the steepest tilt.
+     */
+    @Test
+    fun `numbers draw over roads, and standing pieces over numbers, at the steepest tilt`() {
+        val ray = cos(Camera.MAX_TILT)
+        val roadTop = LIVE_ROAD_LIFT + 0.045f * ROAD_SCALE * LIVE_ROAD_HEIGHT // road GLB is 0.045 high
+        val numberTop = 0.039f + 0.05f // digits sit at 0.039; a generous allowance for their thickness
+        assertTrue(LIVE_NUMBER_DEPTH_BIAS - LIVE_PIECE_DEPTH_BIAS > roadTop / ray, "a road in front can't cover a number")
+        assertTrue(LIVE_STANDING_DEPTH_BIAS - LIVE_NUMBER_DEPTH_BIAS > numberTop / ray, "the Bandit stands on its plate, not in it")
+        assertTrue(LIVE_NUMBER_DEPTH_BIAS > 1.086f / ray, "a peak in front can't cover a number either")
     }
 }

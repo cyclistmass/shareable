@@ -44,7 +44,7 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
                     liveStanding(p.model) -> liveStandingMatrix(p, liveLift(projection?.tilt ?: 0f), rotation, facing)
                     p.model.startsWith("space_number_") -> liveModelMatrix(p.copy(heading = p.heading + rotation))
                     else -> liveModelMatrix(p)
-                }.let { if (livePiece(p.model)) liveTowardCamera(it, projection?.tilt ?: 0f, rotation) else it }
+                }.let { liveDepthBias(p.model).let { d -> if (d > 0f) liveTowardCamera(it, projection?.tilt ?: 0f, rotation, d) else it } }
                 SpaceBoardBatch.Instance(p.model.removePrefix("space_"), matrix, color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
             }) { path -> context.assets.open(path).use { it.readBytes() } }
         }
@@ -279,11 +279,11 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             val m = when {
                 placement.model.startsWith("digit_") -> liveModelMatrix(placement.copy(heading = p.rotation))
                 liveStanding(placement.model) -> liveStandingMatrix(placement, lift, p.rotation, facing)
-                livePiece(placement.model) -> liveModelMatrix(placement)
+                liveDepthBias(placement.model) > 0f -> liveModelMatrix(placement)
                 else -> continue
             }
-            // Pieces draw over the terrain in front of them (#95): nearer in depth, the same on screen.
-            if (livePiece(placement.model)) liveTowardCamera(m, p.tilt, p.rotation)
+            // Pieces draw over the terrain in front of them (#95), and numbers over roads: nearer in depth, the same on screen.
+            liveDepthBias(placement.model).let { d -> if (d > 0f) liveTowardCamera(m, p.tilt, p.rotation, d) }
             engine.transformManager.setTransform(engine.transformManager.getInstance(active[index].root), m)
         }
     }

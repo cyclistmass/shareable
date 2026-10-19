@@ -155,12 +155,27 @@ internal fun liveStalled(now: Long, since: Long, lastFrame: Long): Boolean =
 /** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
 internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
 
+/** Number plates and their digits (Space bakes the digit into its own plate model). */
+internal fun liveNumber(model: String): Boolean = model == "number_plate" || model.startsWith("digit_") || model.startsWith("space_number_")
+
 /**
- * How far pieces are drawn toward the camera (hex units), beating the tallest terrain prop in front of them: a stone
+ * How far roads are drawn toward the camera (hex units), beating the tallest terrain prop in front of them: a stone
  * peak is 1.09 high and at the steepest tilt covers up to ~1.9 along the view ray (#95: "the first road draws over its
  * homestead", then peaks and trees over homesteads).
  */
 internal const val LIVE_PIECE_DEPTH_BIAS = 2.5f
+/** Number plates come nearer than roads, so no road (2.5x tall since 0.3.2) ever hides a number at any tilt. */
+internal const val LIVE_NUMBER_DEPTH_BIAS = 3.5f
+/** Standing pieces come nearer still: a building or knight stays whole, and the Bandit stands on its tile's plate. */
+internal const val LIVE_STANDING_DEPTH_BIAS = 4.5f
+
+/** The layer [model] is drawn in, nearest first: standing pieces, numbers, roads, then the board itself (0). */
+internal fun liveDepthBias(model: String): Float = when {
+    liveStanding(model) -> LIVE_STANDING_DEPTH_BIAS
+    liveNumber(model) -> LIVE_NUMBER_DEPTH_BIAS
+    livePiece(model) -> LIVE_PIECE_DEPTH_BIAS
+    else -> 0f
+}
 
 /**
  * Slides column-major [m]'s translation [d] toward the orthographic camera at [tilt] and [rotation] (the eye direction
