@@ -134,7 +134,7 @@ internal fun liveStandingMatrix(p: LivePlacement, lift: Float, rotation: Float, 
 
 /** Pieces that stand up (buildings, the Bandit): tipped toward the camera like the flat board's sprites. */
 internal fun liveStanding(model: String): Boolean =
-    model == "bandit" || model.endsWith("_merchant") || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
+    model == "bandit" || model == "space_bandit" || model.startsWith("space_ramparts_h") || model.endsWith("_merchant") || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
         "_knight_" in model
 
 /** Standing pieces are seen from this far above the table (Mauro picked 10°, 2026-10-12): side-on, fronts showing. */

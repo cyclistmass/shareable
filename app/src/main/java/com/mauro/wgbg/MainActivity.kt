@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -662,7 +663,8 @@ fun WatchGameScreen(
     val tileFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) framedFaces else plainFaces
     val tileLine = env.tileEdge == EnvSettings.TileEdge.THIN
     // Rendered buildings (#41) for the chosen theme; Age of Chivalry pieces only load in those games.
-    val buildings = remember(env.art, state.ck != null) { BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null, env.art.pirate(ArtObject.KNIGHTS)) }
+    val space = remember(env.art) { SpaceSprites(oceanRes, env.art) }
+    val buildings = remember(env.art, state.ck != null, inventory) { BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null || inventory, env.art.pirate(ArtObject.KNIGHTS), env.art) }
     // The V3 3D tiles (Settings › Tiles › 3D preview): loaded only when chosen.
     val tiles3d = remember(env.tiles3d) { if (env.tiles3d) Tile3dArt.TERRAINS.map { t -> t.map { ImageBitmap.imageResource(oceanRes, it) } } else null }
     val gullFlap = ImageBitmap.imageResource(R.drawable.gull_flap)
@@ -676,12 +678,15 @@ fun WatchGameScreen(
     sea.gullFlap = gullFlap; sea.gullGlide = gullGlide; sea.gullShadow = gullShadow; sea.boatWake = boatWake; sea.boatSprites = boatSprites
     if (sea.sprites3d == null) sea.sprites3d = SeaSprites3d(oceanRes)
     // The sea's critters (#130 modules, the whale first): rolled once per game from the board, so both phones in an online game agree.
-    LaunchedEffect(sea) {
+    var spaceCritters by remember { mutableStateOf<List<SeaCritter>>(emptyList()) }
+    LaunchedEffect(sea, env.art.theme) {
         val seed = boardSeed(state); val hexes = state.board.hexCount
         // Off the main thread: loading the critter modules (assets/critters/<id>/), and finding a start once the first frame knows the view.
         sea.critters = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            SeaCritter.forGame(runCatching { CritterModules.load(appContext.assets) }.getOrDefault(emptyList()), seed, hexes) { job -> kotlin.concurrent.thread(isDaemon = true, name = "critter-start") { job() } }
+            SeaCritter.forGame(runCatching { if (env.art.theme == ArtSet.SPACE) CritterModules.loadSpace(appContext.assets) else CritterModules.load(appContext.assets) }.getOrDefault(emptyList()), seed, hexes) { job -> kotlin.concurrent.thread(isDaemon = true, name = "critter-start") { job() } }
         }
+        if (env.art.theme == ArtSet.SPACE) sea.critters = sea.critters.shuffled(kotlin.random.Random(seed)).take(SpaceArt.MAX_CRITTERS)
+        spaceCritters = if (env.art.theme == ArtSet.SPACE) sea.critters else emptyList()
         android.util.Log.i("WGBG-CRITTER", "critters=${sea.critters.joinToString(",") { it.spec.id }.ifEmpty { "none" }} seed=${boardSeed(state)}")
     }
     // Gesture handlers live across games (a restart would cancel a tap mid-gesture), so they
@@ -769,7 +774,7 @@ fun WatchGameScreen(
                 if (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
                     val snapshot = org.json.JSONObject().apply {
                         put("turn", state.turn); put("hash", state.stateHash().toString())
-                        put("placements", org.json.JSONArray(livePlacements(state, env.art.pirate(ArtObject.BUILDINGS), env.liveLod, env.art.pirate(ArtObject.KNIGHTS)) { it in liveModels }.map { p ->
+                        put("placements", org.json.JSONArray(themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }.map { p ->
                             org.json.JSONObject().apply {
                                 put("model", p.model); put("x", p.position.x); put("z", p.position.y)
                                 put("height", p.height); put("scale", p.scale); put("heading", p.heading); put("owner", p.owner)
@@ -1049,6 +1054,7 @@ fun WatchGameScreen(
     val chestOpen = me >= 0 && !inventory && tick.let {
         (tradeOpen && tradeButtonVisible(state)) || tradeNeedsMe(state, me) || (tradeMode(state, me) == TradeMode.WAITING && state.currentPlayer == me)
     }
+    CompositionLocalProvider(LocalArtChoice provides env.art) {
     Box(modifier.onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
       Box(Modifier.fillMaxSize()) { // the menu floats over the board, so the ocean always fills the screen
       Box(Modifier.fillMaxSize()) {
@@ -1062,13 +1068,13 @@ fun WatchGameScreen(
         val boardLayer = rememberGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen }
         val boardLayerKey = remember { arrayOfNulls<BoardLayerKey>(1) }
         val waterLayer = rememberGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen }
-        val waterLayerKey = remember { arrayOfNulls<WaterLayerKey>(1) }
+        val waterLayerKey = remember(space) { arrayOfNulls<WaterLayerKey>(1) }
         if (liveBoard) {
             val placements = remember(tick, state, env.art, env.liveLod, inventory) {
-                if (inventory) liveInventoryPlacements() else livePlacements(state, env.art.pirate(ArtObject.BUILDINGS), env.liveLod, env.art.pirate(ArtObject.KNIGHTS)) { it in liveModels }
+                if (inventory) themedInventoryPlacements(env.art) else themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
-            LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces) { reason ->
+            LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating) { reason ->
                 liveFailure = reason; env.liveBoard = false
                 android.widget.Toast.makeText(appContext, "3D board unavailable; using the sprite board", android.widget.Toast.LENGTH_LONG).show()
             }
@@ -1189,7 +1195,7 @@ fun WatchGameScreen(
                             !inventory && boardTapHint(boardNow, legalNow, stateNow.robberHex, p) != null -> tapHint = boardTapHint(boardNow, legalNow, stateNow.robberHex, p)
                             !inventory && seaNow.isWater(p) -> seaNow.splash(p)
                             // The 3D collection: tap a piece set to play with it (#119: "useless if I can't pick").
-                            inventory && liveBoardNow -> liveInventoryThemeAt(p)?.let { env.art = env.art.with(ArtObject.BUILDINGS, if (it) ArtSet.PIRATE else ArtSet.DEFAULT) }
+                            inventory && liveBoardNow && ArtObject.entries.none { env.art.space(it) } -> liveInventoryThemeAt(p)?.let { env.art = env.art.with(ArtObject.BUILDINGS, if (it) ArtSet.PIRATE else ArtSet.DEFAULT) }
                             // The flat Inventory: tap a piece to swap its set (Mauro: "tap in inventory").
                             inventory -> inventoryObjectAt(at, size.width.toFloat(), size.height.toFloat(), INVENTORY_CARDS_DP.dp.toPx())?.let { env.art = env.art.cycle(it) }
                         }
@@ -1211,18 +1217,18 @@ fun WatchGameScreen(
                     typeface = resources.getFont(R.font.alegreya_sans_regular)
                 }
                 fun set(name: String, pirate: Boolean) = if (env.art.pirate(ArtObject.BUILDINGS) == pirate) "$name pieces: in use" else "$name pieces: tap to use"
-                for ((text, z) in listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
-                        "Bandit and runtime plate" to 6.1f)) {
+                for ((text, z) in (if (ArtObject.entries.any { env.art.space(it) }) listOf("Selected terrain and harbours" to -5.2f, "Buildings, Ramparts and Capitals" to .45f, "Knights, Merchant and Bandit" to 2.8f) else listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
+                        "Bandit and runtime plate" to 6.1f))) {
                     val at = projection.project(Offset(0f, z))
                     drawContext.canvas.nativeCanvas.drawText(text, at.x, at.y, paint)
                 }
             } else if (inventory) drawInventory(measurer, wood, banditSprites, tileFaces, tileLine,
                 InventoryArt(if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, raiders, cliff, boatSprites, gullGlide, buildings, sea.sprites3d),
-                bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art) else if (liveBoard) {
+                bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art, space = space) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
-                drawLivePorts(state.board, projection, measurer, wood, buildings)
-                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, LIVE_MERCHANT in liveModels) { v ->
-                    liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
+                if (!env.art.space(ArtObject.BOARD)) drawLivePorts(state.board, projection, measurer, wood, buildings)
+                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels) { v ->
+                    env.art.space(ArtObject.KNIGHTS) || liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
                 if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
                 if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             } else {
@@ -1231,25 +1237,28 @@ fun WatchGameScreen(
                 val layerSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt())
                 val waterKey = WaterLayerKey(camera, size, (sea.time * 6f).toInt())
                 if (waterLayerKey[0] != waterKey) {
-                    waterLayer.record(layerDensity, layoutDirection, layerSize) { drawGame(state, measurer, wood, camera, sea, tileFaces, cliff, tileLine, knights, raiders, BoardPart.WATER, banditSprites) }
+                    waterLayer.record(layerDensity, layoutDirection, layerSize) { drawGame(state, measurer, wood, camera, sea, tileFaces, cliff, tileLine, knights, raiders, BoardPart.WATER, banditSprites, space = space) }
                     waterLayerKey[0] = waterKey
                 }
                 drawLayer(waterLayer)
-                drawGame(state, measurer, wood, camera, sea.takeIf { env.animating }, tileFaces, cliff, tileLine, knights, raiders, BoardPart.UNDER, banditSprites)
+                drawGame(state, measurer, wood, camera, sea.takeIf { env.animating }, tileFaces, cliff, tileLine, knights, raiders, BoardPart.UNDER, banditSprites, space = space)
                 // Re-record the still board only when something on it can have changed: a move, the
                 // camera, the canvas size or a look setting. Otherwise the last recording is replayed.
                 val key = BoardLayerKey(System.identityHashCode(state), tick, camera, size, tileLine, knights, tileFaces, cliff, viewer, pileOffsets, buildings, banditSprites != null, tiles3d)
                 if (boardLayerKey[0] != key) {
                     // The explicit-density overload gives the layer its own draw scope; recording through
                     // this Canvas's scope makes the two scopes ask each other for density forever.
-                    boardLayer.record(layerDensity, layoutDirection, layerSize) { drawGame(state, measurer, wood, camera, sea, tileFaces, cliff, tileLine, knights, raiders, BoardPart.STILL, banditSprites, viewer, pileOffsets, buildings, tiles3d) }
+                    boardLayer.record(layerDensity, layoutDirection, layerSize) { drawGame(state, measurer, wood, camera, sea, tileFaces, cliff, tileLine, knights, raiders, BoardPart.STILL, banditSprites, viewer, pileOffsets, buildings, tiles3d, space = space) }
                     boardLayerKey[0] = key
                 }
                 drawLayer(boardLayer)
-                drawGame(state, measurer, wood, camera, sea.takeIf { env.animating }, tileFaces, cliff, tileLine, knights, raiders, BoardPart.OVER, banditSprites)
+                drawGame(state, measurer, wood, camera, sea.takeIf { env.animating }, tileFaces, cliff, tileLine, knights, raiders, BoardPart.OVER, banditSprites, space = space)
                 if (!targets.isEmpty) drawTargets(state.board, targets, camera, targetPulse(sea.time), targetGlow(me), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
                 if (chosen.isNotEmpty()) drawTargets(state.board, Targets.of(chosen), camera, 1f, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             }
+        }
+        if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
         }
         // Inventory: the illustrated resource cards along the bottom, then the dice faces.
         // Look & art page (#71): Done goes back to the start screen. The Tiles: compare page is gone (Mauro, #136).
@@ -1263,19 +1272,19 @@ fun WatchGameScreen(
             GoButton("Done", "collection-done", true, Modifier.align(Alignment.TopStart).padding(12.dp).width(120.dp).height(44.dp)) { inventory = false }
         if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((r, art) in CARD_ART.withIndex()) androidx.compose.foundation.Image(
-                androidx.compose.ui.res.painterResource(art), RESOURCE_NAMES[r], Modifier.size(width = 76.dp, height = 110.dp))
+                artPainter(art), RESOURCE_NAMES[r], Modifier.size(width = 76.dp, height = 110.dp))
             // Knight cards in the chosen theme (Normal / Pirate themed).
             // Tap a knight card or a die to swap that set on its own.
             for (lv in 1..3) androidx.compose.foundation.Image(
-                androidx.compose.ui.res.painterResource(GuideArt.knightCard(lv, env.art.pirate(ArtObject.KNIGHTS))),
+                artPainter(GuideArt.knightCard(lv, env.art.pirate(ArtObject.KNIGHTS))),
                 "Knight level $lv", Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-knight-$lv")
                     .clickable { env.art = env.art.cycle(ArtObject.KNIGHTS) })
             // Dice in the chosen theme: yellow 1-6, red 1-6, the event die's six faces.
             Column(Modifier.testTag("inventory-dice").clickable { env.art = env.art.cycle(ArtObject.DICE) }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val rows = listOf((1..6).map { DiceArt.face(false, env.art.pirate(ArtObject.DICE), it) }, (1..6).map { DiceArt.face(true, env.art.pirate(ArtObject.DICE), it) },
-                    (0..5).map { DiceArt.eventFace(env.art.pirate(ArtObject.DICE), it, env.eventDieStyle) })
+                val rows = listOf((1..6).map { ThemeArt.dice(env.art, false, it) }, (1..6).map { ThemeArt.dice(env.art, true, it) },
+                    (0..5).map { ThemeArt.event(env.art, it, env.eventDieStyle) })
                 for (row in rows) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    for (id in row) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(id), null, Modifier.size(32.dp))
+                    for (id in row) androidx.compose.foundation.Image(artPainter(id), null, Modifier.size(32.dp))
                 }
             }
         }
@@ -1530,6 +1539,7 @@ fun WatchGameScreen(
             // Upper right under Trade, short, clear of the move buttons that stack up from the bottom right.
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 104.dp, end = 8.dp))
         overlay?.invoke(this, state, tick)
+    }
     }
 }
 
@@ -1961,7 +1971,7 @@ private data class BoardLayerKey(
 
 private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodPieces, camera: Camera, sea: Sea? = null, faces: Map<Int, ImageBitmap>? = null, cliff: List<ImageBitmap>? = null, tileLine: Boolean = false, knights: List<ImageBitmap>? = null, raiders: ImageBitmap? = null, part: BoardPart = BoardPart.ALL, bandit: List<ImageBitmap>? = null,
                                 viewer: Int = 0, pileOffsets: List<Offset> = emptyList(), buildings: BuildingSprites? = null,
-                                tiles3d: List<List<ImageBitmap>>? = null) {
+                                tiles3d: List<List<ImageBitmap>>? = null, space: SpaceSprites? = null) {
     if (size.minDimension < 2f) return // not laid out yet (or squeezed to nothing): gradients need real sizes
     val board = s.board
     val l = Layout.fit(board, size.width, size.height, camera)
@@ -1978,7 +1988,12 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
         val a = fit.unproject(Offset(Layout.leftInset + 8.dp.toPx(), 0f)); val b = fit.unproject(Offset(size.width - 100.dp.toPx(), size.height))
         sea.viewArea = androidx.compose.ui.geometry.Rect(minOf(a.x, b.x), minOf(a.y, b.y), maxOf(a.x, b.x), maxOf(a.y, b.y))
     }
-    when (part) {
+    val spaceBoard = space?.choice?.space(ArtObject.BOARD) == true
+    if (spaceBoard && part == BoardPart.WATER) {
+        space!!.fillSea(this, scale)
+        return
+    }
+    if (!spaceBoard) when (part) {
         BoardPart.WATER -> { sea?.drawWater(this, toScreen, scale * l.kAt(0f), l.squash, wood.brush(TOKEN_WOOD_INDEX), Sea.WaterPart.BASE); return }
         BoardPart.UNDER -> sea?.drawWater(this, toScreen, scale * l.kAt(0f), l.squash, wood.brush(TOKEN_WOOD_INDEX), Sea.WaterPart.LIVE)
         BoardPart.ALL -> sea?.drawWater(this, toScreen, scale * l.kAt(0f), l.squash, wood.brush(TOKEN_WOOD_INDEX))
@@ -1999,7 +2014,8 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
             val right = kotlin.math.cos(pose.heading) >= 0f
             val s3d = sea?.sprites3d
             // The 3D ship (#63), bow-first along its course; the painted side view while it isn't loaded.
-            if (s3d != null) drawSeaProp(s3d, at, SeaSprites3d.RAIDERS_FRAME * scale * l.kAt(pose.y), SeaSprites3d.headingIndex(pose.heading, l.squash),
+            if (spaceBoard) space!!.draw(this, SpaceArt.raidersShip, at, scale, l.tilt)
+            else if (s3d != null) drawSeaProp(s3d, at, SeaSprites3d.RAIDERS_FRAME * scale * l.kAt(pose.y), SeaSprites3d.headingIndex(pose.heading, l.squash),
                 SeaSprites3d.tiltStep(l.tilt), SeaArt.raiders, wake = SeaArt.raidersWake)
             else sea?.boatWake?.let { wake ->
                 val stern = l.project(pose.x - kotlin.math.cos(pose.heading) * 0.35f, pose.y - kotlin.math.sin(pose.heading) * 0.35f)
@@ -2008,24 +2024,36 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
                         dstSize = IntSize((size * 0.7f).toInt(), (size * 0.3f).toInt()), alpha = 0.4f)
                 }
             }
-            if (s3d == null) withTransform({ if (!right) scale(-1f, 1f, at) }) {
+            if (!spaceBoard && s3d == null) withTransform({ if (!right) scale(-1f, 1f, at) }) {
                 drawImage(raiders, dstOffset = IntOffset((at.x - size / 2).toInt(), (at.y - size / 2).toInt()), dstSize = IntSize(size.toInt(), size.toInt()),
                     filterQuality = FilterQuality.Medium)
             }
         }
-        sea?.drawSky(this, toScreen, scale * l.kAt(0f))
+        if (!spaceBoard) sea?.drawSky(this, toScreen, scale * l.kAt(0f))
     }
     if (part == BoardPart.OVER) { over(); return }
     if (part == BoardPart.UNDER) return
 
-    drawTrough(board, l, scale, wood)
-    if (cliff != null) drawCliffs(board, l, cliff)
+    if (!spaceBoard) drawTrough(board, l, scale, wood)
+    if (!spaceBoard && cliff != null) drawCliffs(board, l, cliff)
+    if (spaceBoard) for (e in 0 until board.edgeCount) {
+        val a = liveVertex(board, board.edgeA[e]); val b = liveVertex(board, board.edgeB[e])
+        val mid = (a + b) / 2f
+        val coast = board.topology.vertexHexes[board.edgeA[e]].count { it in board.topology.vertexHexes[board.edgeB[e]] } == 1
+        space!!.draw(this, if (coast) SpaceArt.cliff else SpaceArt.lane, l.project(mid.x, mid.y), scale * l.kAt(mid.y), l.tilt)
+    }
     // Painter's order: top rows first so a lower tile's face covers the side wall above it.
     for (h in (0 until board.hexCount).sortedBy { l.rowKey(it) }) {
         val c = l.hexCenter(h)
         // Zoomed in, skip tiles that are entirely off screen.
         val m = 1.2f * scale
         if (c.x < -m || c.y < -m || c.x > size.width + m || c.y > size.height + m) continue
+        if (spaceBoard) {
+            val hs = scale * l.hexK(h)
+            space!!.draw(this, SpaceArt.tile(board.hexResource[h]), c, hs, l.tilt)
+            if (s.numberAt(h) > 0 && h != s.robberHex) space.draw(this, SpaceArt.numberPlate(s.numberAt(h)), c + Offset(SpaceArt.PLATE_X * hs, SpaceArt.PLATE_Y * hs * l.squash), hs, l.tilt)
+            continue
+        }
         val r3d = tiles3d?.getOrNull(if (board.hexResource[h] in 0 until 5) board.hexResource[h] else 5)
         if (r3d != null) {
             // 3D preview: the rendered tile (base and thickness baked in) at this tilt, then our number plate on top.
@@ -2045,8 +2073,9 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
         // The rendered buoys are 1.5x the old token, so they sit a little further out (Mauro, 2026-10-11).
         PortGeom(p.type, a, b, mid, n, mid + Offset(n.x, n.y * l.squash) * ((if (buildings != null) PORT_BUOY_OUT else 0.58f) * ps), ps)
     }
-    for (pg in ports) drawPortWater(pg, pg.scale, l.squash)
-    for (pg in ports) drawPortPiersAndToken(pg, pg.scale, measurer, wood, buildings?.ports?.getOrNull(PortArt.index(pg.type)), l.tilt)
+    if (spaceBoard) for (pg in ports) space!!.draw(this, SpaceArt.port(pg.type), pg.token, pg.scale, l.tilt)
+    if (!spaceBoard) for (pg in ports) drawPortWater(pg, pg.scale, l.squash)
+    if (!spaceBoard) for (pg in ports) drawPortPiersAndToken(pg, pg.scale, measurer, wood, buildings?.ports?.getOrNull(PortArt.index(pg.type)), l.tilt)
 
     // Roads: rendered sprites (two per edge, overlapping at the middle, per the art report) or drawn planks.
     for (e in 0 until topo.edgeCount) {
@@ -2089,11 +2118,15 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
             filterQuality = FilterQuality.Medium)
     }
     if (s.robberHex >= 0) {
-        if (bandit != null) {
+        if (space?.choice?.space(ArtObject.BANDIT) == true) {
+            val hs = scale * l.hexK(s.robberHex)
+            val plate = if (spaceBoard) Offset(SpaceArt.PLATE_X, SpaceArt.PLATE_Y) else if (tiles3d != null) Offset(TILE3D_PLATE_X, TILE3D_PLATE_Y) else Offset(NUMBER_TOKEN_X, NUMBER_TOKEN_Y)
+            space.draw(this, SpaceArt.bandit, l.hexCenter(s.robberHex) + Offset(plate.x * hs, plate.y * hs * l.squash), hs, l.tilt)
+        } else if (bandit != null) {
             // Mauro: the bandit stands ON the number plate and hides it (drawn after the tiles and their tokens).
             val hs = scale * l.hexK(s.robberHex)
             // On the number plate, wherever this tile style puts it (the 3D tiles have it further right and higher).
-            val plate = if (tiles3d != null) Offset(TILE3D_PLATE_X, TILE3D_PLATE_Y) else Offset(NUMBER_TOKEN_X, NUMBER_TOKEN_Y)
+            val plate = if (spaceBoard) Offset(SpaceArt.PLATE_X, SpaceArt.PLATE_Y) else if (tiles3d != null) Offset(TILE3D_PLATE_X, TILE3D_PLATE_Y) else Offset(NUMBER_TOKEN_X, NUMBER_TOKEN_Y)
             drawBandit(bandit, l.hexCenter(s.robberHex) + Offset(plate.x * hs, plate.y * hs * l.squash), hs, l.tilt)
         } else {
             val rs = scale * l.hexK(s.robberHex) * stand
@@ -2117,8 +2150,8 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
         if (kOwner >= 0 && rendered3dKnights) {
             val level = ck!!.knightLevel[v].coerceIn(1, 3)
             val color = PLAYER_COLORS[kOwner]
-            drawPieceSprite(buildings!!.knights[level - 1], l.at(v), scale * l.k(v) * KNIGHT_SCALE / BuildingSprites.FRAME_UNITS, l.tilt, color)
-            if (ck.isActive(v)) drawKnightFlag(l.at(v), scale * l.k(v) * KNIGHT_SCALE, color)
+            drawPieceSprite(buildings!!.knight(level, ck.isActive(v)), l.at(v), scale * l.k(v) * KNIGHT_SCALE / BuildingSprites.FRAME_UNITS, l.tilt, color)
+            if (ck.isActive(v) && !buildings.choice.space(ArtObject.KNIGHTS)) drawKnightFlag(l.at(v), scale * l.k(v) * KNIGHT_SCALE, color)
             continue
         }
         val owner = s.vertexOwner[v]
@@ -2354,7 +2387,7 @@ internal fun inventoryObjectAt(at: Offset, w: Float, h: Float, bottomInset: Floa
 
 private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, bandit: List<ImageBitmap>? = null,
                                     faces: Map<Int, ImageBitmap>? = null, tileLine: Boolean = false, art: InventoryArt? = null, bottomInset: Float = 0f,
-                                    chosen: ArtChoice? = null) {
+                                    chosen: ArtChoice? = null, space: SpaceSprites? = null) {
     if (size.minDimension < 2f) return
     val (scale, left) = inventoryFrame(size.width, size.height, bottomInset, art != null)
     fun label(text: String, at: Offset) {
@@ -2370,7 +2403,10 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     terrains.forEachIndexed { i, (res, n) ->
         val c = Offset(left + i * 2.05f * scale, 1.25f * scale)
         // The same faces and edge setting as the board (it showed the old procedural art before).
-        drawTile(res, n, i, c, scale, measurer, wood, face = faces?.get(res), line = tileLine)
+        if (chosen?.space(ArtObject.BOARD) == true) {
+            space!!.draw(this, SpaceArt.tile(res), c, scale, .55f)
+            if (n > 0) space.draw(this, SpaceArt.numberPlate(n), c + Offset(.36f, .30f * kotlin.math.cos(.55f)) * scale, scale, .55f)
+        } else drawTile(res, n, i, c, scale, measurer, wood, face = faces?.get(res), line = tileLine)
         label(names[i], c + Offset(0f, 1.2f * scale))
     }
     // Row 2: port tokens and the robber.
@@ -2378,7 +2414,8 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     ports.forEachIndexed { i, type ->
         val c = Offset(left + i * 2.05f * scale, 4.0f * scale)
         val buoy = art?.buildings?.ports?.getOrNull(PortArt.index(type))
-        if (buoy != null) drawSteppedSprite(buoy, c, BuildingSprites.FRAME_UNITS * scale * 1.4f * PORT_BUOY_SCALE, 0.55f)
+        if (chosen?.space(ArtObject.BOARD) == true) space!!.draw(this, SpaceArt.port(type), c, scale * 1.4f, .55f)
+        else if (buoy != null) drawSteppedSprite(buoy, c, BuildingSprites.FRAME_UNITS * scale * 1.4f * PORT_BUOY_SCALE, 0.55f)
         else drawPortToken(type, c, scale * 1.4f, measurer, wood)
         label(if (type == Port.GENERIC) "3:1 harbour" else "2:1 harbour", c + Offset(0f, 0.6f * scale))
     }
@@ -2403,7 +2440,8 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
         label(PLAYER_NAMES[p], Offset(x + 0.3f * scale, y + 0.65f * scale))
     }
     val robberAt = Offset(left + 5 * 2.05f * scale + 1.3f * scale, 7.0f * scale)
-    if (bandit != null) drawBandit(bandit, robberAt - Offset(0f, 0.6f * scale), scale * 1.8f, 0.55f) else drawRobber(robberAt, scale * 1.5f)
+    if (chosen?.space(ArtObject.BANDIT) == true) space!!.draw(this, SpaceArt.bandit, robberAt, scale * 1.8f, .55f)
+    else if (bandit != null) drawBandit(bandit, robberAt - Offset(0f, 0.6f * scale), scale * 1.8f, 0.55f) else drawRobber(robberAt, scale * 1.5f)
     // The Age of Chivalry Merchant, standing between the last town and the robber (#112).
     val merchantAt = Offset(left + 10.6f * scale, 7.05f * scale)
     art?.buildings?.let { drawPieceSprite(it.merchant, merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0]) }
@@ -2422,8 +2460,8 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
         // The 3D knights (Age of Chivalry games): levels 1-3, idle then active (flying its flag), in the owner colours.
         val c = Offset(left - 0.6f * scale + i * 0.95f * scale, y4)
         val color = PLAYER_COLORS[(i / 2) % PLAYER_COLORS.size]
-        drawPieceSprite(knights3d[i / 2], c + Offset(0f, 0.15f * scale), scale * 1.5f, 0.55f, color)
-        if (i % 2 == 1) drawKnightFlag(c + Offset(0f, 0.15f * scale), BuildingSprites.FRAME_UNITS * scale * 1.5f, color)
+        drawPieceSprite(art.buildings!!.knight(i / 2 + 1, i % 2 == 1), c + Offset(0f, 0.15f * scale), scale * 1.5f, 0.55f, color)
+        if (i % 2 == 1 && !art.buildings!!.choice.space(ArtObject.KNIGHTS)) drawKnightFlag(c + Offset(0f, 0.15f * scale), BuildingSprites.FRAME_UNITS * scale * 1.5f, color)
         label("L${i / 2 + 1}${if (i % 2 == 1) " on" else ""}", c + Offset(0f, 0.5f * scale))
     } else art.knights.forEachIndexed { i, k ->
         val c = Offset(left - 0.6f * scale + i * 0.95f * scale, y4)
@@ -2434,20 +2472,23 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     val s3d = art.sea3d
     // The 3D sea props (#63) as the board draws them at this tilt, side on; else the painted ones.
     val invStep = SeaSprites3d.tiltStep(0.55f)
-    if (s3d != null) drawSeaProp(s3d, shipAt, SeaSprites3d.RAIDERS_FRAME * scale, 0, invStep, SeaArt.raiders)
+    if (chosen?.space(ArtObject.BOARD) == true) space!!.draw(this, SpaceArt.raidersShip, shipAt, scale, .55f)
+    else if (s3d != null) drawSeaProp(s3d, shipAt, SeaSprites3d.RAIDERS_FRAME * scale, 0, invStep, SeaArt.raiders)
     else image(art.raiders, shipAt, 1.1f)
     label("Raiders", shipAt + Offset(0f, 0.6f * scale))
     val cliffAt = Offset(left + 7.4f * scale, y4 - 0.15f * scale)
-    image(art.cliffs[0], cliffAt, 2.4f); label("Cliff", cliffAt + Offset(0f, 0.45f * scale))
+    if (chosen?.space(ArtObject.BOARD) == true) space!!.draw(this, SpaceArt.cliff, cliffAt, scale, .55f) else image(art.cliffs[0], cliffAt, 2.4f); label("Cliff", cliffAt + Offset(0f, 0.45f * scale))
     art.boats.take(4).forEachIndexed { i, bt ->
         val at = Offset(left + 9.2f * scale + (i % 2) * 0.7f * scale, y4 - 0.35f * scale + (i / 2) * 0.6f * scale)
-        if (s3d != null) drawSeaProp(s3d, at, SeaSprites3d.SLOOP_FRAME * scale * 0.8f, 8 * (i % 2), invStep, SeaArt.sloop, SeaArt.sloopTrim, tint = PLAYER_COLORS[i])
+        if (chosen?.space(ArtObject.BOARD) == true) space!!.draw(this, SpaceArt.boat, at, scale, .55f, PLAYER_COLORS[i])
+        else if (s3d != null) drawSeaProp(s3d, at, SeaSprites3d.SLOOP_FRAME * scale * 0.8f, 8 * (i % 2), invStep, SeaArt.sloop, SeaArt.sloopTrim, tint = PLAYER_COLORS[i])
         else image(bt, at, 0.7f)
     }
     label("Boats", Offset(left + 9.55f * scale, y4 + 0.6f * scale))
     val gullAt = Offset(left + 10.7f * scale, y4)
-    if (s3d != null) drawSeaProp(s3d, gullAt, SeaSprites3d.GULL_FRAME * scale * 2f, 4, invStep, SeaArt.gull) else image(art.gull, gullAt, 0.8f)
-    label("Gull", gullAt + Offset(0f, 0.5f * scale))
+    if (chosen?.theme == ArtSet.SPACE) space!!.draw(this, SpaceArt.sea, gullAt, scale * .12f, 0f)
+    else if (s3d != null) drawSeaProp(s3d, gullAt, SeaSprites3d.GULL_FRAME * scale * 2f, 4, invStep, SeaArt.gull) else image(art.gull, gullAt, 0.8f)
+    label(if (chosen?.theme == ArtSet.SPACE) "Stars" else "Gull", gullAt + Offset(0f, 0.5f * scale))
 }
 
 /**

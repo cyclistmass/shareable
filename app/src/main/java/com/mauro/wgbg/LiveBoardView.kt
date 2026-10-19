@@ -23,9 +23,29 @@ import kotlin.math.*
 internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProjection?, modifier: Modifier,
     /** Standing pieces turn to face you when the board turns (Settings, default on). */
     facing: Boolean = true,
+    critters: List<SeaCritter> = emptyList(),
+    animate: Boolean = true,
     onFailure: (String) -> Unit) {
-    val holder = remember { arrayOfNulls<LiveBoardRenderer>(1) }
     val latestFailure by rememberUpdatedState(onFailure)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val space = remember(placements) { placements.filter { it.model.startsWith("space_") } }
+    val ordinary = remember(placements) { placements.filterNot { it.model.startsWith("space_") } }
+    var batch by remember { mutableStateOf<SpaceBoardBatch.Result?>(null) }
+    LaunchedEffect(space, projection?.rotation, facing) {
+        try {
+        batch = if (space.isEmpty()) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            SpaceBoardBatch.build(space.map { p ->
+                val color = PLAYER_COLORS.getOrNull(p.owner)
+                fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
+                val rotation = projection?.rotation ?: 0f
+                val transformed = if (p.model.startsWith("space_number_") || facing && liveStanding(p.model)) p.copy(heading = p.heading + rotation) else p
+                SpaceBoardBatch.Instance(p.model.removePrefix("space_"), liveModelMatrix(transformed), color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
+            }) { path -> context.assets.open(path).use { it.readBytes() } }
+        }
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (error: Exception) { latestFailure(error.message ?: "Space batch failed") }
+    }
+    val holder = remember { arrayOfNulls<LiveBoardRenderer>(1) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     AndroidView(modifier = modifier, factory = { context ->
         SurfaceView(context).also { surface ->
@@ -34,7 +54,10 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
         }
     }, update = {
         holder[0]?.let { renderer ->
-            renderer.placements = placements
+            renderer.placements = ordinary
+            renderer.batch = batch
+            renderer.critters = critters.take(SpaceArt.MAX_CRITTERS)
+            renderer.animate = animate
             renderer.projection = projection
             renderer.facing = facing
             renderer.running = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
@@ -71,6 +94,14 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private var closed = false
     private var scheduled = false
     var placements = emptyList<LivePlacement>()
+    var batch: SpaceBoardBatch.Result? = null
+    private var shownBatch: SpaceBoardBatch.Result? = null
+    private var batchAsset: FilamentAsset? = null
+    var critters = emptyList<SeaCritter>()
+    var animate = true
+    private var shownCritters = emptyList<SeaCritter>()
+    private val critterInstances = mutableListOf<FilamentInstance>()
+    private var critterTime = 0L
     var projection: LiveProjection? = null
     var facing = true
     private var shown = emptyList<LivePlacement>()
@@ -147,7 +178,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
 
     private fun model(name: String): Model = models.getOrPut(name) {
         val bytes = if (name.startsWith("digit_")) liveNumberGlb(context, name.removePrefix("digit_").toInt()) else {
-            val data = context.assets.open("filament/${liveModelFile(name)}.glb").use { it.readBytes() }
+            val data = context.assets.open(if (name.startsWith("critters/")) name else "filament/${liveModelFile(name)}.glb").use { it.readBytes() }
             ByteBuffer.allocateDirect(data.size).apply { put(data); flip() }
         }
         val instances = arrayOfNulls<FilamentInstance>(1)
@@ -187,6 +218,26 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     }
 
     private fun updateScene() {
+        if (batch !== shownBatch) {
+            batchAsset?.let { scene.removeEntities(it.entities); loader.destroyAsset(it) }
+            batchAsset = batch?.let { result ->
+                val buffer = ByteBuffer.allocateDirect(result.glb.size).apply { put(result.glb); flip() }
+                val instances = arrayOfNulls<FilamentInstance>(1)
+                requireNotNull(loader.createInstancedAsset(buffer, instances)).also { resources.loadResources(it); scene.addEntities(it.entities) }
+            }
+            shownBatch = batch
+            batch?.let { Log.i("WGBG-3D", "Space batch triangles=${it.triangles} draws=${it.draws}") }
+        }
+        if (critters != shownCritters) {
+            for (i in critterInstances) scene.removeEntities(i.entities)
+            critterInstances.clear()
+            for (c in critters) {
+                val path = "critters/space/${c.spec.id}/${c.spec.id}.glb"
+                val i = instance(LivePlacement(path, Offset.Zero), 0)
+                critterInstances.add(i)
+            }
+            shownCritters = critters
+        }
         if (placements == shown) return
         for (i in active) scene.removeEntities(i.entities)
         active.clear()
@@ -238,7 +289,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             return
         }
         try {
-            updateScene(); updateCamera(p)
+            updateScene(); updateCamera(p); updateCritters(frameTimeNanos, p)
             val start = System.nanoTime()
             if (renderer.beginFrame(requireNotNull(swapChain), frameTimeNanos)) {
                 renderer.render(view); renderer.endFrame()
@@ -256,6 +307,26 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         }
     }
 
+    private fun updateCritters(now: Long, p: LiveProjection) {
+        val dt = if (critterTime == 0L || !animate) 0f else ((now - critterTime) / 1e9f).coerceAtMost(.1f)
+        critterTime = now
+        val corners = listOf(Offset.Zero, Offset(width.toFloat(), 0f), Offset(0f, height.toFloat()), Offset(width.toFloat(), height.toFloat())).map(p::unproject)
+        val bounds = androidx.compose.ui.geometry.Rect(corners.minOf { it.x }, corners.minOf { it.y }, corners.maxOf { it.x }, corners.maxOf { it.y })
+        for ((index, c) in shownCritters.withIndex()) {
+            c.update(dt, bounds)
+            val pose = c.pose() ?: continue
+            val i = critterInstances[index]
+            if (pose.opacity <= 0.0) { scene.removeEntities(i.entities); continue }
+            scene.addEntities(i.entities)
+            val place = LivePlacement("", c.at, pose.z.toFloat(), heading = -c.course)
+            engine.transformManager.setTransform(engine.transformManager.getInstance(i.root), liveModelMatrix(place))
+            val animator = i.animator
+            val clip = pose.anim?.substringBefore(':')
+            val animation = (0 until animator.animationCount).firstOrNull { animator.getAnimationName(it) == clip }
+            if (animation != null) { animator.applyAnimation(animation, pose.animTime.toFloat()); animator.updateBoneMatrices() }
+        }
+    }
+
     private fun reportTiming(now: Long, p: LiveProjection) {
         fun percentile(values: List<Double>, q: Double): Double = values.sorted()[(q * (values.size - 1)).roundToInt()]
         if (intervals.isNotEmpty()) Log.i("WGBG-3D-PERF", "frames=${intervals.size} elapsedMs=${(now - windowStart) / 1e6} " +
@@ -268,7 +339,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
                 put("elapsedMs", (now - windowStart) / 1e6); put("intervalMs", org.json.JSONArray(intervals))
                 put("submitMs", org.json.JSONArray(submit)); put("skipped", skipped)
                 put("tilt", p.tilt); put("rotation", p.rotation)
-                put("lod", shown.first { it.model.startsWith("tile_") }.model.takeLast(1).toInt())
+                put("lod", shown.firstOrNull { it.model.startsWith("tile_") }?.model?.takeLast(1)?.toIntOrNull() ?: 0)
                 put("pirate", shown.any { it.model.startsWith("pirate_") })
                 put("placements", shown.size); put("renderables", scene.renderableCount)
             }
@@ -287,6 +358,8 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         closed = true
         scene.removeEntities(lights.toIntArray())
         for (i in active) scene.removeEntities(i.entities)
+        for (i in critterInstances) scene.removeEntities(i.entities)
+        batchAsset?.let { scene.removeEntities(it.entities); loader.destroyAsset(it) }
         for (m in models.values) loader.destroyAsset(m.asset)
         for (m in tints.values) engine.destroyMaterialInstance(m)
         resources.destroy(); loader.destroy(); provider.destroyMaterials(); provider.destroy()

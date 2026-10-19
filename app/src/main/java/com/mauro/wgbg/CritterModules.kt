@@ -139,6 +139,11 @@ internal object CritterModules {
     fun load(assets: AssetManager): List<CritterModule> =
         load({ assets.list(it).orEmpty().toList() }, { assets.open(it) })
 
+    fun loadSpace(assets: AssetManager): List<CritterModule> = SpaceArt.critters.map { path ->
+        module(path.substringAfterLast('/'), assets.list("$path/frames").orEmpty().toList(),
+            assets.open("$path/critter.json").bufferedReader().use { it.readText() }) { assets.open("$path/$it") }
+    }
+
     /** [list] names a folder's entries and [open] reads a file, both by path from the assets root. */
     fun load(list: (String) -> List<String>, open: (String) -> java.io.InputStream, keepBroken: Boolean = false): List<CritterModule> =
         list("critters").sorted().filter { "critter.json" in list("critters/$it") }.mapNotNull { dir ->

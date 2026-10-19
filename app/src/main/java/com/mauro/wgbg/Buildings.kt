@@ -24,27 +24,31 @@ import kotlin.math.atan2
  * The rendered buildings (#41) loaded for one theme: per piece 8 tilt steps of a wood body (tinted to the
  * player's colour when drawn) and an untinted trim. Age of Chivalry pieces load only when [chivalry].
  */
-class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean, knightsPirate: Boolean = pirate) {
-    class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>)
+class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boolean, knightsPirate: Boolean = pirate, val choice: ArtChoice = ArtChoice(if (pirate) ArtSet.PIRATE else ArtSet.DEFAULT)) {
+    class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>, val frame: Float = FRAME_UNITS, val shadow: List<ImageBitmap> = emptyList())
+    private fun space(s: SpaceArt.Sprite, grow: Float = 1f) = Piece(s.legacyPiece().body.map { ImageBitmap.imageResource(res, it) }, s.legacyPiece().trim.map { ImageBitmap.imageResource(res, it) }, s.frameUnits * grow, (0..7).map { ImageBitmap.imageResource(res, s.shadow[SpaceArt.legacyTilt(it)]) })
 
     private fun load(res: Resources, p: BuildingArt.Piece) =
         Piece(p.body.map { ImageBitmap.imageResource(res, it) }, p.trim.map { ImageBitmap.imageResource(res, it) })
 
-    val homestead = load(res, BuildingArt.homestead(pirate))
-    val town = load(res, BuildingArt.town(pirate))
+    val homestead = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.homestead, SPACE_HOMESTEAD_GROW) else load(res, BuildingArt.homestead(pirate))
+    val town = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.town) else load(res, BuildingArt.town(pirate))
     /** Roads by board edge direction: upright, rising to the right (+30) and falling to the right (-30). */
-    val roadV = load(res, BuildingArt.roadV(pirate))
-    val roadP30 = load(res, BuildingArt.roadP30(pirate))
-    val roadM30 = load(res, BuildingArt.roadM30(pirate))
+    val roadV = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(0)) else load(res, BuildingArt.roadV(pirate))
+    val roadP30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(1)) else load(res, BuildingArt.roadP30(pirate))
+    val roadM30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(2)) else load(res, BuildingArt.roadM30(pirate))
     /** Ramparts by wall height, low to high (Age of Chivalry only); see [rampartsHeight]. */
-    val ramparts: List<Piece> = if (chivalry) BuildingArt.ramparts(pirate).map { load(res, it) } else emptyList()
-    private val capitals = if (chivalry) BuildingArt.capitals(pirate).map { load(res, it) } else emptyList()
+    val ramparts: List<Piece> = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) (1..3).map { space(SpaceArt.ramparts(it)) } else BuildingArt.ramparts(pirate).map { load(res, it) }) else emptyList()
+    private val capitals = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) listOf(0, 2, 1).map { space(SpaceArt.capital(it)) } else BuildingArt.capitals(pirate).map { load(res, it) }) else emptyList()
     /** The bell-buoy ports (PortArt.index order), 8 tilt steps each. */
     val ports: List<List<ImageBitmap>> = PortArt.TYPES.map { t -> t.map { ImageBitmap.imageResource(res, it) } }
     /** The Merchant pawn (#112), rendered like the buildings so it stands at their (and the Bandit's) angle. */
-    val merchant = load(res, MerchantArt.DEFAULT)
+    val merchant = if (choice.space(ArtObject.MERCHANT)) space(SpaceArt.merchant) else load(res, MerchantArt.DEFAULT)
     /** The 3D knights, levels 1 to 3 (Age of Chivalry only). */
-    val knights: List<Piece> = if (chivalry) KnightArt.levels(knightsPirate).map { load(res, it) } else emptyList()
+    val knights: List<Piece> = if (chivalry) (if (choice.space(ArtObject.KNIGHTS)) (1..3).map { space(SpaceArt.knight(it, true)) } else KnightArt.levels(knightsPirate).map { load(res, it) }) else emptyList()
+
+    private val inactiveKnights = if (chivalry && choice.space(ArtObject.KNIGHTS)) (1..3).map { space(SpaceArt.knight(it, false)) } else knights
+    fun knight(level: Int, active: Boolean) = (if (active) knights else inactiveKnights)[level - 1]
 
     /** The Capital for a metropolis on [track]: Guilds for trade, Crown for politics, Academy for science. */
     fun capital(track: Int): Piece? = capitals.getOrNull(capitalIndex(track))
@@ -59,6 +63,8 @@ class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean, knight
     companion object {
         /** Hex units across one 256 px frame (193 px per hex unit). */
         const val FRAME_UNITS = 256f / 193f
+        /** The Space homestead dome is a fifth smaller than the Default house in its frame; drawn up to match (Space playtest). */
+        const val SPACE_HOMESTEAD_GROW = 1.25f
         /** The road policy from the art report: two 0.66-long sprites centred this far either side of an edge's middle. */
         const val ROAD_OFFSET = 0.17f
 
@@ -90,7 +96,7 @@ class BuildingSprites(res: Resources, pirate: Boolean, chivalry: Boolean, knight
  */
 internal fun DrawScope.drawPieceSprite(piece: BuildingSprites.Piece, at: Offset, unitPx: Float, tilt: Float, color: Color, degrees: Float = 0f,
                                        bodyFilter: ColorFilter? = null) {
-    val side = BuildingSprites.FRAME_UNITS * unitPx
+    val side = piece.frame * unitPx
     if (side < 2f || !side.isFinite()) return
     val (a, b, f) = banditSteps(tilt)
     val dst = IntOffset((at.x - side / 2).toInt(), (at.y - side / 2).toInt())
@@ -101,6 +107,8 @@ internal fun DrawScope.drawPieceSprite(piece: BuildingSprites.Piece, at: Offset,
         drawImage(body, IntOffset.Zero, IntSize(body.width, body.height), dst, size, alpha = alpha, colorFilter = tint, filterQuality = FilterQuality.Medium)
         drawImage(trim, IntOffset.Zero, IntSize(trim.width, trim.height), dst, size, alpha = alpha, filterQuality = FilterQuality.Medium)
     }
+    // Shadows stay in board space even when the owner turns a supply piece.
+    piece.shadow.getOrNull(a)?.let { drawImage(it, IntOffset.Zero, IntSize(it.width, it.height), dst, size, filterQuality = FilterQuality.Medium) }
     if (degrees == 0f) {
         layer(a, 1f); if (f > 0.02f) layer(b, f)
     } else rotate(degrees, at) { layer(a, 1f); if (f > 0.02f) layer(b, f) }

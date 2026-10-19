@@ -298,7 +298,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                                 }.testTag("discard-card-$r"),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
+                            Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
                             if (pile[r] > 0) Text("−${pile[r]}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
                         }
@@ -335,7 +335,7 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
     Text("$label: choose what the two number dice show", color = INK_LIGHT, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     @Composable fun row(isRed: Boolean, picked: Int, pick: (Int) -> Unit) = Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(if (isRed) "Red die" else "Ivory die", color = INK_LIGHT, fontSize = 13.sp, modifier = Modifier.width(76.dp))
-        for (v in 1..6) Image(painterResource(DiceArt.face(isRed, false, v)), "$v",
+        for (v in 1..6) Image(artPainter(DiceArt.face(isRed, false, v)), "$v",
             Modifier.size(44.dp).background(if (picked == v) Color(0xFFD9B865) else Color.Transparent, RoundedCornerShape(8.dp)).padding(3.dp)
                 .clickable { pick(v) }.testTag("die-${if (isRed) "red" else "ivory"}-$v"))
     }
@@ -360,7 +360,7 @@ private fun Picker(title: String, options: List<Pair<String, Action>>, onMove: (
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { close(); onMove(a) }.testTag("pick-$label")) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-                    for (c in cards) Image(painterResource(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
+                    for (c in cards) Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
                 }
                 Text(label, color = INK_LIGHT, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             } else MoveButton(label) { close(); onMove(a) }
@@ -429,7 +429,7 @@ internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<St
                     wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK ->
                         ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], ALL_CARD_ART[wgbg.engine.Track.commodity(a.a)],
                             "${ck.deckSize[a.a]} left", w = 64, h = 90)
-                    else -> Image(painterResource(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+                    else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
                 }
                 val under = when (a.type) {
                     wgbg.engine.CkActionType.DISCARD_PROGRESS -> "have ${ck.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
@@ -552,7 +552,7 @@ internal fun SpotPicker(choices: List<SpotChoice>, onPick: (Action) -> Unit) {
             if (cost == null) Text("free", color = Color(0xFF2A1A0C), fontSize = 14.sp)
             else Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (r in cost.indices) repeat(cost[r]) {
-                    Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.size(width = 20.dp, height = 28.dp))
+                    Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.size(width = 20.dp, height = 28.dp))
                 }
             }
         }
