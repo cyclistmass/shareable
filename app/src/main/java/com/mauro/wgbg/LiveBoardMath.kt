@@ -141,6 +141,16 @@ internal fun liveStanding(model: String): Boolean =
     model == "bandit" || model == "space_bandit" || model.startsWith("space_ramparts_h") || model.endsWith("_merchant") || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
         "_knight_" in model
 
+/** How long the running 3D board may go without putting a frame on screen before it falls back to the flat board. */
+internal const val LIVE_STALL_NANOS = 5_000_000_000L
+
+/**
+ * True when the 3D board, running since [since], has shown no frame for [LIVE_STALL_NANOS]: none since it started, or
+ * none since [lastFrame] (0 = never). Times are System.nanoTime.
+ */
+internal fun liveStalled(now: Long, since: Long, lastFrame: Long): Boolean =
+    since != 0L && now - maxOf(since, lastFrame) > LIVE_STALL_NANOS
+
 /** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
 internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
 

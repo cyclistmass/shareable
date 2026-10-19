@@ -125,8 +125,12 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private var windowStart = 0L
     private var skipped = 0
     private var timedProjection: LiveProjection? = null
+    /** When the board last started running and last put a frame on screen (System.nanoTime), for [liveStalled]. */
+    private var runningSince = 0L
+    private var lastFrameAt = 0L
     var running = false
         set(value) {
+            if (value && !field) runningSince = System.nanoTime()
             field = value
             if (value && !closed && !scheduled) { scheduled = true; Choreographer.getInstance().postFrameCallback(this) }
             if (!value) { Choreographer.getInstance().removeFrameCallback(this); scheduled = false; resetTiming() }
@@ -289,6 +293,13 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         if (!running || closed) return
         scheduled = true; Choreographer.getInstance().postFrameCallback(this)
         val p = projection ?: return
+        if (liveStalled(System.nanoTime(), runningSince, lastFrameAt)) {
+            // Nothing on screen for a while (no surface, or every frame skipped): the flat board rather than a blank one.
+            running = false
+            Log.e("WGBG-3D", "No frame for ${LIVE_STALL_NANOS / 1_000_000_000} s; reverting to sprites")
+            fail("The 3D board drew nothing")
+            return
+        }
         if (swapChain == null || width == 0 || height == 0) {
             // A static Compose canvas can attach a new SurfaceView after the window's pre-draw
             // pass, then schedule no more draws. Request that pass so SurfaceView creates its
@@ -303,6 +314,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             if (renderer.beginFrame(requireNotNull(swapChain), frameTimeNanos)) {
                 renderer.render(view); renderer.endFrame()
                 val now = System.nanoTime()
+                lastFrameAt = now
                 if (lastRendered != 0L) intervals.add((now - lastRendered) / 1e6)
                 lastRendered = now
                 submit.add((now - start) / 1e6)
