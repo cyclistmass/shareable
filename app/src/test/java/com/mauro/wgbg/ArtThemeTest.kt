@@ -29,22 +29,25 @@ class ArtThemeTest {
         assertEquals(ArtSet.DEFAULT, once[ArtObject.BUILDINGS])
         assertTrue(once.swapped(ArtObject.KNIGHTS))
         val twice = once.cycle(ArtObject.KNIGHTS)
-        assertEquals(ArtChoice(), twice, "back to the theme's own set, with no swap left behind")
-        assertEquals(ArtChoice(), ArtChoice().cycle(ArtObject.MERCHANT), "one set only: a tap changes nothing")
+        assertEquals(ArtSet.SPACE, twice[ArtObject.KNIGHTS])
+        assertEquals(ArtChoice(), twice.cycle(ArtObject.KNIGHTS), "wraps back to the theme without a redundant swap")
+        assertEquals(ArtSet.SPACE, ArtChoice().cycle(ArtObject.MERCHANT)[ArtObject.MERCHANT])
     }
 
     @Test fun `reset undoes the swaps and keeps the theme`() {
         val messy = ArtChoice(ArtSet.PIRATE).cycle(ArtObject.DICE).cycle(ArtObject.BUILDINGS)
-        assertEquals(ArtSet.DEFAULT, messy[ArtObject.DICE])
+        assertEquals(ArtSet.SPACE, messy[ArtObject.DICE])
         assertEquals(ArtChoice(ArtSet.PIRATE), messy.reset())
         assertEquals(ArtChoice(ArtSet.DEFAULT), messy.withTheme(ArtSet.DEFAULT), "picking a theme regroups everything")
     }
 
     @Test fun `no set without art can be picked`() {
-        assertFalse(ArtSet.SPACE in ArtChoice.themes, "Space joins the Theme row when its art is wired in")
-        assertEquals(listOf(ArtSet.DEFAULT, ArtSet.PIRATE), ArtChoice.themes)
+        assertTrue(ArtSet.SPACE in ArtChoice.themes)
+        assertEquals(ArtSet.entries, ArtChoice.themes)
         assertEquals(ArtChoice(), ArtChoice().with(ArtObject.MERCHANT, ArtSet.PIRATE))
-        assertEquals(ArtSet.DEFAULT, ArtChoice(ArtSet.SPACE)[ArtObject.BUILDINGS], "a theme without art falls back to Default")
+        for (obj in ArtObject.entries) assertEquals(ArtSet.SPACE, ArtChoice(ArtSet.SPACE)[obj])
+        for (obj in listOf(ArtObject.BOARD, ArtObject.CARDS, ArtObject.BANDIT))
+            assertEquals(ArtSet.DEFAULT, ArtChoice(ArtSet.PIRATE)[obj], "Pirate keeps its existing shared art")
     }
 
     @Test fun `the choice is saved, old Pirate saves carry over, and reset clears it`() {
@@ -54,13 +57,28 @@ class ArtThemeTest {
         assertEquals(ArtChoice(ArtSet.PIRATE), env.art)
         env.art = env.art.cycle(ArtObject.KNIGHTS)
         val again = EnvSettings(store)
-        assertEquals(ArtSet.DEFAULT, again.art[ArtObject.KNIGHTS])
+        assertEquals(ArtSet.SPACE, again.art[ArtObject.KNIGHTS])
         assertEquals(ArtSet.PIRATE, again.art[ArtObject.BUILDINGS])
         assertTrue(again.pirateTheme)
         again.reset()
         assertEquals(ArtChoice(), EnvSettings(store).art)
         store.put(EnvSettings.artKey(ArtObject.DICE), 7f) // junk
         assertEquals(ArtChoice(), EnvSettings(store).art, "an unknown set reads as following the theme")
+    }
+
+    @Test fun `Space and all independent swaps survive recreation and regroup on reset`() {
+        val store = MapStore()
+        val space = ArtChoice(ArtSet.SPACE)
+        for (obj in ArtObject.entries) {
+            val changed = space.with(obj, ArtSet.DEFAULT)
+            EnvSettings(store).art = changed
+            assertEquals(changed, EnvSettings(store).art)
+            assertEquals(space, changed.reset())
+            assertEquals(space, changed.withTheme(ArtSet.SPACE))
+            for (other in ArtObject.entries.filter { it != obj }) assertEquals(ArtSet.SPACE, changed[other])
+        }
+        store.put(EnvSettings.THEME, 999f)
+        assertEquals(ArtSet.DEFAULT, EnvSettings(store).art.theme)
     }
 
     @Test fun `inventory taps land on the piece drawn there`() {

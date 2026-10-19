@@ -9,6 +9,92 @@ import java.security.MessageDigest
 import wgbg.engine.Resource
 
 class SpaceArtTest {
+    @Test fun `Space dispatch covers all cards and dice with engine names and event order`() {
+        val choice = ArtChoice(ArtSet.SPACE)
+        for (c in 0..7) {
+            assertEquals(SpaceArt.resourceCard(c), ThemeArt.resource(choice, c))
+            assertEquals(SpaceArt.resourceCard(c), ThemeArt.image(choice, ALL_CARD_ART[c]))
+        }
+        for (c in 0..4) {
+            assertEquals(SpaceArt.fortuneCard(c), ThemeArt.fortune(choice, c))
+            assertEquals(SpaceArt.fortuneCard(c), ThemeArt.namedCard(choice, FORTUNE[c], null))
+        }
+        for (c in 0..24) {
+            assertEquals(SpaceArt.progressCard(c), ThemeArt.progress(choice, c))
+            assertEquals(SpaceArt.progressCard(c), ThemeArt.namedCard(choice, PROGRESS_NAMES[c], null))
+        }
+        for (track in 0..2) assertEquals(SpaceArt.deckBack(track), ThemeArt.namedCard(choice, DECK_NAMES[track], null))
+        for (lv in 1..3) assertEquals(SpaceArt.knightCard(lv), ThemeArt.knight(choice, lv))
+        for (red in listOf(false, true)) for (face in 1..6) assertEquals(SpaceArt.diceFace(red, face), ThemeArt.dice(choice, red, face))
+        for ((event, source) in listOf(1, 2, 3, 6, 5, 4).withIndex())
+            assertEquals(SpaceArt.sprite("die_event_face_$source").full[0], ThemeArt.event(choice, event, 3))
+        assertNull(ThemeArt.namedCard(choice, "unknown card", null))
+    }
+
+    @Test fun `Default and Pirate dispatch keeps existing art and each swap is independent`() {
+        for (set in listOf(ArtSet.DEFAULT, ArtSet.PIRATE)) {
+            val choice = ArtChoice(set)
+            for (c in 0..7) assertEquals(ALL_CARD_ART[c], ThemeArt.resource(choice, c))
+            for (c in 0..4) assertEquals(GuideArt.fortuneArt(c, set == ArtSet.PIRATE), ThemeArt.fortune(choice, c))
+            for (red in listOf(false, true)) for (n in 1..6) assertEquals(DiceArt.face(red, set == ArtSet.PIRATE, n), ThemeArt.dice(choice, red, n))
+            for (event in 0..5) for (style in 0..3) assertEquals(DiceArt.eventFace(set == ArtSet.PIRATE, event, style), ThemeArt.event(choice, event, style))
+        }
+        val mixed = ArtChoice(ArtSet.SPACE).with(ArtObject.CARDS, ArtSet.DEFAULT).with(ArtObject.DICE, ArtSet.PIRATE)
+        assertEquals(ALL_CARD_ART[0], ThemeArt.resource(mixed, 0))
+        assertEquals(DiceArt.face(true, true, 6), ThemeArt.dice(mixed, true, 6))
+        assertEquals(SpaceArt.knightCard(3), ThemeArt.knight(mixed, 3))
+    }
+
+    @Test fun `Space live placements cover expansion state without duplicate plates or knight discs`() {
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 5)
+        val ck = s.ck!!
+        s.edgeOwner[0] = 1
+        for (v in 0..3) { s.vertexOwner[v] = v; s.vertexBuilding[v] = if (v == 0) wgbg.engine.Piece.SETTLEMENT else wgbg.engine.Piece.CITY }
+        for (t in 0..2) { ck.metroVertex[t] = t + 1; ck.metroOwner[t] = t + 1; ck.wall[t + 1] = 1 }
+        for (i in 0..5) { ck.knightOwner[8 + i] = i % 4; ck.knightLevel[8 + i] = 1 + i / 2; if (i % 2 == 1) ck.knightFlags[8 + i] = wgbg.engine.CkState.ACTIVE }
+        ck.merchantOwner = 2; ck.merchantHex = 7
+        val hash = s.stateHash()
+        for (lod in 0..1) {
+            val placements = themedLivePlacements(s, ArtChoice(ArtSet.SPACE), lod) { true }
+            assertTrue(placements.all { it.model.startsWith("space_") })
+            assertEquals(19, placements.count { it.model.startsWith("space_tile_") })
+            assertEquals(6, placements.count { it.model.startsWith("space_knight_") })
+            assertEquals(2, placements.count { it.model == "space_road_v" })
+            assertEquals(s.board.ports.size, placements.count { it.model.startsWith("space_port_") })
+            for (t in 0..2) assertTrue(placements.any { it.model == spaceModel(SpaceArt.capital(t)) && it.position == liveVertex(s.board, t + 1) })
+            for (p in placements) assertTrue(File(assets, "filament/${p.model}.glb").isFile, p.model)
+            for (h in 0 until s.board.hexCount) if (s.numberAt(h) > 0 && h != s.robberHex) {
+                val p = placements.single { it.model == "space_number_${s.numberAt(h)}" && it.position == liveHex(s.board, h) + androidx.compose.ui.geometry.Offset(.36f, .30f) }
+                assertEquals(SpaceArt.TILE_DECK_HEIGHT + .012f, p.height)
+            }
+            assertTrue(placements.none { it.model in listOf("number_plate", "knight_ring", "knight_band") })
+            val batch = SpaceBoardBatch.build(placements.map { SpaceBoardBatch.Instance(it.model.removePrefix("space_"), liveModelMatrix(it)) }, ::bytes)
+            assertTrue(batch.triangles < 300_000); assertTrue(batch.draws <= 150 - 18)
+            assertEquals(hash, s.stateHash())
+        }
+    }
+
+    @Test fun `Space board swap leaves Default piece models and legacy placements unchanged`() {
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 23)
+        s.vertexOwner[0] = 0; s.vertexBuilding[0] = wgbg.engine.Piece.SETTLEMENT
+        for (set in listOf(ArtSet.DEFAULT, ArtSet.PIRATE)) {
+            assertEquals(livePlacements(s, set == ArtSet.PIRATE, 0) { true }, themedLivePlacements(s, ArtChoice(set), 0) { true })
+            assertEquals(liveInventoryPlacements(), themedInventoryPlacements(ArtChoice(set)))
+        }
+        val mixed = themedLivePlacements(s, ArtChoice().with(ArtObject.BOARD, ArtSet.SPACE), 0) { true }
+        assertTrue(mixed.any { it.model == "default_homestead" && it.height == SpaceArt.TILE_DECK_HEIGHT })
+        assertTrue(mixed.any { it.model == "bandit" })
+        assertThrows(IllegalArgumentException::class.java) { themedLivePlacements(s, ArtChoice(ArtSet.SPACE), 99) { true } }
+    }
+
+    @Test fun `Space live Inventory includes all states and all model paths resolve`() {
+        val list = themedInventoryPlacements(ArtChoice(ArtSet.SPACE))
+        for (p in list) assertTrue(File(assets, "filament/${p.model}.glb").isFile, p.model)
+        for (lv in 1..3) for (active in listOf(false, true)) assertTrue(list.any { it.model == spaceModel(SpaceArt.knight(lv, active)) })
+        for (height in 1..3) assertTrue(list.any { it.model == spaceModel(SpaceArt.ramparts(height)) })
+        for (track in 0..2) assertTrue(list.any { it.model == spaceModel(SpaceArt.capital(track)) })
+    }
+
     private val assets = File("src/main/assets")
     private val drawables = File("src/main/res/drawable-nodpi")
     private fun bytes(path: String) = File(assets, path).readBytes()

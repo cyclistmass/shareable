@@ -197,7 +197,8 @@ fun cardNameSp(name: String, w: Int): Float {
 fun ProgressCardFace(name: String, edge: Color, art: Int?, small: String? = null, w: Int = 56, h: Int = 78, modifier: Modifier = Modifier) {
     Box(modifier.size(width = w.dp, height = h.dp).background(Color(0xFFEFE3C8), RoundedCornerShape(5.dp))
         .clip(RoundedCornerShape(5.dp)).border(2.dp, edge, RoundedCornerShape(5.dp))) {
-        if (art != null) Image(painterResource(art), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        val selectedArt = ThemeArt.namedCard(LocalArtChoice.current, name, art)
+        if (selectedArt != null) Image(artPainter(selectedArt), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(3.dp)
             .background(Color(0xE6EFE3C8), RoundedCornerShape(3.dp)).padding(2.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -248,7 +249,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     detail?.let { d ->
         Row(Modifier.padding(bottom = 6.dp).brassEdgedWood().padding(12.dp).widthIn(max = 520.dp).pointerInput(d) { detectTapGestures { detail = null } }.testTag("card-detail"),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(d.art), d.title, Modifier.size(width = 100.dp, height = 140.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            Image(artPainter(ThemeArt.namedCard(LocalArtChoice.current, d.title, d.art)!!), d.title, Modifier.size(width = 100.dp, height = 140.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(d.title, color = Color(0xFFF1D58A), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 d.kind?.let { Text(it, color = Color(0xFFCDBFA6), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
@@ -266,8 +267,15 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             val n = s.hand(me, r)
             if (n == 0) continue
             Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.ck != null))) {
-                Image(painterResource(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
+                Image(artPainter(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
+            }
+        }
+        if (s.ck == null && LocalArtChoice.current.space(ArtObject.CARDS)) {
+            for (c in FORTUNE.indices) {
+                val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
+                if (n > 0) namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70,
+                    art = SpaceArt.fortuneCard(c), long = CardDetail(SpaceArt.fortuneCard(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c])))
             }
         }
         val ck = s.ck ?: return@Row
@@ -275,7 +283,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         for (c in 0 until wgbg.engine.Commodity.COUNT) {
             val n = s.card(me, CARD_TYPES + c)
             if (n > 0) Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).testTag("hand-commodity-$c").longPressFor(cardDetail(CARD_TYPES + c, true))) {
-                Image(painterResource(COMMODITY_ART[c]), ALL_CARD_NAMES[CARD_TYPES + c], Modifier.size(width = 50.dp, height = 70.dp))
+                Image(artPainter(COMMODITY_ART[c]), ALL_CARD_NAMES[CARD_TYPES + c], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
             }
         }
@@ -412,7 +420,7 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
 @Composable
 private fun MiniRollCard(m: RollMini) {
     Box(Modifier.size(width = 21.dp, height = 30.dp), contentAlignment = Alignment.Center) {
-        if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(ALL_CARD_ART[m.card]),
+        if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(artPainter(ALL_CARD_ART[m.card]),
             ALL_CARD_NAMES[m.card], Modifier.fillMaxSize())
         else Box(Modifier.fillMaxSize().background(Color(0xFF5A4030), RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(2.dp)),
             contentAlignment = Alignment.Center) { Text("?", color = Color(0xFFEFE3C8), fontSize = 10.sp, fontWeight = FontWeight.Bold) }

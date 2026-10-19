@@ -12,12 +12,15 @@ enum class ArtSet(val label: String) { DEFAULT("Default"), PIRATE("Pirate"), SPA
  */
 enum class ArtObject(val label: String, val sets: List<ArtSet>) {
     /** Homesteads, towns, roads, Ramparts and Capitals. */
-    BUILDINGS("Buildings", listOf(ArtSet.DEFAULT, ArtSet.PIRATE)),
+    BUILDINGS("Buildings", ArtSet.entries),
     /** Knight pieces, their 3D models and the knight cards in the guide. */
-    KNIGHTS("Knights", listOf(ArtSet.DEFAULT, ArtSet.PIRATE)),
-    DICE("Dice", listOf(ArtSet.DEFAULT, ArtSet.PIRATE)),
+    KNIGHTS("Knights", ArtSet.entries),
+    DICE("Dice", ArtSet.entries),
     /** The Age of Chivalry Merchant: the generic pawn until a theme supplies its own (#112). */
-    MERCHANT("Merchant", listOf(ArtSet.DEFAULT));
+    MERCHANT("Merchant", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
+    BOARD("Board", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
+    BANDIT("Bandit", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
+    CARDS("Cards", listOf(ArtSet.DEFAULT, ArtSet.SPACE));
 
     /** The set this object uses under [theme]: the theme's own when it has one, else Default. */
     fun under(theme: ArtSet): ArtSet = if (theme in sets) theme else sets.first()
@@ -36,6 +39,7 @@ data class ArtChoice(val theme: ArtSet = ArtSet.DEFAULT, val swaps: Map<ArtObjec
     operator fun get(o: ArtObject): ArtSet = swaps[o]?.takeIf { it in o.sets } ?: o.under(theme)
 
     fun pirate(o: ArtObject) = this[o] == ArtSet.PIRATE
+    fun space(o: ArtObject) = this[o] == ArtSet.SPACE
 
     /** Whether [o] differs from what the theme would give it. */
     fun swapped(o: ArtObject) = this[o] != o.under(theme)

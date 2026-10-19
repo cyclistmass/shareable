@@ -433,7 +433,7 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
                 contentAlignment = Alignment.Center,
             ) {
                 // The illustrated card; dimmed until it is part of the trade.
-                if (r < ALL_CARD_ART.size) Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())   // bright: no reason to dim them (Mauro)
+                if (r < ALL_CARD_ART.size) Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())   // bright: no reason to dim them (Mauro)
                 else Box(Modifier.fillMaxSize().background(Color(0xFFEFE3C8).copy(alpha = if (lit) 1f else 0.5f), RoundedCornerShape(5.dp))
                     .border(2.dp, COMMODITY_COLORS[r - CARD_ART.size], RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
                     // Commodities (Age of Chivalry) until their card art lands.
@@ -479,7 +479,7 @@ fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<St
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (a in choices.sortedBy { it.a }) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { onMove(a) }.testTag("choose-card-${a.a}")) {
-                Image(painterResource(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
+                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
                 Text("${if (owner == me) "have" else "has"} ${s.card(owner, a.a)}", color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
         }
@@ -500,7 +500,7 @@ private fun CardRow(counts: IntArray, editable: Boolean, single: Boolean, badge:
                 contentAlignment = Alignment.Center,
             ) {
                 // The illustrated card; dimmed until it is part of the trade.
-                if (r < ALL_CARD_ART.size) Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
+                if (r < ALL_CARD_ART.size) Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(Color(0xFFEFE3C8).copy(alpha = if (lit) 1f else 0.45f), RoundedCornerShape(5.dp))
                     .border(2.dp, COMMODITY_COLORS[r - CARD_ART.size], RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
                     // Commodities (Age of Chivalry) until their card art lands.

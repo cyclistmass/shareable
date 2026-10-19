@@ -67,10 +67,10 @@ private val GUIDE_GOLD = Color(0xFFF1D58A)
 @Composable
 fun CardGuide(chivalry: Boolean, pirate: Boolean, onClose: () -> Unit, modifier: Modifier = Modifier) {
     @Composable fun heading(t: String) = Text(t, color = GUIDE_GOLD, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-    @Composable fun card(i: Int, w: Int = 30) = Image(painterResource(ALL_CARD_ART[i]), ALL_CARD_NAMES[i], Modifier.size(width = w.dp, height = (w * 1.4f).dp))
+    @Composable fun card(i: Int, w: Int = 30) = Image(artPainter(ALL_CARD_ART[i]), ALL_CARD_NAMES[i], Modifier.size(width = w.dp, height = (w * 1.4f).dp))
     // A card face at about guide size (56x78 dp, #71): a progress card's cream panel, or (Fortune) a knight card.
     @Composable fun face(name: String, edge: Color, art: Int, small: String? = null, plain: Boolean = false) {
-        if (plain) Image(painterResource(art), name, Modifier.size(width = 56.dp, height = 78.dp))
+        if (plain) Image(artPainter(art), name, Modifier.size(width = 56.dp, height = 78.dp))
         else ProgressCardFace(name, edge, art, small, 56, 78)
     }
     Column(modifier.widthIn(max = 720.dp).fillMaxHeight().brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp).testTag("card-guide"),
@@ -118,14 +118,14 @@ fun CardGuide(chivalry: Boolean, pirate: Boolean, onClose: () -> Unit, modifier:
             heading("Knights")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (lv in 1..3) Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp).testTag("guide-knight-$lv")) {
-                    Image(painterResource(GuideArt.knightCard(lv, pirate)), "Knight level $lv", Modifier.size(width = 56.dp, height = 78.dp))
+                    Image(artPainter(GuideArt.knightCard(lv, pirate)), "Knight level $lv", Modifier.size(width = 56.dp, height = 78.dp))
                     Text("Strength $lv", color = GUIDE_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         } else {
             heading("Fortune cards")
             for (c in FORTUNE.indices) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top, modifier = Modifier.testTag("fortune-row-$c")) {
-                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = GuideArt.fortuneIsKnightCard(c))
+                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = GuideArt.fortuneIsKnightCard(c) && !LocalArtChoice.current.space(ArtObject.CARDS))
                 Column {
                     Text(FORTUNE[c], color = GUIDE_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(150.dp))
                     Text(FORTUNE_HINTS[c], color = GUIDE_INK.copy(alpha = 0.85f), fontSize = 12.sp)
