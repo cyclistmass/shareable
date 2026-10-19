@@ -24,4 +24,10 @@ class FirebaseOffMainTest {
         assertTrue(reads == 2 && "if (transport.isInitialized()) return then(transport.value)" in main, "transport.value read on the main thread")
         assertTrue(Regex("""withTransport \{ t ->""").findAll(main).count() == 3, "Join, Host and Resume go through withTransport")
     }
+
+    @Test
+    fun `Report Send sets up Firebase off the main thread`() {
+        val send = File("src/main/java/com/mauro/wgbg/CrashReport.kt").readText().substringAfter("fun sendCrashReport(")
+        assertTrue(send.indexOf("Thread {") in 0 until send.indexOf("LobbyRepository.create"), "sendCrashReport sets up Firebase on the caller's (main) thread")
+    }
 }
