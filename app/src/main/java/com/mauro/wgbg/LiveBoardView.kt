@@ -31,15 +31,21 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
     val space = remember(placements) { placements.filter { it.model.startsWith("space_") } }
     val ordinary = remember(placements) { placements.filterNot { it.model.startsWith("space_") } }
     var batch by remember { mutableStateOf<SpaceBoardBatch.Result?>(null) }
-    LaunchedEffect(space, projection?.rotation, facing) {
+    LaunchedEffect(space, projection?.rotation, projection?.tilt, facing) {
         try {
         batch = if (space.isEmpty()) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             SpaceBoardBatch.build(space.map { p ->
                 val color = PLAYER_COLORS.getOrNull(p.owner)
                 fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
                 val rotation = projection?.rotation ?: 0f
-                val transformed = if (p.model.startsWith("space_number_") || facing && liveStanding(p.model)) p.copy(heading = p.heading + rotation) else p
-                SpaceBoardBatch.Instance(p.model.removePrefix("space_"), liveModelMatrix(transformed), color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
+                // Standing pieces lie back toward the camera like the per-model path (updateCamera): upright under the
+                // near top-down camera, a Space knight showed only its thin top edge (Space playtest).
+                val matrix = when {
+                    liveStanding(p.model) -> liveStandingMatrix(p, liveLift(projection?.tilt ?: 0f), rotation, facing)
+                    p.model.startsWith("space_number_") -> liveModelMatrix(p.copy(heading = p.heading + rotation))
+                    else -> liveModelMatrix(p)
+                }
+                SpaceBoardBatch.Instance(p.model.removePrefix("space_"), matrix, color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
             }) { path -> context.assets.open(path).use { it.readBytes() } }
         }
         } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }

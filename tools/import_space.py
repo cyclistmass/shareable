@@ -55,6 +55,39 @@ def glb_stats(path):
             "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+# The dome glass of towns and Capitals is authored teal inside FixedDetails, so it never took the owner colour in 3D
+# (Space playtest, #88). Grey it like the wood body; liveTint paints FixedDetails of these models in the player colour.
+OWNER_GLASS = ("town", "capital_academy", "capital_crown", "capital_guilds")
+GLASS = (0.27, 0.68, 0.62)
+BODY_GREY = 0.72
+
+
+def glass_to_body(path):
+    """Rewrite the teal glass vertex colours of FixedDetails in place (same size; idempotent). Returns the count."""
+    data = bytearray(path.read_bytes())
+    size = struct.unpack_from("<I", data, 12)[0]
+    gltf = json.loads(data[20:20 + size])
+    binary = 20 + size + 8
+    changed = 0
+    for mesh in gltf["meshes"]:
+        for prim in mesh["primitives"]:
+            if gltf["materials"][prim["material"]]["name"] != "FixedDetails" or "COLOR_0" not in prim["attributes"]:
+                continue
+            acc = gltf["accessors"][prim["attributes"]["COLOR_0"]]
+            view = gltf["bufferViews"][acc["bufferView"]]
+            assert acc["componentType"] == 5126, path
+            comps = {"VEC3": 3, "VEC4": 4}[acc["type"]]
+            stride = view.get("byteStride", comps * 4)
+            start = binary + view.get("byteOffset", 0) + acc.get("byteOffset", 0)
+            for i in range(acc["count"]):
+                at = start + i * stride
+                if tuple(round(v, 2) for v in struct.unpack_from("<3f", data, at)) == GLASS:
+                    struct.pack_into("<3f", data, at, BODY_GREY, BODY_GREY, BODY_GREY)
+                    changed += 1
+    path.write_bytes(bytes(data))
+    return changed
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
@@ -73,6 +106,8 @@ def main():
         target = ASSETS / "filament" / (name + ".glb")
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src / item["model"], target)
+        if key in OWNER_GLASS:
+            print(f"{name}: {glass_to_body(target)} glass vertices take the owner colour", flush=True)
         models[key] = {"path": "filament/" + name + ".glb", "source": item["model"], **glb_stats(target)}
 
     for item in catalog["objects"]:

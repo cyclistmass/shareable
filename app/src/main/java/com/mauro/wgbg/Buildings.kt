@@ -29,20 +29,23 @@ class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boo
     class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>, val frame: Float = FRAME_UNITS, val shadow: List<ImageBitmap> = emptyList(), val lumaBody: Boolean = false)
     private fun space(s: SpaceArt.Sprite, grow: Float = 1f) = Piece(s.legacyPiece().body.map { ImageBitmap.imageResource(res, it) }, s.legacyPiece().trim.map { ImageBitmap.imageResource(res, it) }, s.frameUnits * grow, (0..7).map { ImageBitmap.imageResource(res, s.shadow[SpaceArt.legacyTilt(it)]) })
 
+    /** Capitals share the town's domes, authored the same way round. */
+    private fun glassDomes(p: Piece) = Piece(p.trim, p.body, p.frame, p.shadow, lumaBody = true)
+
     private fun load(res: Resources, p: BuildingArt.Piece) =
         Piece(p.body.map { ImageBitmap.imageResource(res, it) }, p.trim.map { ImageBitmap.imageResource(res, it) })
 
     val homestead = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.homestead, SPACE_HOMESTEAD_GROW) else load(res, BuildingArt.homestead(pirate))
     // The Space town ships its glass domes in the untinted trim and only the wireframe in the body, so every town
     // came out teal (Space playtest): swap them, the glass takes the owner colour and the white ribs sit on top.
-    val town = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.town).let { Piece(it.trim, it.body, it.frame, it.shadow, lumaBody = true) } else load(res, BuildingArt.town(pirate))
+    val town = if (choice.space(ArtObject.BUILDINGS)) glassDomes(space(SpaceArt.town)) else load(res, BuildingArt.town(pirate))
     /** Roads by board edge direction: upright, rising to the right (+30) and falling to the right (-30). */
     val roadV = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(0)) else load(res, BuildingArt.roadV(pirate))
     val roadP30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(1)) else load(res, BuildingArt.roadP30(pirate))
     val roadM30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(2)) else load(res, BuildingArt.roadM30(pirate))
     /** Ramparts by wall height, low to high (Age of Chivalry only); see [rampartsHeight]. */
     val ramparts: List<Piece> = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) (1..3).map { space(SpaceArt.ramparts(it)) } else BuildingArt.ramparts(pirate).map { load(res, it) }) else emptyList()
-    private val capitals = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) listOf(0, 2, 1).map { space(SpaceArt.capital(it)) } else BuildingArt.capitals(pirate).map { load(res, it) }) else emptyList()
+    private val capitals = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) listOf(0, 2, 1).map { glassDomes(space(SpaceArt.capital(it))) } else BuildingArt.capitals(pirate).map { load(res, it) }) else emptyList()
     /** The bell-buoy ports (PortArt.index order), 8 tilt steps each. */
     val ports: List<List<ImageBitmap>> = PortArt.TYPES.map { t -> t.map { ImageBitmap.imageResource(res, it) } }
     /** The Merchant pawn (#112), rendered like the buildings so it stands at their (and the Bandit's) angle. */

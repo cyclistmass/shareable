@@ -109,7 +109,9 @@ internal object SpaceBoardBatch {
                 require(primitive.number("mode", 4) == 4)
                 val original = source.json.list("materials")[primitive.number("material")].obj()
                 val material = original.filterKeys { it != "name" }.toMutableMap()
-                if (original["name"] == "WoodBody" && instance.linearTint != null) {
+                val name = original["name"] as? String ?: ""
+                // The same rule as the per-model path (liveTint): wood bodies, plus the town and Capital dome glass.
+                if ((woodTint(name) || spaceGlassTint("space_" + instance.role, name)) && instance.linearTint != null) {
                     val pbr = material["pbrMetallicRoughness"].obj().toMutableMap()
                     val base = pbr["baseColorFactor"]?.arr() ?: listOf(1.0, 1.0, 1.0, 1.0)
                     pbr["baseColorFactor"] = (0..2).map { (base[it] as Number).toFloat() * instance.linearTint[it] } + (base[3] as Number).toFloat()

@@ -291,6 +291,15 @@ class SpaceArtTest {
         assertTrue(positions.any { ((it["max"] as List<*>)[0] as Number).toFloat() > 20f })
     }
 
+    @Test fun `batch paints the town and Capital dome glass in the owner colour`() {
+        for (role in listOf("town", "capital_crown")) {
+            val batch = SpaceBoardBatch.build(listOf(SpaceBoardBatch.Instance(role, matrix(), listOf(1f, 0f, 0f))), ::bytes)
+            val materials = (json(batch.glb)["materials"] as List<*>).map { it as Map<*, *> }
+            val tinted = materials.count { (((it["pbrMetallicRoughness"] as Map<*, *>)["baseColorFactor"] as List<*>?)?.get(1) as Number?)?.toFloat() == 0f }
+            assertEquals(materials.size - 1, tinted, role) // Body and glass (merged when equal) take red; only the brass keeps its own.
+        }
+    }
+
     @Test fun `batch rejects textured animated malformed and invalid transform input`() {
         assertThrows(IllegalArgumentException::class.java) { SpaceBoardBatch.build(emptyList(), ::bytes) }
         for (role in listOf("card_card_back", "star_whale"))

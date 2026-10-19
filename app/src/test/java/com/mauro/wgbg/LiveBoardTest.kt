@@ -89,6 +89,14 @@ class LiveBoardTest {
         for (name in listOf("BrassTrim", "FixedDetails", "RuntimeDigits", "WoodBodyTrim", "woodbody", "")) assertFalse(woodTint(name))
     }
 
+    @Test fun `Space town and Capital glass takes the owner colour, other Space details stay their own`() {
+        for (m in listOf("space_town", "space_capital_crown", "space_capital_guilds", "space_capital_academy")) {
+            assertEquals(PLAYER_COLORS[1], liveTint(m, "FixedDetails", 1))
+            assertEquals(null, liveTint(m, "FixedDetails", -1))
+        }
+        for (m in listOf("space_homestead", "space_ramparts_h2", "space_knight_l1_active", "default_town")) assertEquals(null, liveTint(m, "FixedDetails", 1))
+    }
+
     @Test fun `both themes and LODs use real terrain numbers roads and expansion pieces without state changes`() {
         val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
         // A rendering fixture isolates all piece forms from rule progression.

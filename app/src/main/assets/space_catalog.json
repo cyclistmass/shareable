@@ -1305,7 +1305,7 @@
       "primitives": 3,
       "textured": false,
       "bytes": 56188,
-      "sha256": "56725d8ddf5cb643f7cbab4fb4ff1e193dda5ad045fe940d5e71d1c7a230220c"
+      "sha256": "3b92f19ebfb3b3aef58957338bdf11eb0465c358b517b43a27d31eaf66c0ba48"
     },
     "capital_crown": {
       "path": "filament/space_capital_crown.glb",
@@ -1314,7 +1314,7 @@
       "primitives": 3,
       "textured": false,
       "bytes": 59880,
-      "sha256": "369a6a56f5e1d07c0ea2f9d8804a41b371d72bec94a96c5f15b46df1e19a76ff"
+      "sha256": "af760aaf3df3615e1683bf21a55a0088fcef06713d162b097de925d6787c9aeb"
     },
     "capital_guilds": {
       "path": "filament/space_capital_guilds.glb",
@@ -1323,7 +1323,7 @@
       "primitives": 3,
       "textured": false,
       "bytes": 52392,
-      "sha256": "fc84a35fa511c8d01504250e87405ffde488a158a241f79c759abec59be193ce"
+      "sha256": "985c398ad3e417c9f3aa9eeeaa82c4f67e904bcf8948f4755f1185d54458d148"
     },
     "homestead": {
       "path": "filament/space_homestead.glb",
@@ -1449,7 +1449,7 @@
       "primitives": 3,
       "textured": false,
       "bytes": 40252,
-      "sha256": "26e8c51e455b7496e00500e74847e4ddf4f7f0bc791035a6f6cd2d4818a2ffc8"
+      "sha256": "d0e547c940b365de7a3f2297d363d8f792800284df841ee4c572689b4a186bb5"
     },
     "star_whale": {
       "path": "filament/space_star_whale.glb",

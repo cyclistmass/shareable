@@ -71,6 +71,10 @@ internal data class LiveProjection(val center: Offset, val scale: Float, val til
 
 internal fun woodTint(materialName: String): Boolean = materialName == "WoodBody"
 
+/** Space towns and Capitals: their dome glass is FixedDetails, greyed on import (tools/import_space.py OWNER_GLASS). */
+internal fun spaceGlassTint(model: String, materialName: String): Boolean =
+    materialName == "FixedDetails" && (model == "space_town" || model.startsWith("space_capital_"))
+
 /**
  * The knight's pedestal until the modelled base comes (#101, 0.2.9): the number-plate disc twice over, a player-colour
  * ring with a dark road-coloured disc on it, so a blue knight still reads on blue sea or a blue road (Mauro: "a ring of
@@ -91,7 +95,7 @@ internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || 
 internal fun liveTint(model: String, material: String, owner: Int): androidx.compose.ui.graphics.Color? = when {
     model == KNIGHT_BAND -> KNIGHT_BAND_COLOR
     model == KNIGHT_RING -> PLAYER_COLORS.getOrNull(owner)
-    owner >= 0 && woodTint(material) -> PLAYER_COLORS.getOrNull(owner)
+    owner >= 0 && (woodTint(material) || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
     else -> null
 }
 

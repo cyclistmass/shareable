@@ -46,6 +46,8 @@ internal class SpaceSprites(private val resources: Resources, val choice: ArtCho
     }
 }
 
+internal const val SPACE_LIVE_SEA_SCALE = 3f
+
 internal fun spaceModel(sprite: SpaceArt.Sprite) = sprite.model.removePrefix("filament/").removeSuffix(".glb")
 
 internal fun themedInventoryPlacements(choice: ArtChoice): List<LivePlacement> {
@@ -54,7 +56,8 @@ internal fun themedInventoryPlacements(choice: ArtChoice): List<LivePlacement> {
         fun selected(obj: ArtObject, space: SpaceArt.Sprite, normal: String) =
             if (choice.space(obj)) spaceModel(space) else normal
         val prefix = if (choice.pirate(ArtObject.BUILDINGS)) "pirate" else "default"
-        add(LivePlacement(selected(ArtObject.BOARD, SpaceArt.sea, "sea"), Offset.Zero, LIVE_SEA, 2f))
+        add(LivePlacement(selected(ArtObject.BOARD, SpaceArt.sea, "sea"), Offset.Zero, LIVE_SEA,
+            if (choice.space(ArtObject.BOARD)) 2f * SPACE_LIVE_SEA_SCALE else 2f))
         for (r in 0..5) {
             val at = Offset(-6.5f + r * 2.6f, -3.5f)
             val terrain = listOf("timber", "clay", "fleece", "grain", "stone", "desert")[r]
@@ -124,7 +127,8 @@ internal fun themedLivePlacements(s: GameState, choice: ArtChoice, lod: Int, has
             add(p.copy(model = sprite?.let(::spaceModel) ?: m, position = position, height = height))
         }
         if (board) {
-            add(LivePlacement(spaceModel(SpaceArt.sea), Offset.Zero, LIVE_SEA))
+            // The starfield model is 12 units across, the default sea 22: at 1x it left a strip with blank sides.
+            add(LivePlacement(spaceModel(SpaceArt.sea), Offset.Zero, LIVE_SEA, SPACE_LIVE_SEA_SCALE))
             for (h in 0 until s.board.hexCount) {
                 val at = liveHex(s.board, h)
                 add(LivePlacement(spaceModel(SpaceArt.tile(s.board.hexResource[h], lod)), at))
