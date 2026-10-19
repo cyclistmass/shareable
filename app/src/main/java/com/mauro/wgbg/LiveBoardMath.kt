@@ -141,6 +141,27 @@ internal fun liveStanding(model: String): Boolean =
     model == "bandit" || model == "space_bandit" || model.startsWith("space_ramparts_h") || model.endsWith("_merchant") || model.endsWith("_homestead") || model.endsWith("_town") || model.endsWith("_ramparts") || "_capital_" in model ||
         "_knight_" in model
 
+/** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
+internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
+
+/**
+ * How far pieces are drawn toward the camera (hex units), beating the tallest terrain prop in front of them: a stone
+ * peak is 1.09 high and at the steepest tilt covers up to ~1.9 along the view ray (#95: "the first road draws over its
+ * homestead", then peaks and trees over homesteads).
+ */
+internal const val LIVE_PIECE_DEPTH_BIAS = 2.5f
+
+/**
+ * Slides column-major [m]'s translation [d] toward the orthographic camera at [tilt] and [rotation] (the eye direction
+ * of [LiveBoardRenderer]'s lookAt). Under an orthographic camera that changes only depth, never the pixels, so a piece
+ * keeps its place on screen but draws over terrain just in front of it; pieces all move alike and still sort among
+ * themselves.
+ */
+internal fun liveTowardCamera(m: FloatArray, tilt: Float, rotation: Float, d: Float = LIVE_PIECE_DEPTH_BIAS): FloatArray {
+    m[12] += d * sin(tilt) * sin(rotation); m[13] += d * cos(tilt); m[14] += d * sin(tilt) * cos(rotation)
+    return m
+}
+
 /** Standing pieces are seen from this far above the table (Mauro picked 10°, 2026-10-12): side-on, fronts showing. */
 internal const val LIVE_PIECE_VIEW = 0.17453292f
 
