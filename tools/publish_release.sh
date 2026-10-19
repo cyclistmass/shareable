@@ -50,3 +50,6 @@ up "$WORK/working-german-board-game.apk" application/vnd.android.package-archive
 if [ -f "$VIDEO" ]; then cp "$VIDEO" "$WORK/working-german-board-game-gameplay.mp4"; up "$WORK/working-german-board-game-gameplay.mp4" video/mp4; fi
 rm -rf "$WORK"
 echo "published wgbg-v$VERSION from ${SHA:0:7}"
+# Close the issues this release shipped (named in commit subjects since the previous release).
+REPO="$REPO" SHAREABLE="$SHAREABLE" "$(dirname "$0")/close_shipped.sh" "$VERSION" "$SHA"
+

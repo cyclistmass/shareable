@@ -61,7 +61,8 @@ requests, and skips changes that only touch Markdown or `docs/`.
 | `tools/online_sim.sh` | Two emulators play one online game (autoplay) and compare end states |
 | `tools/test_perf_framestats.sh` | Checks the frame-stats parser |
 | `tools/record_showcase.sh`, `tools/record_screenshots.sh` | README media; they assert nothing, but they break when buttons move, so they double as a UI smoke check |
-| `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green) |
+| `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green; then closes the issues it shipped) |
+| `tools/close_shipped.sh` | Run by the release: closes each issue a commit since the last release marks `Fixes #N` / `Closes #N`, with a "Shipped in X" note. A bare `#N` is progress and stays open (listed for review). `DRY_RUN=1` lists only. |
 
 ## Gaps
 
