@@ -15,4 +15,13 @@ class FirebaseOffMainTest {
         for (f in File("src/main/java/com/mauro/wgbg").listFiles()!!.filter { it.extension == "kt" })
             assertTrue(blocking.find(f.readText()) == null, "${f.name} sets up Firebase on the main thread while composing")
     }
+
+    @Test
+    fun `Join, Host and Resume wait for the online transport off the main thread`() {
+        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+        // transport.value is only read once it's set up, or on a background thread inside withTransport.
+        val reads = Regex("""transport\.value""").findAll(main).count()
+        assertTrue(reads == 2 && "if (transport.isInitialized()) return then(transport.value)" in main, "transport.value read on the main thread")
+        assertTrue(Regex("""withTransport \{ t ->""").findAll(main).count() == 3, "Join, Host and Resume go through withTransport")
+    }
 }
