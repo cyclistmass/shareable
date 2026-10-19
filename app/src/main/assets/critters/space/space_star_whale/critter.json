@@ -1,0 +1,104 @@
+{
+  "id": "space_star_whale",
+  "name": "Star Whale",
+  "model": "space_star_whale.glb",
+  "length": 4.039999902248383,
+  "layer": "under",
+  "altitude": [
+    -1.8,
+    -0.7
+  ],
+  "zone": "open-sea",
+  "clear_of_coast": 0.8,
+  "movement": {
+    "speed": 0.065,
+    "turn": 8,
+    "bank": 6
+  },
+  "animations": [
+    {
+      "name": "idle",
+      "seconds": 4,
+      "mode": "loop"
+    },
+    {
+      "name": "move",
+      "seconds": 2,
+      "mode": "loop"
+    }
+  ],
+  "behavior": {
+    "pattern": "space-explicit",
+    "stages": [
+      {
+        "id": "idle",
+        "share": 70,
+        "seconds": [
+          8,
+          16
+        ],
+        "delta": [
+          0,
+          0,
+          0
+        ],
+        "anim": "idle",
+        "next": {
+          "idle": 1,
+          "move": 1
+        }
+      },
+      {
+        "id": "move",
+        "share": 30,
+        "seconds": [
+          4,
+          8
+        ],
+        "delta": [
+          0.26,
+          0,
+          0
+        ],
+        "anim": "move",
+        "next": {
+          "idle": 2,
+          "move": 1
+        }
+      }
+    ]
+  },
+  "count": [
+    1,
+    1
+  ],
+  "chance": 1,
+  "shadow": false,
+  "frames": {
+    "headings": 8,
+    "tilts": 8,
+    "size": 288,
+    "orthographic_scale": 5.3,
+    "tilt_formula": "55 * 0.96 * i / 7 degrees",
+    "heading_formula": "45 * h degrees; model faces +X",
+    "poses": [
+      {
+        "clip": "idle",
+        "count": 4,
+        "seconds": 4
+      },
+      {
+        "clip": "move",
+        "count": 4,
+        "seconds": 2
+      }
+    ],
+    "file": "{clip}{frame:02d}_h{heading}_t{tilt}.webp",
+    "layout": "individual square frames",
+    "anchor": [
+      144.0,
+      144.0
+    ],
+    "span": 5.3
+  }
+}
