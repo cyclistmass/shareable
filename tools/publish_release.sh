@@ -35,6 +35,9 @@ curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://ap
 if [ -n "${APK:-}" ]; then
   echo "CI's APK:    $(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)"
   echo "Tested APK:  $(sha256sum < "$APK" | cut -c1-64) (publishing this one)"
+  # Players update over CI-signed releases: a different signing cert would make every update fail.
+  cert() { "$(ls -d "${ANDROID_HOME:-$LOCALAPPDATA/Android/Sdk}"/build-tools/*/ | tail -1)apksigner.bat" verify --print-certs "$1" | sed -n 's/.*SHA-256 digest: //p'; }
+  [ "$(cert "$APK")" = "$(cert "$WORK/working-german-board-game.apk")" ] || { echo "Tested APK is signed with a different cert than CI's; not publishing"; exit 1; }
   cp "$APK" "$WORK/working-german-board-game.apk"
 fi
 
