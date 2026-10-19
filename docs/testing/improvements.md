@@ -46,3 +46,8 @@ move it to **Done** with the commit when it lands.
   triangles. Keep the new batch-budget test and profile its eventual consumer on a mid-range device.
 - 2026-10-18, Codex (#88): preconfigure a writable Gradle cache, signing-key copy and in-process Kotlin
   compiler for restricted Windows sessions; avoids wrapper/signing lock failures and repeated daemon fallbacks.
+- 2026-10-19, bugs (#111): profile the Space and sea sprite decodes that still happen inside draw (SpaceSprites.image,
+  SeaSprites3d.frame cache misses on a tilt-step change or a new boat or critter frame) with a frame trace on a lane. If
+  they cost frames, decode them in the background with a redraw trigger and a board-layer key, so pieces don't blink in.
+- 2026-10-19, bugs: worktrees with a Gradle build tree can't be removed by `git worktree remove` on Windows (Filename
+  too long). Use `cmd /c rmdir /s /q "\?\C:\path"`, then `git worktree prune`.
