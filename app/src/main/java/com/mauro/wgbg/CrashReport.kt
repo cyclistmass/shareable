@@ -135,8 +135,12 @@ private fun kotlinx.coroutines.CoroutineScope.launchDone(onDone: () -> Unit) {
 /** Sends [report] and its [shots] (#128); [done] gets whether the report went and how many shots did. */
 fun sendCrashReport(context: Context, report: String, shots: List<String> = emptyList(), done: (Boolean, Int) -> Unit) {
     val main = android.os.Handler(android.os.Looper.getMainLooper())
-    runCatching {
-        val t = LobbyRepository.create(context) as? FirestoreTransport ?: return done(false, 0)
-        t.sendCrash(report, shots).whenComplete { n, e -> main.post { done(e == null, n ?: 0) } }
-    }.onFailure { done(false, 0) }
+    // Firebase is set up off the main thread (#111): a Send tapped while it starts would otherwise wait on it there.
+    Thread {
+        runCatching {
+            val t = LobbyRepository.create(context) as? FirestoreTransport
+            if (t == null) { main.post { done(false, 0) }; return@Thread }
+            t.sendCrash(report, shots).whenComplete { n, e -> main.post { done(e == null, n ?: 0) } }
+        }.onFailure { main.post { done(false, 0) } }
+    }.start()
 }
