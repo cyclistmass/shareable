@@ -202,6 +202,9 @@ fun HumanControls(
     }
     var ckChoices by remember { mutableStateOf<Pair<String, List<Action>>?>(null) }
     val types = legal.map { it.type }.toSet()
+    // A picker left open after its moves stopped being legal (a new turn, a bot's move, a resumed game) hid the
+    // Roll button under a prompt that said roll (#105). Drop any sheet that has nothing left to pick.
+    if (sheet != null && !sheetStillLegal(sheet, ckChoices?.second, legal)) sheet = null
     // The buttons in a column hugging the right edge with the main one (Roll / End turn) at the very bottom, within
     // reach of a right thumb. Every card sheet (pick, give, discard, name a card) sits in one place: bottom centre,
     // the lower third of the screen, like the trade chest (Mauro: "same card puller/giver ... for thumb reach").
@@ -568,4 +571,13 @@ internal fun fortunePlayable(legal: List<Action>): Set<Int> = buildSet {
         ActionType.PLAY_MONOPOLY -> add(DevCard.MONOPOLY)
         else -> {}
     }
+}
+
+/** Whether an open picker still has a legal move to offer (#105: a stale one hid the Roll button). */
+internal fun sheetStillLegal(sheet: String?, ckActs: List<Action>?, legal: List<Action>): Boolean = when (sheet) {
+    null -> false
+    "yop" -> legal.any { it.type == ActionType.PLAY_YEAR_OF_PLENTY }
+    "mono" -> legal.any { it.type == ActionType.PLAY_MONOPOLY }
+    "ck" -> ckActs != null && ckActs.any { it in legal }
+    else -> true
 }
