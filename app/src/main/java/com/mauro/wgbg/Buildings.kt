@@ -25,14 +25,17 @@ import kotlin.math.atan2
  * player's colour when drawn) and an untinted trim. Age of Chivalry pieces load only when [chivalry].
  */
 class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boolean, knightsPirate: Boolean = pirate, val choice: ArtChoice = ArtChoice(if (pirate) ArtSet.PIRATE else ArtSet.DEFAULT)) {
-    class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>, val frame: Float = FRAME_UNITS, val shadow: List<ImageBitmap> = emptyList())
+    /** [lumaBody]: the body is coloured (not grey wood), so it takes [lumaTint] rather than [pieceTint]. */
+    class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>, val frame: Float = FRAME_UNITS, val shadow: List<ImageBitmap> = emptyList(), val lumaBody: Boolean = false)
     private fun space(s: SpaceArt.Sprite, grow: Float = 1f) = Piece(s.legacyPiece().body.map { ImageBitmap.imageResource(res, it) }, s.legacyPiece().trim.map { ImageBitmap.imageResource(res, it) }, s.frameUnits * grow, (0..7).map { ImageBitmap.imageResource(res, s.shadow[SpaceArt.legacyTilt(it)]) })
 
     private fun load(res: Resources, p: BuildingArt.Piece) =
         Piece(p.body.map { ImageBitmap.imageResource(res, it) }, p.trim.map { ImageBitmap.imageResource(res, it) })
 
     val homestead = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.homestead, SPACE_HOMESTEAD_GROW) else load(res, BuildingArt.homestead(pirate))
-    val town = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.town) else load(res, BuildingArt.town(pirate))
+    // The Space town ships its glass domes in the untinted trim and only the wireframe in the body, so every town
+    // came out teal (Space playtest): swap them, the glass takes the owner colour and the white ribs sit on top.
+    val town = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.town).let { Piece(it.trim, it.body, it.frame, it.shadow, lumaBody = true) } else load(res, BuildingArt.town(pirate))
     /** Roads by board edge direction: upright, rising to the right (+30) and falling to the right (-30). */
     val roadV = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(0)) else load(res, BuildingArt.roadV(pirate))
     val roadP30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(1)) else load(res, BuildingArt.roadP30(pirate))
@@ -101,7 +104,7 @@ internal fun DrawScope.drawPieceSprite(piece: BuildingSprites.Piece, at: Offset,
     val (a, b, f) = banditSteps(tilt)
     val dst = IntOffset((at.x - side / 2).toInt(), (at.y - side / 2).toInt())
     val size = IntSize(side.toInt(), side.toInt())
-    val tint = bodyFilter ?: pieceTint(color)
+    val tint = bodyFilter ?: if (piece.lumaBody) lumaTint(color) else pieceTint(color)
     fun layer(i: Int, alpha: Float) {
         val body = piece.body[i]; val trim = piece.trim[i]
         drawImage(body, IntOffset.Zero, IntSize(body.width, body.height), dst, size, alpha = alpha, colorFilter = tint, filterQuality = FilterQuality.Medium)
@@ -135,6 +138,18 @@ internal fun pieceMatrix(color: Color): FloatArray {
     m[18] = 1f
     return m
 }
+
+/** Colour by brightness: the body's luma times [color] (with the pieces' brightness), for bodies that are not grey. */
+internal fun lumaMatrix(color: Color): FloatArray {
+    val w = floatArrayOf(0.299f, 0.587f, 0.114f)
+    val p = floatArrayOf(color.red, color.green, color.blue)
+    val m = FloatArray(20)
+    for (r in 0 until 3) for (c in 0 until 3) m[r * 5 + c] = 1.6f * PIECE_BRIGHTNESS * p[r] * w[c]
+    m[18] = 1f
+    return m
+}
+private val lumaTints = HashMap<Color, ColorFilter>()
+internal fun lumaTint(color: Color): ColorFilter = lumaTints.getOrPut(color) { ColorFilter.colorMatrix(ColorMatrix(lumaMatrix(color))) }
 
 private val pieceTints = HashMap<Color, ColorFilter>()
 /** The colour filter for a piece of [color] (cached: there are only a few player colours). */
