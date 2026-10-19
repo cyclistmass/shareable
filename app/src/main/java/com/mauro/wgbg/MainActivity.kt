@@ -342,6 +342,18 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
         screen = Screen.ONLINE_LOBBY
     }
     fun failed(e: Throwable) { busy = false; problem = onlineProblem(e) }
+    /**
+     * Runs [then] with the online transport, set up off the main thread: a first Join, Host or Resume used to wait for
+     * Firebase there, and the app could stop answering taps. Says "Connecting…" while it waits.
+     */
+    fun withTransport(then: (wgbg.net.GameTransport) -> Unit) {
+        if (transport.isInitialized()) return then(transport.value)
+        val note = problem; problem = "Connecting…"
+        scope.launch {
+            runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { transport.value } }
+                .fold({ problem = note; then(it) }, ::failed)
+        }
+    }
     // The room to offer on the start screen ("Resume"), kept until the game ends or the host deletes it.
     var resumeCode by remember { mutableStateOf(savedRoom.getString("room", null)) }
     fun forgetRoom() { savedRoom.edit().remove("room").remove("paused").apply(); resumeCode = null }
@@ -373,7 +385,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
     fun rejoin(code: String) {
         setup = setup.copy(name = savedRoom.getString("name", null) ?: setup.name)
         busy = true; problem = "Rejoining room $code…"
-        LobbySession.rejoin(transport.value, setup, code).whenComplete { r, e ->
+        withTransport { t -> LobbySession.rejoin(t, setup, code).whenComplete { r, e ->
             scope.launch {
                 busy = false
                 if (e != null) { forgetRoom(); problem = "Couldn't rejoin $code: ${onlineProblem(e)}" }
@@ -381,7 +393,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                 else if (r.client.view().room?.status == Status.done) { r.close(); forgetRoom(); problem = "Room $code has ended." }
                 else { problem = null; savedRoom.edit().remove("paused").apply(); enterRoom(r) }
             }
-        }
+        } }
     }
     // Back after the app was closed or killed while in a game: rejoin it (the game catches up from its moves), for
     // as long as the room lives; a room you chose to leave for now waits for Resume on the start screen instead.
@@ -431,9 +443,9 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                 initial = setup,
                 onOpenLobby = { picked -> val s = picked.trimmedName()
                     setup = s; savedSetup.edit().putString("last", s.encode()).apply(); busy = true; problem = null
-                    LobbySession.host(transport.value, s, java.security.SecureRandom().nextLong()).whenComplete { r, e ->
+                    withTransport { t -> LobbySession.host(t, s, java.security.SecureRandom().nextLong()).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
-                    }
+                    } }
                 },
                 onJoinRoom = { s -> setup = s; savedSetup.edit().putString("last", s.encode()).apply(); problem = null; screen = Screen.JOIN },
                 resumeRoom = resumeCode.takeIf { session == null && !busy },
@@ -452,9 +464,9 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                 BackHandler { screen = Screen.SETUP }
                 JoinRoomScreen(setup.name, busy, initialCode = inviteCode ?: "", onJoin = { code, name ->
                     setup = setup.copy(name = name.trim()); busy = true; problem = null
-                    joinFirstOpenSeat(transport.value, setup, code).whenComplete { r, e ->
+                    withTransport { t -> joinFirstOpenSeat(t, setup, code).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
-                    }
+                    } }
                 }, onBack = { screen = Screen.SETUP })
             }
             Screen.LOBBY -> lobby?.let { l ->
