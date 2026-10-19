@@ -61,9 +61,13 @@ all_text() { echo "$2" | grep -o "\(text\|content-desc\)=\"$1\"[^/]*bounds=\"\[[
   awk '{print int(($1+$3)/2), int(($2+$4)/2)}' | sort -n -k1,1; }
 # Close the on-screen keyboard with its Enter/Done key, as a player would. Not Back: on Android 14 (lane 2) one Back
 # closes the keyboard AND the app (0.2.9 test, 2026-10-13).
-hide_keyboard() { sleep 0.5; "$ADB" shell dumpsys input_method | grep -q "mInputShown=true" && "$ADB" shell input keyevent KEYCODE_ENTER; sleep 1; }
+# Enter first (a player's Done key); if it only moved to the next box, Back closes the keyboard. Back only while
+# it's still up, or it would close the screen. Check it's really gone: a box hidden under it gets the wrong text.
+kb_up() { "$ADB" shell dumpsys input_method | grep -q "mInputShown=true"; }
+hide_keyboard() { sleep 0.5; for k in ENTER BACK; do kb_up || return 0; "$ADB" shell input keyevent KEYCODE_$k; sleep 1; done
+  kb_up && fail "the keyboard won't close"; return 0; }
 # Type into a text box (tap it, clear it, type).
-type_into() { tap $1 $2; sleep 0.5; "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in $(seq 1 14); do "$ADB" shell input keyevent KEYCODE_DEL; done
+type_into() { [ -n "$3" ] || fail "no text box to type \"$1\" into"; tap $1 $2; sleep 0.5; "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in $(seq 1 14); do "$ADB" shell input keyevent KEYCODE_DEL; done
   "$ADB" shell input text "$3"; sleep 0.5; }
 
 # A fresh install state, then in through the start screen like a player.
