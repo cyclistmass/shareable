@@ -55,7 +55,7 @@ declare -A POS
 tap_at() { [ -n "${POS[$1]:-}" ] || POS[$1]=$(find_text "$1"); [ -n "${POS[$1]}" ] || { unset "POS[$1]"; return 1; }; "$ADB" shell input tap ${POS[$1]} </dev/null; sleep 0.5; }
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
-fail() { echo "USERPLAY $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
+fail() { echo "USERPLAY $TAG FAILED: $1"; [ "$MODE" = join ] && touch "$ROOM_FILE.failed"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
 # Centres of every element with text $1, left to right.
 all_text() { echo "$2" | grep -o "\(text\|content-desc\)=\"$1\"[^/]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]" | grep -o 'bounds=.*' | tr -c '0-9\n' ' ' |
   awk '{print int(($1+$3)/2), int(($2+$4)/2)}' | sort -n -k1,1; }
@@ -127,13 +127,16 @@ else
       # Read the room code off the lobby and hand it to the friend; Start game once they're in and ready.
       code=$(dump | grep -o 'text="[^"]*"' | grep -o '[A-Z]\{3,\}-[1-9][0-9]\{1,2\}' | head -1)
       [ -n "$code" ] || fail "no room code on the lobby screen"
-      mkdir -p "$(dirname "$ROOM_FILE")"; echo "$code" > "$ROOM_FILE"; echo "USERPLAY $TAG: hosting $code"
+      mkdir -p "$(dirname "$ROOM_FILE")"; rm -f "$ROOM_FILE.failed"; echo "$code" > "$ROOM_FILE"; echo "USERPLAY $TAG: hosting $code"
       shot lobby
       for _ in $(seq 1 90); do
         "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break
+        [ -e "$ROOM_FILE.failed" ] && break
         d=$(dump); echo "$d" | grep -q 'text="Duo"' && tap_text "Start game" "$d"; sleep 3
       done
       rm -f "$ROOM_FILE"
+      # A friend who never made it in would leave the host sitting in the lobby until its time limit.
+      "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || { rm -f "$ROOM_FILE.failed"; fail "the friend never joined (see the join log)"; }
     else
       tap_text "Start game" || fail "no Start game (lobby: $(dump | grep -o 'text="[^"]*ready[^"]*"' | head -2))"
     fi
