@@ -34,7 +34,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -257,17 +256,17 @@ private fun NameField(name: String, onChange: (String) -> Unit) = ParchmentField
 
 /**
  * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
- * left the screen, closing the app from the start screen. While the box has focus, Back lets go of it; where the
- * keyboard eats that Back itself (Android 16), focus goes once the keyboard hides, or leaving takes a third Back.
+ * left the screen, closing the app from the start screen. Only while the keyboard is up does Back let go of the box;
+ * once it's down (Done, or Android 16's keyboard eating the Back itself) the next Back leaves as usual. Focus is never
+ * dropped just because the keyboard hid: a hardware Enter then put it straight back on the first box, reopening the
+ * keyboard, and Back stopped working on the Join screen.
  */
 @Composable
 internal fun Modifier.backPutsKeyboardAway(): Modifier {
     var focused by remember { mutableStateOf(false) }
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    androidx.activity.compose.BackHandler(enabled = focused) { focus.clearFocus() }
     val ime = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
-    var imeSeen by remember { mutableStateOf(false) }
-    LaunchedEffect(ime, focused) { if (ime) imeSeen = true else if (imeSeen && focused) { imeSeen = false; focus.clearFocus() } }
+    androidx.activity.compose.BackHandler(enabled = focused && ime) { focus.clearFocus() }
     return onFocusChanged { focused = it.isFocused }
 }
 
