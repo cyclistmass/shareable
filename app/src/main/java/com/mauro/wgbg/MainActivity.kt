@@ -2257,8 +2257,8 @@ private fun DrawScope.drawSupplies(s: GameState, l: Layout, wood: WoodPieces, st
         with(wood) {
             if (sp.kind == Supply.Kind.ROAD) road(l.project(sp.x - sp.dx, sp.y - sp.dy), l.project(sp.x + sp.dx, sp.y + sp.dy), p, ps)
             else {
-                val deg = Math.toDegrees((Supply.seatAngle(p, me, n) - Math.PI.toFloat() / 2f).toDouble()).toFloat()
-                withTransform({ rotate(deg, at) }) { if (sp.kind == Supply.Kind.TOWN) city(at, p, ps) else settlement(at, p, ps) }
+                val deg = faceOwnerDegrees(Supply.seatAngle(p, me, n))
+                if (sp.kind == Supply.Kind.TOWN) city(at, p, ps, deg) else settlement(at, p, ps, deg)
             }
         }
     }
