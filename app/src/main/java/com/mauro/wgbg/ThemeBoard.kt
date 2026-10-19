@@ -30,6 +30,8 @@ internal class SpaceSprites(private val resources: Resources, val choice: ArtCho
         }
         layer(sprite.shadow)
         if (owner != null && sprite.tintable) { layer(sprite.body, pieceTint(owner)); layer(sprite.trim) }
+        // Neutral pieces shipped without a full layer (the Bandit) draw their body untinted under the trim.
+        else if (sprite.full.isEmpty()) { layer(sprite.body); layer(sprite.trim) }
         else layer(sprite.full)
     }
     /** The starfield repeated over the whole canvas (one 12-unit frame left the edges bare beside the side panel). */

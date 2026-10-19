@@ -31,6 +31,12 @@ class SpaceArtTest {
         assertNull(ThemeArt.namedCard(choice, "unknown card", null))
     }
 
+    @Test fun `every Space sprite has something to draw without an owner colour`() {
+        // The Bandit ships only body and trim; SpaceSprites.draw must fall back to them, never draw just a shadow.
+        for ((role, sp) in SpaceArt.sprites) assertTrue(sp.full.isNotEmpty() || sp.body.isNotEmpty(), "$role has no visible layer")
+        assertTrue(SpaceArt.bandit.full.isEmpty() && SpaceArt.bandit.body.isNotEmpty())
+    }
+
     @Test fun `Default and Pirate dispatch keeps existing art and each swap is independent`() {
         for (set in listOf(ArtSet.DEFAULT, ArtSet.PIRATE)) {
             val choice = ArtChoice(set)

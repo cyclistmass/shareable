@@ -26,12 +26,12 @@ import kotlin.math.atan2
  */
 class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boolean, knightsPirate: Boolean = pirate, val choice: ArtChoice = ArtChoice(if (pirate) ArtSet.PIRATE else ArtSet.DEFAULT)) {
     class Piece(val body: List<ImageBitmap>, val trim: List<ImageBitmap>, val frame: Float = FRAME_UNITS, val shadow: List<ImageBitmap> = emptyList())
-    private fun space(s: SpaceArt.Sprite) = Piece(s.legacyPiece().body.map { ImageBitmap.imageResource(res, it) }, s.legacyPiece().trim.map { ImageBitmap.imageResource(res, it) }, s.frameUnits, (0..7).map { ImageBitmap.imageResource(res, s.shadow[SpaceArt.legacyTilt(it)]) })
+    private fun space(s: SpaceArt.Sprite, grow: Float = 1f) = Piece(s.legacyPiece().body.map { ImageBitmap.imageResource(res, it) }, s.legacyPiece().trim.map { ImageBitmap.imageResource(res, it) }, s.frameUnits * grow, (0..7).map { ImageBitmap.imageResource(res, s.shadow[SpaceArt.legacyTilt(it)]) })
 
     private fun load(res: Resources, p: BuildingArt.Piece) =
         Piece(p.body.map { ImageBitmap.imageResource(res, it) }, p.trim.map { ImageBitmap.imageResource(res, it) })
 
-    val homestead = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.homestead) else load(res, BuildingArt.homestead(pirate))
+    val homestead = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.homestead, SPACE_HOMESTEAD_GROW) else load(res, BuildingArt.homestead(pirate))
     val town = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.town) else load(res, BuildingArt.town(pirate))
     /** Roads by board edge direction: upright, rising to the right (+30) and falling to the right (-30). */
     val roadV = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(0)) else load(res, BuildingArt.roadV(pirate))
@@ -63,6 +63,8 @@ class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boo
     companion object {
         /** Hex units across one 256 px frame (193 px per hex unit). */
         const val FRAME_UNITS = 256f / 193f
+        /** The Space homestead dome is a fifth smaller than the Default house in its frame; drawn up to match (Space playtest). */
+        const val SPACE_HOMESTEAD_GROW = 1.25f
         /** The road policy from the art report: two 0.66-long sprites centred this far either side of an edge's middle. */
         const val ROAD_OFFSET = 0.17f
 
