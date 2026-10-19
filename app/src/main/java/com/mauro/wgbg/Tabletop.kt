@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -50,6 +51,22 @@ val ALEGREYA_SANS = FontFamily(
     Font(R.font.alegreya_sans_medium, FontWeight.SemiBold),
     Font(R.font.alegreya_sans_bold, FontWeight.Bold),
 )
+
+/**
+ * Material typography in the house fonts, so any Text without its own style is Alegreya too, not Roboto: titles in
+ * Alegreya SC, everything else in Alegreya Sans (Fable review T1: about a third of the text on screen fell back to Roboto).
+ */
+val WOOD_TYPOGRAPHY: Typography = Typography().run {
+    fun TextStyle.sc() = copy(fontFamily = ALEGREYA_SC)
+    fun TextStyle.sans() = copy(fontFamily = ALEGREYA_SANS)
+    Typography(
+        displayLarge = displayLarge.sc(), displayMedium = displayMedium.sc(), displaySmall = displaySmall.sc(),
+        headlineLarge = headlineLarge.sc(), headlineMedium = headlineMedium.sc(), headlineSmall = headlineSmall.sc(),
+        titleLarge = titleLarge.sc(), titleMedium = titleMedium.sc(), titleSmall = titleSmall.sc(),
+        bodyLarge = bodyLarge.sans(), bodyMedium = bodyMedium.sans(), bodySmall = bodySmall.sans(),
+        labelLarge = labelLarge.sans(), labelMedium = labelMedium.sans(), labelSmall = labelSmall.sans(),
+    )
+}
 
 object Wood {
     val NIGHT = Color(0xFF0B0907)

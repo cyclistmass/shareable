@@ -530,14 +530,15 @@ internal fun ChestButton(label: String, color: Color, tag: String, width: androi
 
 @Composable
 private fun BigButton(label: String, color: Color, tag: String, onClick: (() -> Unit)?, width: androidx.compose.ui.unit.Dp = 78.dp) {
+    // The same 9-slice brass plates as every other button (green go, red stop, gold counter), not a flat rounded box
+    // (Fable review T3: the chest buttons looked like another app); dimmed by the plate when there is nothing to do.
     val on = onClick != null
-    Box(
-        Modifier.size(width = width, height = 38.dp)
-            .background(if (on) color else color.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-            .border(2.dp, if (on) BRASS_LIGHT else BRASS_DARK, RoundedCornerShape(10.dp))
-            .then(if (on) Modifier.clickable { onClick!!() } else Modifier).testTag(tag),
-        contentAlignment = Alignment.Center,
-    ) { Text(label, color = if (on) Color.White else INK.copy(alpha = 0.4f), fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+    val plate = when { color.green > color.red -> Plate.GO; color.red > 0.6f && color.green < 0.4f -> Plate.STOP
+        color.red > 0.8f && color.green > 0.6f -> Plate.GOLD; else -> Plate.BRASS }
+    PlateBox(plate, enabled = on, onClick = { onClick?.invoke() }, modifier = Modifier.size(width = width, height = 38.dp).testTag(tag)) {
+        Text(label, style = Wood.sans(14.sp, FontWeight.Bold, when { !on -> INK.copy(alpha = 0.45f); plate == Plate.GOLD -> Color(0xFF3A2410); else -> Color.White }),
+            maxLines = 1, softWrap = false)
+    }
 }
 
 @Composable

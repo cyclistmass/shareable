@@ -142,7 +142,8 @@ fun SplashScreen(
                     else BrassButton(b.label, b.tag, Modifier.fillMaxWidth().height(44.dp), size = 16.sp) { tap() }
                     // A resumed game could only be left for now, never ended (Mauro, 2026-10-18: "i cant quit it").
                     if (b.action == Splash.Action.RESUME_GAME) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        BottomLink("End saved game", "end-saved-game") { confirmEnd = true }
+                        // A real button, not a bare link, so it reads as tappable (Fable review T10).
+                        WoodButton("End saved game", "end-saved-game", Modifier.height(40.dp)) { confirmEnd = true }
                     }
                 }
             }
@@ -194,8 +195,9 @@ fun EndGameConfirm(onKeep: () -> Unit, onEnd: () -> Unit, modifier: Modifier = M
         Text("End this game for good?", style = Wood.title(20.sp, Color(0xFFF1D58A)))
         Text("It can't be resumed after this.", style = Wood.sans(13.sp, color = Color(0xFFEDE6D8)))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            WoodButton("Keep it", "end-game-no") { onKeep() }
-            ColorButton("End game", Color(0xFFC0392B), "end-game-yes") { onEnd() }
+            // The safe choice is the green one; only the one that ends the game is red (Fable review W2).
+            GoButton("Keep it", "end-game-no", true, Modifier.heightIn(min = 44.dp)) { onKeep() }
+            StopButton("End game", "end-game-yes") { onEnd() }
         }
     }
 }

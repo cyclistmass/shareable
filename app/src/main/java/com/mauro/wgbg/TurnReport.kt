@@ -133,8 +133,22 @@ class TurnTracker(private val names: List<String>) {
                 r.plus(if (victim >= 0) "$n moved the bandit and took a card from ${names[victim]}" else "$n moved the bandit")
                     .let { if (victim >= 0 && card >= 0) it.copy(steal = Steal(who, victim, card)) else it }
             }
-            action.type == ActionType.DISCARD -> r.plus("$n discarded " + gained[who].withIndex().filter { it.value < 0 }.joinToString(", ") { "${-it.value} ${ALL_CARD_NAMES[it.index]}" })
-                .let { rep -> if (rep.rollOut.size > who) rep.copy(rollOut = rep.rollOut.mapIndexed { p, out -> if (p != who) out else IntArray(out.size) { out[it] + maxOf(0, -gained[who][it]) } }) else rep }
+            action.type == ActionType.DISCARD -> {
+                // One line per player for a whole discard, however many moves it took ("Blue discarded 2 Fleece, 1 Grain"),
+                // not a line per card, some of them empty (Fable review T8).
+                val out = if (r.rollOut.size > who) r.rollOut[who].let { o -> IntArray(o.size) { o[it] + maxOf(0, -gained[who][it]) } }
+                    else IntArray(gained[who].size) { maxOf(0, -gained[who][it]) }
+                val rep = if (r.rollOut.size > who) r.copy(rollOut = r.rollOut.mapIndexed { p, o -> if (p != who) o else out }) else r
+                val what = out.withIndex().filter { it.value > 0 }.joinToString(", ") { "${it.value} ${ALL_CARD_NAMES[it.index]}" }
+                val head = "$n discarded"
+                // Update the player's line in place when [out] is the running total (it is after a roll); else add one.
+                val at = if (r.rollOut.size > who) rep.events.indexOfLast { it.startsWith("$head ") && it[head.length + 1].isDigit() } else -1
+                when {
+                    what.isEmpty() -> rep
+                    at >= 0 -> rep.copy(events = rep.events.toMutableList().also { it[at] = "$head $what" })
+                    else -> rep.plus("$head $what")
+                }
+            }
             action.type == ActionType.MARITIME_TRADE -> r.plus("$n traded with the bank: ${tradeText(gained[who])}")
             action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.CkActionType.OFFER_TRADE_CK -> r.plus("$n offered a trade")
             action.type == ActionType.CONFIRM_TRADE -> {

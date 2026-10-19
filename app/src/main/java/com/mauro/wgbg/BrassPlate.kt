@@ -23,6 +23,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.Text
 import kotlin.math.roundToInt
 
 /** Raised burnished-brass plate styles (Codex art via Pip): brass, green go, red stop, bright gold. */
@@ -91,10 +94,13 @@ enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUS
  */
 @Composable
 fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifier = Modifier, plate: Plate = Plate.BRASS, lit: Boolean = false,
-                    enabled: Boolean = true, width: androidx.compose.ui.unit.Dp = 66.dp, height: androidx.compose.ui.unit.Dp = 54.dp, onClick: () -> Unit) {
+                    enabled: Boolean = true, width: androidx.compose.ui.unit.Dp = 66.dp, height: androidx.compose.ui.unit.Dp = 54.dp,
+                    caption: String? = null, onClick: () -> Unit) {
     PlateBox(if (lit) Plate.GOLD else plate, enabled = enabled, onClick = onClick,
         modifier = modifier.size(width = width, height = height).testTag(tag).semantics(mergeDescendants = true) { contentDescription = label }) {
-        androidx.compose.foundation.Canvas(Modifier.size(30.dp)) {
+      // An optional word under the icon, for buttons a new player hunts for (Fable review W8: End turn).
+      androidx.compose.foundation.layout.Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+        androidx.compose.foundation.Canvas(Modifier.size(if (caption != null) 24.dp else 30.dp)) {
             val ink = androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)
             val w = size.width; val h = size.height; val sw = w * 0.11f
             val stroke = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
@@ -169,5 +175,8 @@ fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifi
                 }
             }
         }
+        if (caption != null) Text(caption, style = Wood.sans(10.sp, FontWeight.Bold,
+            androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)), maxLines = 1)
+      }
     }
 }

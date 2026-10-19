@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -180,7 +181,7 @@ class MainActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
         }
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(background = Color.Black, surface = Color.Black)) {
+            MaterialTheme(colorScheme = darkColorScheme(background = Color.Black, surface = Color.Black), typography = WOOD_TYPOGRAPHY) {
                 // Debug builds: `--es start chivalry|base` jumps straight into a game (CI monkey tests).
                 // Debug extras only count for a fresh launch: Android relaunches a task from recents (even after a
                 // reboot) with its ORIGINAL intent, which once silently brought back autoplay in a hand-played game.
@@ -1396,11 +1397,9 @@ fun WatchGameScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GearButton(settingsOpen, { settingsOpen = true; panelOpen = false }, Modifier.size(44.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Turn ${players.first().turn}  ·  v${appVersion()}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    // Small and out of the way; it asks before leaving.
-                    Text("Exit", color = Color(0xFFFFB4A0), fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(10.dp))
-                            .clickable { confirmExit = true }.padding(horizontal = 10.dp, vertical = 3.dp).testTag("menu-exit"))
+                    Text("Turn ${players.first().turn}  ·  v${appVersion()}", style = Wood.title(16.sp), modifier = Modifier.weight(1f))
+                    // A real red plate, not a small word; it still asks before leaving (Fable review T10, Mauro: "i cant exit the game").
+                    StopButton("Leave game", "menu-exit") { confirmExit = true }
                 }
                 // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
                 WoodButton("Card guide", "menu-guide") { guideOpen = true; panelOpen = false; settingsOpen = false }
@@ -1478,24 +1477,34 @@ fun WatchGameScreen(
             EndGameConfirm(onKeep = { confirmEnd = false }, onEnd = { confirmEnd = false; saveStore?.clear(); onExit() })
         }
         if (confirmExit) Column(
-            Modifier.align(Alignment.Center).brassEdgedWood().padding(18.dp).testTag("exit-confirm"),
+            Modifier.align(Alignment.Center).widthIn(max = 480.dp).brassEdgedWood().padding(18.dp).testTag("exit-confirm"),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Leave this game?", color = Color(0xFFF1D58A), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(if (online != null) "Leave for now: Resume from the start screen any time, until the host deletes the game. " +
-                    (if (net?.isHost == true) "Delete game ends it for everyone." else "Quit: leave for good.")
-                else if (saveStore != null && human) "Leave for now: Resume it from the start screen any time. Quit game: end it for good." else "It won't be saved.",
-                color = Color(0xFFEDE6D8), fontSize = 13.sp)
+            // Keep playing is the safe green one and Leave for now neutral brass (it keeps the game); only the button that ends
+            // the game is red, on its own line under a caption (Fable review W10 / T3: three red buttons side by side).
+            val keeps = online != null || (saveStore != null && human)
+            Text("Leave this game?", style = Wood.title(20.sp))
+            Text(if (keeps) "Leave for now and Resume it from the start screen any time" + (if (online != null) ", until the host ends it." else ".")
+                else "This game isn't saved.", style = Wood.sans(14.sp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                WoodButton("Keep playing", "exit-no") { confirmExit = false }
-                ColorButton(if (online != null || (saveStore != null && human)) "Leave for now" else "Leave", Color(0xFFC0392B), "exit-yes") { confirmExit = false; onExit() }
-                // A saved local game can be ended too, not only left for now (Mauro, 2026-10-18: resumed it, "i cant quit it").
-                if (online == null && saveStore != null && human) ColorButton("Quit game", Color(0xFFC0392B), "exit-quit-local") { confirmExit = false; confirmEnd = true }
-                if (online != null && onDeleteRoom != null && net?.isHost == true)
-                    ColorButton("Delete game", Color(0xFFC0392B), "exit-delete") { confirmExit = false; onDeleteRoom() }
-                if (online != null && onQuitRoom != null && net?.isHost != true)
-                    ColorButton("Quit", Color(0xFFC0392B), "exit-quit") { confirmExit = false; onQuitRoom() }
+                GoButton("Keep playing", "exit-no", true, Modifier.heightIn(min = 44.dp)) { confirmExit = false }
+                BrassButton(if (keeps) "Leave for now" else "Leave", "exit-yes", Modifier.heightIn(min = 44.dp), size = 15.sp) { confirmExit = false; onExit() }
+            }
+            // A saved local game can be ended too, not only left for now (Mauro, 2026-10-18: resumed it, "i cant quit it").
+            val end: Triple<String, String, () -> Unit>? = when {
+                online == null && saveStore != null && human -> Triple("Quit game", "exit-quit-local") { confirmExit = false; confirmEnd = true }
+                online != null && onDeleteRoom != null && net?.isHost == true ->
+                    Triple("End game for everyone", "exit-delete") { confirmExit = false; onDeleteRoom() }
+                online != null && onQuitRoom != null && net?.isHost != true -> Triple("Quit for good", "exit-quit") { confirmExit = false; onQuitRoom() }
+                else -> null
+            }
+            if (end != null) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Wood.BRASS_DIM))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("End it for good:", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
+                    StopButton(end.first, end.second) { end.third() }
+                }
             }
         }
         // The Trade button is always there in Play mode; it lights up when a trade waits on you.

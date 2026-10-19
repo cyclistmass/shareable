@@ -219,11 +219,13 @@ private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, onKind: (SeatK
         when (seat.kind) {
             SeatKind.BOT -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    for (b in BotLevel.entries) Choice(b.label, seat.bot == b, "seat-$i-bot-${b.name}", Modifier.weight(1f).height(26.dp),
+                    for (b in BotLevel.offered) Choice(b.label, seat.bot.plays == b, "seat-$i-bot-${b.name}", Modifier.weight(1f).height(26.dp),
                         radius = 7.dp, size = 11.sp) { onBot(b) }
                 }
             }
-            SeatKind.FRIEND -> Text("Invite from the lobby, or pass this phone", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
+            // There is no pass-the-phone mode yet: on Play a bot sits here, so say so (Fable review W3).
+            SeatKind.FRIEND -> Text("Kept open for a friend when you Host a room. Play on this phone: a bot sits here.",
+                style = Wood.sans(12.sp, color = Wood.INK_SOFT))
             SeatKind.EMPTY -> Text("Nobody sits here", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
         }
     }

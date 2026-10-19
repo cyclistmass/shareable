@@ -197,9 +197,9 @@ private fun SeatRow(lobby: Lobby, i: Int, onChange: (Lobby) -> Unit) {
 @Composable
 private fun BotPicker(current: BotLevel?, seat: Int, allowNone: Boolean, onPick: (BotLevel?) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        val options: List<BotLevel?> = (if (allowNone) listOf<BotLevel?>(null) else emptyList()) + BotLevel.entries
+        val options: List<BotLevel?> = (if (allowNone) listOf<BotLevel?>(null) else emptyList()) + BotLevel.offered
         for (b in options) {
-            val on = b == current
+            val on = b == current?.plays
             val shape = RoundedCornerShape(7.dp)
             Box(
                 Modifier.height(26.dp)

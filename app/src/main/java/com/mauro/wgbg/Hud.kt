@@ -105,7 +105,7 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PL
         val scroll = androidx.compose.foundation.rememberScrollState()
         Box(Modifier.weight(1f).fillMaxWidth()) {
         Column(Modifier.fillMaxSize().padding(end = 22.dp).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        for (line in report.production) Text(line, color = HUD_TEXT, fontSize = 12.sp, maxLines = 1)
+        for (line in report.production) Text(line, color = HUD_TEXT, fontSize = 12.sp, maxLines = 2)
         for (line in report.events) Text(line, color = HUD_TEXT.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 2)
         val earlier = history.filter { it !== report }
         if (earlier.isNotEmpty()) {
@@ -113,8 +113,8 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PL
             for (t in earlier) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    (if (t.player == me) "Your turn" else "${names[t.player]}'s turn") +
-                        (if (t.rolled) " · rolled ${t.die1 + t.die2}" else "") + " · turn ${t.turn + 1}",
+                    // "Turn 3 · Blue rolled 9", not "Blue's turn · rolled 9 · turn 3" (Fable review T8).
+                    "Turn ${t.turn + 1} · " + (if (t.player == me) "You" else names[t.player]) + (if (t.rolled) " rolled ${t.die1 + t.die2}" else ""),
                     color = PLAYER_COLORS[t.player].copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp,
                 )
                 for (line in t.production) Text(line, color = HUD_TEXT.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 2)

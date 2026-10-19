@@ -107,7 +107,7 @@ private fun deck(t: Int) = DECK_NAMES.getOrElse(t) { "deck $t" }
 
 /** A short button / confirm label for a C&K action, in our names; null for non-C&K actions. */
 fun ckLabel(s: GameState, a: Action, names: List<String>): String? = when (a.type) {
-    CkActionType.BUILD_KNIGHT -> "Raise a knight here"
+    CkActionType.BUILD_KNIGHT -> "Place a new knight here"
     CkActionType.ACTIVATE_KNIGHT -> "Supply this knight"
     CkActionType.PROMOTE_KNIGHT -> "Promote this knight"
     CkActionType.MOVE_KNIGHT -> "Move the knight here"
