@@ -274,6 +274,9 @@ internal fun pauseAfter(type: wgbg.engine.ActionKind, speed: Int, pace: Float = 
 internal fun botPauseAfter(type: wgbg.engine.ActionKind, speed: Int, aiPace: Float = EnvSettings.AI_PACE_DEFAULT, personOffered: Boolean = false): Long = when (type) {
     ActionType.REJECT_TRADE -> if (personOffered) (aiPace * 1000 / speed).toLong() else 0L
     ActionType.END_TURN -> (aiPace * 2000 / speed).toLong()
+    // The roll gets the full beat too: a player saw a long wait before a bot's dice, then the roll, the 7's discards and
+    // the bandit rushed past at half of it (player report, 0.3.1).
+    ActionType.ROLL -> maxOf(pauseAfter(type, speed), (aiPace * 2000 / speed).toLong())
     else -> maxOf(pauseAfter(type, speed), (aiPace * 1000 / speed).toLong())
 }
 
@@ -424,9 +427,9 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
                 env = splashEnv, sound = splashSound,
             )
             Screen.SETUP -> { BackHandler { screen = Screen.START }; NewGameScreen(
-                onStart = { setup = it; savedSetup.edit().putString("last", it.encode()).apply(); resuming = null; gameNo++; screen = Screen.GAME },
+                onStart = { setup = it.trimmedName(); savedSetup.edit().putString("last", setup.encode()).apply(); resuming = null; gameNo++; screen = Screen.GAME },
                 initial = setup,
-                onOpenLobby = { s ->
+                onOpenLobby = { picked -> val s = picked.trimmedName()
                     setup = s; savedSetup.edit().putString("last", s.encode()).apply(); busy = true; problem = null
                     LobbySession.host(transport.value, s, java.security.SecureRandom().nextLong()).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
@@ -448,7 +451,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
             Screen.JOIN -> {
                 BackHandler { screen = Screen.SETUP }
                 JoinRoomScreen(setup.name, busy, initialCode = inviteCode ?: "", onJoin = { code, name ->
-                    setup = setup.copy(name = name); busy = true; problem = null
+                    setup = setup.copy(name = name.trim()); busy = true; problem = null
                     joinFirstOpenSeat(transport.value, setup, code).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
                     }
@@ -603,6 +606,7 @@ fun WatchGameScreen(
     // Moves from the human's taps and buttons; the game loop checks each against the rules.
     val humanMoves = remember { Channel<Action>(Channel.UNLIMITED) }
     var tradeOpen by remember { mutableStateOf(false) }
+    val harbourTab = remember { mutableStateOf(false) }   // the trade chest's Harbour tab, kept across bank trades
     // A tapped board move waits here for Confirm (or a second tap on the same spot).
     var pending by remember { mutableStateOf<List<Action>>(emptyList()) }
     // Where the pending pick was tapped (lattice), for moves with no spot of their own (town improvements).
@@ -1346,7 +1350,7 @@ fun WatchGameScreen(
             // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
             if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, bottom = 8.dp, end = 8.dp)) {
                 val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
-                TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false }, responses = responses, version = tick, autoNoSeconds = autoNo,
+                TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
                     room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
             }
             else if (cardPick.isNotEmpty() && chosen.isEmpty()) Column(

@@ -218,12 +218,15 @@ fun TradePanel(
     autoNoSeconds: Int? = null,
     /** Width the chest may fill; the cards grow to use it (Mauro: "the trade panel could be a little bigger"). */
     room: Dp = 480.dp,
+    /** Harbour tab chosen, kept by the caller: the chest leaves the screen for a moment after each bank trade, and
+     *  a tab held here went back to Players every time (player report, 0.3.1). */
+    harbour: androidx.compose.runtime.MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     version
     val mode = tradeMode(s, me)
     // Fresh selections whenever the trade situation changes.
     val key = listOf(s.turn, s.phase, s.actingPlayer, s.counters.contentHashCode(), s.hands.sum())
-    var maritime by remember { mutableStateOf(false) }
+    var maritime by harbour
     var countering by remember(key) { mutableStateOf(false) }
     var get by remember(key) { mutableStateOf(IntArray(tradeCards(s))) }
     var give by remember(key) { mutableStateOf(IntArray(tradeCards(s))) }

@@ -120,3 +120,6 @@ data class GameSetup(
         fun diceLabel(decks: Int) = if (decks == 0) "Random" else "${36 * decks}-card deck"
     }
 }
+
+/** The name as players see it in the log: "Mauro " read "Mauro  moved the bandit" (player report, 0.3.1). */
+internal fun GameSetup.trimmedName() = copy(name = name.trim())
