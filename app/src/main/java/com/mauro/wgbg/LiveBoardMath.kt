@@ -102,8 +102,9 @@ internal fun liveTint(model: String, material: String, owner: Int): androidx.com
 /** Runtime plate moved into the lower third, inside the low foreground of the realtime exports. */
 internal val LIVE_PLATE = Offset(0.36f, 0.45f)
 
+/** [stretch] scales the model's height only, on top of [scale] (roads stand taller than they're modelled). */
 internal data class LivePlacement(val model: String, val position: Offset, val height: Float = 0f,
-    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1)
+    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1, val stretch: Float = 1f)
 
 /**
  * Column-major glTF Y-axis transform; positive heading cancels the camera's screen orbit. A [lift] (radians) then tips
@@ -111,7 +112,7 @@ internal data class LivePlacement(val model: String, val position: Offset, val h
  */
 internal fun liveModelMatrix(p: LivePlacement, lift: Float = 0f, rotation: Float = 0f): FloatArray {
     val c = cos(p.heading) * p.scale; val s = sin(p.heading) * p.scale
-    val h = floatArrayOf(c, 0f, -s, 0f, p.scale, 0f, s, 0f, c) // columns
+    val h = floatArrayOf(c, 0f, -s, 0f, p.scale * p.stretch, 0f, s, 0f, c) // columns
     if (lift == 0f) return floatArrayOf(h[0], h[1], h[2], 0f, h[3], h[4], h[5], 0f, h[6], h[7], h[8], 0f,
         p.position.x, p.height, p.position.y, 1f)
     // Rodrigues about the camera's ground-level right axis (cos r, 0, -sin r): up turns toward the eye (sin r, 0, cos r).
@@ -200,6 +201,18 @@ internal const val LIVE_KNIGHT_MODEL_SCALE = 1f
 /** Roads stand proud of the tile edges in their channel (Mauro 2026-10-13: "add 3-4%"): lifted 3.5% of a hex. */
 internal const val LIVE_ROAD_LIFT = 0.035f
 
+/** Roads stand this many times their modelled height (Mauro 2026-10-19: "roads should be prouder / taller"; picked 4x). */
+internal const val LIVE_ROAD_HEIGHT = 2.5f
+
+/** Half the length of one road model on the board (the GLB is 0.66 of a hex side long). */
+internal const val LIVE_ROAD_HALF = 0.33f * ROAD_SCALE
+/** How far a road's end stops short of each corner, leaving a gap before the building there (Mauro 2026-10-19: "a little
+ *  more gap"; picked 0.20 of a hex side, up from 0.036). */
+internal const val LIVE_ROAD_GAP = 0.20f
+
+/** How far each road half sits from its edge's middle so its end is [gap] short of the corner (never past the middle). */
+internal fun liveRoadSpread(edge: Float, gap: Float): Float = (edge / 2f - gap - LIVE_ROAD_HALF).coerceAtLeast(0f)
+
 /**
  * Reads only real game state. No fixture pieces are added to the playing board. Knights are models when [hasModel]
  * has them; otherwise [drawLiveOverlay] still draws their sprites.
@@ -229,8 +242,10 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         if (owner < 0) continue
         val a = liveVertex(b, b.edgeA[e]); val z = liveVertex(b, b.edgeB[e])
         val dir = (z - a) / (z - a).getDistance()
-        for (side in listOf(-1f, 1f)) add(LivePlacement("${theme}_road_v", (a + z) / 2f + dir * side * ROAD_SPREAD, LIVE_ROAD_LIFT,
-            scale = ROAD_SCALE, heading = atan2(dir.x, dir.y), owner = owner))
+        // The two halves slide toward the middle (overlapping more) so each end stops LIVE_ROAD_GAP short of its corner.
+        val spread = liveRoadSpread((z - a).getDistance(), LIVE_ROAD_GAP)
+        for (side in listOf(-1f, 1f)) add(LivePlacement("${theme}_road_v", (a + z) / 2f + dir * side * spread, LIVE_ROAD_LIFT,
+            scale = ROAD_SCALE, heading = atan2(dir.x, dir.y), owner = owner, stretch = LIVE_ROAD_HEIGHT))
     }
     for (v in 0 until b.vertexCount) {
         val owner = s.vertexOwner[v]

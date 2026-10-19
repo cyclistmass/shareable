@@ -253,6 +253,19 @@ class SpaceArtTest {
         add("mycelium_lane", if (players == 4) 72 else 109)
     }
 
+    @Test fun `roads stretched taller than modelled batch on the Space board, and skewed matrices are still refused`() {
+        fun heightOf(m: FloatArray): Float {
+            val out = json(SpaceBoardBatch.build(listOf(SpaceBoardBatch.Instance("road_v", m)), ::bytes).glb)
+            val positions = (out["accessors"] as List<*>).map { it as Map<*, *> }.filter { it["type"] == "VEC3" && it["min"] != null }
+            return positions.maxOf { ((it["max"] as List<*>)[1] as Number).toFloat() } - positions.minOf { ((it["min"] as List<*>)[1] as Number).toFloat() }
+        }
+        val plain = liveModelMatrix(LivePlacement("space_road_v", androidx.compose.ui.geometry.Offset(1f, 2f), scale = ROAD_SCALE, heading = 0.7f))
+        val tall = liveModelMatrix(LivePlacement("space_road_v", androidx.compose.ui.geometry.Offset(1f, 2f), scale = ROAD_SCALE, heading = 0.7f, stretch = LIVE_ROAD_HEIGHT))
+        assertEquals(heightOf(plain) * LIVE_ROAD_HEIGHT, heightOf(tall), heightOf(plain) * 1e-3f)
+        val skew = matrix().also { it[4] = 0.5f }
+        assertThrows(IllegalArgumentException::class.java) { SpaceBoardBatch.build(listOf(SpaceBoardBatch.Instance("road_v", skew)), ::bytes) }
+    }
+
     @Test fun `worst four and six player boards fit triangle and material batch budgets`() {
         for (players in listOf(4, 6)) {
             val placements = worstBoard(players)
@@ -307,7 +320,9 @@ class SpaceArtTest {
         assertThrows(IllegalArgumentException::class.java) {
             SpaceBoardBatch.build(listOf(SpaceBoardBatch.Instance("homestead", matrix()))) { byteArrayOf(1, 2, 3) }
         }
-        for (m in listOf(FloatArray(15), matrix().also { it[0] = Float.NaN }, matrix().also { it[0] = 2f }))
+        for (m in listOf(FloatArray(15), matrix().also { it[0] = Float.NaN },
+                // Per-axis scale is fine (tall roads); a squashed-flat axis, a mirror or a skew is not.
+                matrix().also { it[0] = 0f }, matrix().also { it[0] = -1f }, matrix().also { it[1] = 0.5f }))
             assertThrows(IllegalArgumentException::class.java) { SpaceBoardBatch.build(listOf(SpaceBoardBatch.Instance("homestead", m)), ::bytes) }
     }
 }

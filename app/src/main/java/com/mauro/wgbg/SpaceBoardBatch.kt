@@ -96,10 +96,12 @@ internal object SpaceBoardBatch {
             val m = instance.matrix
             require(m.size == 16 && m.all { it.isFinite() })
             require(m[3] == 0f && m[7] == 0f && m[11] == 0f && m[15] == 1f)
-            // Uniform positive scale and rotation: normals use the same rotation then normalize.
+            // Rotation with a positive scale per axis (roads stand taller than modelled): orthogonal columns. Normals take
+            // the inverse transpose, which for such a matrix is each column divided by its squared length, then normalize.
             val lengths = (0..2).map { c -> (0..2).sumOf { r -> (m[c * 4 + r] * m[c * 4 + r]).toDouble() } }
-            require(lengths[0] > 0 && lengths.all { abs(it - lengths[0]) < lengths[0] * 1e-4 })
-            for (a in 0..2) for (b in a + 1..2) require(abs((0..2).sumOf { r -> (m[a*4+r]*m[b*4+r]).toDouble() }) < lengths[0] * 1e-4)
+            require(lengths.all { it > 0 })
+            for (a in 0..2) for (b in a + 1..2) require(abs((0..2).sumOf { r -> (m[a*4+r]*m[b*4+r]).toDouble() }) < sqrt(lengths[a] * lengths[b]) * 1e-4)
+            val inverse = FloatArray(3) { (1.0 / lengths[it]).toFloat() }
             val determinant = m[0]*(m[5]*m[10]-m[6]*m[9]) - m[4]*(m[1]*m[10]-m[2]*m[9]) + m[8]*(m[1]*m[6]-m[2]*m[5])
             require(determinant > 0)
             instance.linearTint?.let { require(it.size == 3 && it.all { c -> c.isFinite() && c in 0f..1f }) }
@@ -126,7 +128,7 @@ internal object SpaceBoardBatch {
                 for (v in 0 until vertices) {
                     val point = source.floats(position, v, 3)
                     val n = source.floats(normal, v, 3)
-                    val transformedNormal = FloatArray(3) { r -> m[r]*n[0] + m[4+r]*n[1] + m[8+r]*n[2] }
+                    val transformedNormal = FloatArray(3) { r -> m[r]*n[0]*inverse[0] + m[4+r]*n[1]*inverse[1] + m[8+r]*n[2]*inverse[2] }
                     val length = sqrt(transformedNormal.sumOf { (it*it).toDouble() }).toFloat()
                     require(length > 0)
                     for (r in 0..2) {

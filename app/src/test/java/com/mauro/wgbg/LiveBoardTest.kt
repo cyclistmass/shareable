@@ -111,6 +111,15 @@ class LiveBoardTest {
             assertEquals(18, list.count { it.model == "number_plate" })
             assertEquals(2, list.count { it.model == "${theme}_road_v" && it.owner == 2 })
             assertTrue(list.filter { it.model.endsWith("_road_v") }.all { it.height == LIVE_ROAD_LIFT }, "roads stand proud of the tile edges")
+            assertTrue(list.filter { it.model.endsWith("_road_v") }.all { it.stretch == LIVE_ROAD_HEIGHT }, "roads stand taller than modelled")
+            // Each road half's outer end stops LIVE_ROAD_GAP short of its corner, so buildings there keep clear of it.
+            val a = liveVertex(s.board, s.board.edgeA[0]); val z = liveVertex(s.board, s.board.edgeB[0])
+            val dir = (z - a) / (z - a).getDistance()
+            for (half in list.filter { it.model == "${theme}_road_v" && it.owner == 2 }) {
+                val ends = listOf(half.position - dir * LIVE_ROAD_HALF, half.position + dir * LIVE_ROAD_HALF)
+                val gap = minOf(ends.minOf { (it - a).getDistance() }, ends.minOf { (it - z).getDistance() })
+                assertEquals(LIVE_ROAD_GAP, gap, 1e-4f, "road end to corner")
+            }
             assertEquals(1, list.count { it.model == "${theme}_homestead" && it.owner == 0 })
             assertEquals(1, list.count { it.model == "${theme}_ramparts" && it.owner == 1 })
             assertEquals(1, list.count { it.model == "${theme}_capital_guilds" && it.owner == 2 })
