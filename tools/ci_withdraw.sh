@@ -33,9 +33,9 @@ for ruleset in $RULESETS; do
   ts_open; "$ADB" logcat -b crash -c 2>/dev/null || true
   timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
   sleep 4
-  # Bots say no at once; only a counter holds for the AI pace. Slider to 5 s (Menu › Settings, by touch) so
+  # Bots say no at once; only a counter holds for the AI pace. Slider to 5 s (Menu › Settings › Play, by touch) so
   # there is time to tap Withdraw after a counter.
-  if tap_text "Menu" && tap_text "Settings"; then
+  if tap_text "Menu" && tap_text "Settings" && tap_text "Play"; then
     dpi=$("$ADB" shell wm density | grep -o '[0-9]*' | tail -1)
     xy=$(dump | grep 'text="[0-9.]* s"' | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | tr -c '0-9\n' ' ' | awk -v d="$dpi" '{print $3 + int(214 * d / 160), int(($2+$4)/2)}')
     [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 0.6

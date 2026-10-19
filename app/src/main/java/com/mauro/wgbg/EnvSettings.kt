@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -224,7 +226,7 @@ object Pace {
 /** The 3D board (test) On/Off switch and its detail level; in the game's Menu, and in Settings on Look & art. */
 @Composable
 fun LiveBoardChoice(env: EnvSettings) {
-    Text("3D board (test)", fontSize = 13.sp, color = Color(0xFFD9B865))
+    Text("3D board (test)", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Choice("On", selected = env.liveBoard, tag = "live-board-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = true }
         Choice("Off", selected = !env.liveBoard, tag = "live-board-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = false }
@@ -234,7 +236,7 @@ fun LiveBoardChoice(env: EnvSettings) {
         Choice("Detail: LOD1", selected = env.liveLod == 1, tag = "live-lod-1", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 1 }
     }
     if (env.liveBoard) {
-        Text("Buildings face me when I turn the board", fontSize = 13.sp, color = Color(0xFFD9B865))
+        Text("Buildings face me when I turn the board", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Choice("On", selected = env.facePieces, tag = "face-pieces-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.facePieces = true }
             Choice("Off", selected = !env.facePieces, tag = "face-pieces-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.facePieces = false }
@@ -243,112 +245,154 @@ fun LiveBoardChoice(env: EnvSettings) {
 }
 
 /**
- * The gear menu: every setting in one wood-and-brass panel. Changes save as they happen;
- * Reset puts scenery and sound back to their defaults.
+ * The gear menu: every setting in one wood-and-brass panel, in groups that open and shut (Fable review T4: one
+ * 25-item scroll hid the three things people change). Changes save as they happen; Reset puts scenery and sound back.
+ * In a game, "This game" comes first with its own controls; the game's Menu keeps only actions (W7).
  */
 @Composable
 fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = Modifier,
-                  gameControls: (@Composable () -> Unit)? = null, liveBoardChoice: Boolean = true) {
+                  gameControls: (@Composable () -> Unit)? = null, lookAndArt: Boolean = false) {
     // No Done button: every change saves as it is made, and the Menu button (showing Hide) closes the panel (Mauro).
     // Scrolls when the screen is too short for every setting (landscape phones).
     Column(modifier.width(360.dp).brassEdgedWood().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp).testTag("settings-panel"),
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Settings", fontSize = 18.sp, color = Color(0xFFF1D58A), modifier = Modifier.weight(1f))
+            Text("Settings", style = Wood.title(18.sp), modifier = Modifier.weight(1f))
             ResetButton { env.reset(); sound.reset() }
         }
-        // In a game: Pause, speed and Watch bots first (Mauro, 2026-10-12: "should be under the gear menu").
-        if (gameControls != null) {
-            Text("This game", fontSize = 13.sp, color = Color(0xFFD9B865))
-            gameControls()
-        }
         AccountSection()
-        // In a game the 3D switch sits in the main Menu instead (Mauro: "3d board should move out to that main menu").
-        if (liveBoardChoice) LiveBoardChoice(env)
-        Text("AI pace: seconds between the AI players' turns (their moves take half)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("%.1f s".format(env.aiPace), fontSize = 12.sp, color = Color(0xFFEDE6D8), modifier = Modifier.width(100.dp))
-            Slider(env.aiPace, { env.aiPace = Math.round(it * 2) / 2f }, Modifier.width(220.dp).height(32.dp).testTag("ai-pace"),
-                valueRange = EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7, colors = brassSlider())
-        }
-        Text("Animations (off, or Density at 0 in the game Menu: nothing moves)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("On", selected = env.animations, tag = "animations-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = true }
-            Choice("Off", selected = !env.animations, tag = "animations-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = false }
-        }
-        Text("Scenery", fontSize = 13.sp, color = Color(0xFFD9B865))
-        // The four kinds; Density, which scales them all together, is in the game's Menu (Mauro, 2026-10-18: "in the game
-        // menu not front page").
-        for (item in EnvSettings.Item.entries)
-            SliderRow(item.label, env[item], "env-${item.name.lowercase()}") { env[item] = it }
-        // Mauro: a theme groups every piece; single pieces swap by tapping them on the Inventory, and Reset undoes that.
-        Text("Theme (tap a piece on the Inventory to swap just that one)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            for (t in ArtChoice.themes) Choice(t.label, selected = env.art.theme == t, tag = "theme-${if (t == ArtSet.DEFAULT) "normal" else t.name.lowercase()}",
-                modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.art = env.art.withTheme(t) }
-            val swapped = ArtObject.entries.filter { env.art.swapped(it) }
-            if (swapped.isNotEmpty()) Choice("Reset pieces", selected = false, tag = "theme-reset", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) {
-                env.art = env.art.reset()
-            }
-        }
-        ArtObject.entries.filter { env.art.swapped(it) }.takeIf { it.isNotEmpty() }?.let { swapped ->
-            Text("Swapped: " + swapped.joinToString { "${it.label} (${env.art[it].label})" }, fontSize = 12.sp, color = Color(0xFFE8E2D6))
-        }
-        Text("Event die (Pirate theme)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (pair in DiceArt.EVENT_STYLES.indices.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (i in pair) Choice(DiceArt.EVENT_STYLES[i], selected = env.eventDieStyle == i, tag = "event-die-$i",
-                        modifier = Modifier.height(36.dp).width(122.dp), size = 12.sp) { env.eventDieStyle = i; env.art = env.art.with(ArtObject.DICE, ArtSet.PIRATE) }
+        // In a game: Pause, speed and Watch bots first (Mauro, 2026-10-12: "should be under the gear menu").
+        if (gameControls != null) SettingsGroup("This game", "game") { gameControls() }
+        SettingsGroup("Sound", "sound") { SoundBody(sound) }
+        // Look & art opens on the board, where the theme lives.
+        SettingsGroup("Board", "board", startOpen = lookAndArt) {
+            // Mauro: a theme groups every piece; single pieces swap by tapping them on the Inventory, and Reset undoes that.
+            Setting("Theme", "Tap a piece on the Inventory to swap just that one.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    for (t in ArtChoice.themes) Choice(t.label, selected = env.art.theme == t, tag = "theme-${if (t == ArtSet.DEFAULT) "normal" else t.name.lowercase()}",
+                        modifier = Modifier.height(36.dp).width(100.dp), size = 13.sp) { env.art = env.art.withTheme(t) }
+                }
+                ArtObject.entries.filter { env.art.swapped(it) }.takeIf { it.isNotEmpty() }?.let { swapped ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Swapped: " + swapped.joinToString { "${it.label} (${env.art[it].label})" }, style = Wood.sans(12.sp), modifier = Modifier.weight(1f))
+                        Choice("Reset pieces", selected = false, tag = "theme-reset", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) {
+                            env.art = env.art.reset()
+                        }
+                    }
                 }
             }
-            // A preview of the chosen style's ship face.
-            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(DiceArt.eventFace(true, 0, env.eventDieStyle)), null, Modifier.size(56.dp))
+            Setting("Event die", "The Pirate theme's ship face.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (pair in DiceArt.EVENT_STYLES.indices.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for (i in pair) Choice(DiceArt.EVENT_STYLES[i], selected = env.eventDieStyle == i, tag = "event-die-$i",
+                                modifier = Modifier.height(36.dp).width(122.dp), size = 12.sp) { env.eventDieStyle = i; env.art = env.art.with(ArtObject.DICE, ArtSet.PIRATE) }
+                        }
+                    }
+                    // A preview of the chosen style's ship face.
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(DiceArt.eventFace(true, 0, env.eventDieStyle)), null, Modifier.size(56.dp))
+                }
+            }
+            Setting("Tiles") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Choice("Painted", selected = !env.tiles3d, tag = "tiles-painted", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.tiles3d = false }
+                    Choice("3D (preview)", selected = env.tiles3d, tag = "tiles-3d", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) { env.tiles3d = true }
+                }
+            }
+            Setting("Tile edges") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (e in EnvSettings.TileEdge.entries)
+                        Choice(e.label, selected = env.tileEdge == e, tag = "edge-${e.name.lowercase()}", modifier = Modifier.height(36.dp).width(100.dp), size = 13.sp) { env.tileEdge = e }
+                }
+            }
+            LiveBoardChoice(env)
+            Setting("Side panel") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Choice("Solid", selected = !env.seeThrough, tag = "side-solid", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.seeThrough = false }
+                    Choice("See-through", selected = env.seeThrough, tag = "side-see-through", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) { env.seeThrough = true }
+                }
+            }
+            Setting("View sliders", "Zoom, Tilt and Turn on the game screen. Pinch, drag and twist work without them.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Choice("Show", selected = env.viewBars, tag = "view-bars-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.viewBars = true }
+                    Choice("Hide", selected = !env.viewBars, tag = "view-bars-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.viewBars = false }
+                }
+            }
         }
-        Text("Zoom, Tilt and Turn sliders on the game screen (pinch, drag and twist work without them)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("Show", selected = env.viewBars, tag = "view-bars-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.viewBars = true }
-            Choice("Hide", selected = !env.viewBars, tag = "view-bars-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.viewBars = false }
+        // Density scales the four kinds together, so it leads the group (W9: it sat alone in the game's Menu).
+        SettingsGroup("Scenery", "scenery") {
+            SliderRow("Density", env.density, "env-density") { env.density = it }
+            Text("Boats, birds and sea life, all together. At 0 nothing moves.", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
+            for (item in EnvSettings.Item.entries)
+                SliderRow(item.label, env[item], "env-${item.name.lowercase()}") { env[item] = it }
         }
-        Text("Report button on the game screen (opens a bug report with a screenshot)", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("Show", selected = env.bugButton, tag = "bug-button-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = true }
-            Choice("Hide", selected = !env.bugButton, tag = "bug-button-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = false }
-        }
-        Text("Side panel", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("Solid", selected = !env.seeThrough, tag = "side-solid", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.seeThrough = false }
-            Choice("See-through", selected = env.seeThrough, tag = "side-see-through", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) { env.seeThrough = true }
-        }
-        Text("Tiles", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice("Painted", selected = !env.tiles3d, tag = "tiles-painted", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.tiles3d = false }
-            Choice("3D (preview)", selected = env.tiles3d, tag = "tiles-3d", modifier = Modifier.height(36.dp).width(130.dp), size = 13.sp) { env.tiles3d = true }
-        }
-        Text("Tile edges", fontSize = 13.sp, color = Color(0xFFD9B865))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (e in EnvSettings.TileEdge.entries)
-                Choice(e.label, selected = env.tileEdge == e, tag = "edge-${e.name.lowercase()}", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.tileEdge = e }
-        }
-        Text("Sound", fontSize = 13.sp, color = Color(0xFFD9B865))
-        VolumeRow("Music", sound.musicVolume, "vol-music") { sound.musicVolume = it }
-        VolumeRow("Sounds", sound.soundVolume, "vol-sounds") { sound.soundVolume = it }
-        Text("Songs", fontSize = 13.sp, color = Color(0xFFD9B865))
-        SoundSettings.SONGS.forEachIndexed { i, song ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SongTick(sound, i)
-                Text("♪ ${song.title}", fontSize = 12.sp, color = if (sound.songOn(i)) Color(0xFFCDBFA6) else Color(0xFF8A7A62))
+        SettingsGroup("Play", "play") {
+            Setting("AI pace", "Seconds between the AI players' turns; their moves take half.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("%.1f s".format(env.aiPace), style = Wood.sans(12.sp), modifier = Modifier.width(100.dp))
+                    BrassSlider(env.aiPace, { env.aiPace = Math.round(it * 2) / 2f }, "ai-pace", 220.dp,
+                        EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7)
+                }
+            }
+            Setting("Animations", "Off, or Density at 0: nothing moves.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Choice("On", selected = env.animations, tag = "animations-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = true }
+                    Choice("Off", selected = !env.animations, tag = "animations-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = false }
+                }
+            }
+            Setting("Report button", "On the game screen: a bug report with a screenshot, in one tap.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Choice("Show", selected = env.bugButton, tag = "bug-button-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = true }
+                    Choice("Hide", selected = !env.bugButton, tag = "bug-button-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = false }
+                }
             }
         }
     }
 }
 
+/** A Settings group: a brass title that opens and shuts it. */
+@Composable
+private fun SettingsGroup(title: String, tag: String, startOpen: Boolean = false, content: @Composable () -> Unit) {
+    var open by rememberSaveable(tag) { mutableStateOf(startOpen) }
+    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable { open = !open }.testTag("settings-$tag"),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = Wood.title(15.sp), modifier = Modifier.weight(1f))
+        Text(if (open) "^" else "v", style = Wood.title(18.sp, Wood.BRASS_EDGE), modifier = Modifier.width(24.dp))
+    }
+    if (open) Column(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
+}
+
+/** One setting: a one-word label, its control, and any explanation under the control in small soft ink. */
+@Composable
+private fun Setting(label: String, help: String? = null, control: @Composable () -> Unit) {
+    Text(label, style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
+    control()
+    if (help != null) Text(help, style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.padding(bottom = 6.dp))
+}
+
 @Composable
 private fun SliderRow(label: String, value: Float, tag: String, sliderWidth: androidx.compose.ui.unit.Dp = 220.dp, onChange: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("$label ${(value * 100).roundToInt()}%", fontSize = 12.sp, color = Color(0xFFEDE6D8), modifier = Modifier.width(100.dp))
-        Slider(value, onChange, Modifier.width(sliderWidth).height(32.dp).testTag(tag), colors = brassSlider())
+        Text("$label ${(value * 100).roundToInt()}%", style = Wood.sans(12.sp), modifier = Modifier.width(100.dp))
+        BrassSlider(value, onChange, tag, sliderWidth)
     }
+}
+
+/** A slider drawn in the motif: brass groove and a plain brass knob, no Material halo (Fable review T4). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BrassSlider(value: Float, onChange: (Float) -> Unit, tag: String, width: androidx.compose.ui.unit.Dp,
+                        range: ClosedFloatingPointRange<Float> = 0f..1f, steps: Int = 0) {
+    Slider(value, onChange, Modifier.width(width).height(36.dp).testTag(tag), valueRange = range, steps = steps, colors = brassSlider(),
+        thumb = { BrassKnob(Modifier.size(24.dp)) })
+}
+
+@Composable
+private fun BrassKnob(modifier: Modifier) = androidx.compose.foundation.Canvas(modifier) {
+    val r = size.minDimension / 2
+    drawCircle(Wood.BRASS_SHADOW, r)
+    drawCircle(Wood.BRASS, r * .84f)
+    drawCircle(Wood.BRASS_LIGHT, r * .34f, center + androidx.compose.ui.geometry.Offset(-r * .25f, -r * .25f))
 }
 
 /** The brass gear button (Mauro's art): darker while pressed, and it turns a little each tap. */
@@ -370,14 +414,6 @@ private fun VolumeSlider(value: Float, tag: String, width: androidx.compose.ui.u
     val colors = brassSlider()
     Slider(value, onChange, Modifier.width(width).height(44.dp).testTag(tag), colors = colors,
         thumb = { Phonograph(value, Modifier.size(44.dp)) })
-}
-
-@Composable
-private fun VolumeRow(label: String, value: Float, tag: String, onChange: (Float) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("$label ${(value * 100).roundToInt()}%", fontSize = 12.sp, color = Color(0xFFEDE6D8), modifier = Modifier.width(100.dp))
-        VolumeSlider(value, tag, 220.dp, onChange)
-    }
 }
 
 /** A worn-brass gramophone horn on a little walnut box, drawn at 45% to 100% of its box as [volume] goes 0 to 1. */
@@ -468,33 +504,17 @@ class SoundSettings(private val store: FloatStore) {
     }
 }
 
-/** Scenery density in the game's Menu: how much moves and lives on the board, all kinds together (0 = nothing). */
+/** Settings > Sound: Music and Game sounds sliders, Pause / Next, and the song list. */
 @Composable
-fun DensityControl(env: EnvSettings) {
-    Text("Scenery density (boats, birds, sea life)", fontSize = 13.sp, color = Color(0xFFD9B865))
-    SliderRow("Density", env.density, "env-density") { env.density = it }
-}
-
-/** Sound in the menu: a header with a ^ that opens Music and Game sounds sliders and the song list. */
-@Composable
-fun SoundControls(sound: SoundSettings) {
-    var open by rememberSaveable { mutableStateOf(false) }
+fun SoundBody(sound: SoundSettings) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(
-            Modifier.clickable { open = !open }.testTag("sound-toggle").height(36.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Sound and songs", fontSize = 14.sp)
-            Text(if (open) "^" else "v", fontSize = 18.sp, color = Color(0xFFD9B865), modifier = Modifier.width(24.dp))
-        }
-        if (open) {
+        run {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Music ${(sound.musicVolume * 100).roundToInt()}%", fontSize = 12.sp, modifier = Modifier.width(96.dp))
+                Text("Music ${(sound.musicVolume * 100).roundToInt()}%", style = Wood.sans(12.sp), modifier = Modifier.width(96.dp))
                 VolumeSlider(sound.musicVolume, "vol-music", 200.dp) { sound.musicVolume = it }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Sounds ${(sound.soundVolume * 100).roundToInt()}%", fontSize = 12.sp, modifier = Modifier.width(96.dp))
+                Text("Sounds ${(sound.soundVolume * 100).roundToInt()}%", style = Wood.sans(12.sp), modifier = Modifier.width(96.dp))
                 VolumeSlider(sound.soundVolume, "vol-sounds", 200.dp) { sound.soundVolume = it }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -504,7 +524,7 @@ fun SoundControls(sound: SoundSettings) {
                     sound.musicPaused = false; sound.onNext()
                 }
             }
-            Text("Songs (tick to keep in the list, tap a name to play it)", fontSize = 12.sp)
+            Text("Songs (tick to keep in the list, tap a name to play it)", style = Wood.sans(12.sp))
             SoundSettings.SONGS.forEachIndexed { i, song ->
                 val now = i == sound.nowPlaying && !sound.musicPaused
                 Row(verticalAlignment = Alignment.CenterVertically) {

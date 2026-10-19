@@ -49,7 +49,7 @@ tap_text_opt() { ( tap_text "$1" ) >/dev/null || true; }
 watch() {
   "$A" shell am start --activity-clear-task -n $PKG/.MainActivity --es start "$1" --ez watch true --ef tilt "$3" --ef zoom "$4" >/dev/null
   sleep 3
-  tap_text "Menu"; tap_text "Settings"   # the speed button is under the gear
+  tap_text "Menu"; tap_text "Settings"; tap_text "This game"   # the speed button is under the gear, in This game
   for _ in $(seq 1 "$2"); do "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     local label; label=$("$A" shell cat /sdcard/ui.xml | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2 || true)
     [ -n "$label" ] && tap_text_opt "$label"; done

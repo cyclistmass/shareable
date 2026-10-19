@@ -1401,7 +1401,7 @@ fun WatchGameScreen(
       }
         if (panelOpen) CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) {
             Column(
-                Modifier.align(Alignment.TopEnd).fillMaxHeight()
+                Modifier.align(Alignment.TopEnd)
                     .padding(top = 60.dp, end = 8.dp, bottom = 8.dp)
                     .width(340.dp)
                     .brassEdgedWood()
@@ -1416,28 +1416,14 @@ fun WatchGameScreen(
                     // A real red plate, not a small word; it still asks before leaving (Fable review T10, Mauro: "i cant exit the game").
                     StopButton("Leave game", "menu-exit") { confirmExit = true }
                 }
+                // Actions only (Fable review W7); every setting, and this game's own controls, are behind Settings.
                 // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
                 WoodButton("Card guide", "menu-guide") { guideOpen = true; panelOpen = false; settingsOpen = false }
+                WoodButton("Fit the board", "menu-fit") { camera = Camera.FIT; panelOpen = false }
+                WoodButton("Settings", "menu-settings") { settingsOpen = true; panelOpen = false }
                 // A bug or an idea, typed or spoken, with this whole game attached (Mauro, 2026-10-12).
                 WoodButton("Report a bug or idea", "menu-feedback") { panelOpen = false; settingsOpen = false; reportCapture = true }
                 if (online != null) Text("Online · room ${online.id}", fontWeight = FontWeight.Bold, modifier = Modifier.testTag("menu-room"))
-                // Sound, 3D and Density near the top, where a phone shows them without scrolling (reports kIkrdfU, KZ5kmoV:
-                // the sound and playlist were there but below the fold).
-                SoundControls(sound)
-                if (!lookAndArt) LiveBoardChoice(env)
-                DensityControl(env)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
- // Inventory lives on the Look & art page before the game now (#71, Mauro: clean up the menu).
-                    WoodButton("Fit", "menu-fit") { camera = Camera.FIT }
-                    if (env.liveBoard) WoodButton("3D collection (test)", "menu-live-collection") { inventory = true; panelOpen = false; settingsOpen = false; camera = Camera.FIT; boardRotation = 0f }
-                    if (online == null) WoodButton(if (diceSetting == 0) "Dice: random" else "Dice: ${36 * diceSetting} deck · ${(dice as? DiceDeck)?.remaining ?: ""}", "menu-dice") {
-                        diceSetting = (diceSetting + 1) % 5
-                    }
-                }
-                PlayerPanel(players, names)
-                Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
-                    style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                for (line in log) Text(line, style = MaterialTheme.typography.bodySmall, maxLines = 1)
             }
         }
       }
@@ -1472,9 +1458,9 @@ fun WatchGameScreen(
         // Pause, speed and Watch bots live under the gear (Mauro, 2026-10-12); local games only, not on Look & art.
         if (settingsOpen) SettingsPanel(env, sound,
             Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = 8.dp),
-            gameControls = if (online == null && !lookAndArt) {
-                {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            gameControls = if (!lookAndArt) {
+                { CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (online == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         WoodButton(if (playing) "Pause" else "Play", "menu-pause") { playing = !playing }
                         WoodButton(if (speed == MAX_SPEED) "Max" else "${speed}×", "menu-speed") { speed = if (speed == MAX_SPEED) 1 else speed * 2 }
                         WoodButton(if (human) "Watch bots" else "Play", "menu-watch") { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; seed++; playing = true }
@@ -1484,9 +1470,19 @@ fun WatchGameScreen(
                         }
                         if (!human && oneGame && tick.let { state.isOver }) WoodButton("Next game", "menu-next-game") { seed++ }
                     }
-                }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (env.liveBoard) WoodButton("3D collection (test)", "menu-live-collection") { inventory = true; panelOpen = false; settingsOpen = false; camera = Camera.FIT; boardRotation = 0f }
+                        if (online == null) WoodButton(if (diceSetting == 0) "Dice: random" else "Dice: ${36 * diceSetting} deck · ${(dice as? DiceDeck)?.remaining ?: ""}", "menu-dice") {
+                            diceSetting = (diceSetting + 1) % 5
+                        }
+                    }
+                    PlayerPanel(players, names)
+                    Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
+                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    for (line in log) Text(line, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                } } }
             } else null,
-            liveBoardChoice = lookAndArt)
+            lookAndArt = lookAndArt)
         if (confirmEnd) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
             BackHandler { confirmEnd = false }
             EndGameConfirm(onKeep = { confirmEnd = false }, onEnd = { confirmEnd = false; saveStore?.clear(); onExit() })

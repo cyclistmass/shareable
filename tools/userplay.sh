@@ -147,14 +147,15 @@ shot start
 for _ in $(seq 1 120); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
 "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started (still on the start screen?)"
 # Animations off from the menu, like a player can (Mauro: test games skip the animation; it also makes reading the
-# screen fast, since a still screen needs no waiting): Menu, Settings, Animations Off, Hide (it saves as you tap).
+# screen fast, since a still screen needs no waiting): Menu, Settings, Play, Animations Off, Hide (it saves as you tap).
+# Settings opens with its groups shut (Fable review T4), so open Play first; only its Off is then on screen.
 if tap_text "Menu"; then
-  tap_desc "Settings" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
+  tap_desc "Settings" && tap_text "Play" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
   tap_text "Hide"
 fi
-# Local games: speed the bots up like a player can (Menu, the gear, tap the speed button up to Max, Hide).
+# Local games: speed the bots up like a player can (Menu, the gear, This game, tap the speed button up to Max, Hide).
 if [ "$MODE" = local ]; then
-  tap_text "Menu" && tap_desc "Settings" && for _ in 1 2 3 4 5; do
+  tap_text "Menu" && tap_desc "Settings" && tap_text "This game" && for _ in 1 2 3 4 5; do
     lbl=$(dump | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2)
     [ "$lbl" = "Max" ] && break; [ -n "$lbl" ] && tap_text "$lbl"
   done; tap_text "Hide"

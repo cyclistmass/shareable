@@ -61,7 +61,7 @@ play_setup() { # place your opening pieces through the agent hooks (no debug bad
   done
 }
 one_game() { # watching: stop on the finished board instead of starting the next
-  tap_text "Menu"; tap_text "Settings"; tap_text "Nonstop"; tap_text_opt "Hide"; sleep 6   # Nonstop is under the gear
+  tap_text "Menu"; tap_text "Settings"; tap_text "This game"; tap_text "Nonstop"; tap_text_opt "Hide"; sleep 6   # Nonstop is under the gear
 }
 
 # 1. The tilted board late in a game (Default theme): rendered towns and roads, Bandit V2.
@@ -91,10 +91,10 @@ done
 "$A" shell input tap 1200 540 >/dev/null 2>&1 || true
 tap_text "Trade"; sleep 1
 shot trade-chest
-# 5. Settings (the gear) scrolled to the event die styles, then 6. the Inventory, which is on the Look & art page
+# 5. Settings (the gear) with Board open, scrolled to the event die styles, then 6. the Inventory, which is on the Look & art page
 # before a game now (#71).
 tap_text "Close"; sleep 0.5
-tap_text "Menu"; tap_text "Settings"; sleep 1.2
+tap_text "Menu"; tap_text "Settings"; tap_text "Board"; sleep 1.2
 "$A" shell input swipe 1900 950 1900 520 500; sleep 1
 shot settings
 "$A" shell am start --activity-clear-task -n $PKG/.MainActivity >/dev/null; sleep 4

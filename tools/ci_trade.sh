@@ -48,8 +48,8 @@ for ruleset in $RULESETS; do
   ts_open; "$ADB" logcat -b crash -c 2>/dev/null || true
   timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
   sleep 4
-  # Bots at full speed, quick pace (Menu › Settings, by touch), so a turn with two lots comes up sooner.
-  tap_text "Menu" && tap_text "Settings" && tap_text "2×" && tap_text "4×" && tap_text "8×" && tap_text "Quick"; tap_text "Hide" || true
+  # Bots at full speed, quick pace (Menu › Settings › This game, by touch), so a turn with two lots comes up sooner.
+  tap_text "Menu" && tap_text "Settings" && tap_text "This game" && tap_text "2×" && tap_text "4×" && tap_text "8×" && tap_text "Quick"; tap_text "Hide" || true
   done_ab=0; done_c=0; done_d=0; again=0; games=1; start=$(date +%s); ts_alive
   while [ $(( $(date +%s) - start )) -lt "$SECS" ] && { [ $done_c = 0 ] || [ $done_d = 0 ]; } && [ $fail = 0 ]; do
     crashed && { bad "crash"; break; }
