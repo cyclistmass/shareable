@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -120,26 +121,36 @@ fun NewGameScreen(
                 }
                 Text("Tap photo to pick one", style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.width(90.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.weight(1f),
-                    onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+            // Side by side when each seat gets about 120 dp; on a narrower panel (CI's 640x320 screen) "Greedy" read "Gr",
+            // so the seats stack, each with its choices across the panel.
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 380.dp) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.weight(1f),
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                } else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.fillMaxWidth(), stacked = true,
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                }
             }
             Text("Game", style = Wood.title(18.sp), modifier = Modifier.padding(top = 4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (r in Ruleset.entries) Choice(r.label, setup.ruleset == r, "ruleset-${r.name}",
                     Modifier.weight(1f).height(40.dp), radius = 9.dp, size = 15.sp) { setup = setup.withRuleset(r) }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Points", style = Wood.sans(14.sp, color = Wood.INK_SOFT), modifier = Modifier.width(70.dp))
-                Choice("−", false, "points-down", Modifier.size(34.dp), size = 18.sp,
-                    enabled = setup.points > GameSetup.POINTS_RANGE.first) { setup = setup.withPoints(setup.points - 1) }
-                Text("${setup.points}", style = Wood.sans(18.sp, FontWeight.Bold), modifier = Modifier.width(28.dp).testTag("points"),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Choice("+", false, "points-up", Modifier.size(34.dp), size = 18.sp,
-                    enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
-            }
-            // Their own row that wraps: beside Points they ran off the right edge of a narrow panel (CI's 640x320 screen).
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Points and the buttons share a row that wraps: on a phone (914 dp wide) they fit in one row so the panel needs
+            // no scroll; on a narrow panel (CI's 640x320 screen) the buttons wrap below instead of running off the edge.
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Points", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
+                    Choice("−", false, "points-down", Modifier.size(34.dp), size = 18.sp,
+                        enabled = setup.points > GameSetup.POINTS_RANGE.first) { setup = setup.withPoints(setup.points - 1) }
+                    Text("${setup.points}", style = Wood.sans(18.sp, FontWeight.Bold), modifier = Modifier.width(28.dp).testTag("points"),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Choice("+", false, "points-up", Modifier.size(34.dp), size = 18.sp,
+                        enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
+                }
+                Spacer(Modifier.weight(1f))
                 if (onFeedback != null) WoodButton("Report", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
                 if (onPlayIntro != null) WoodButton("Intro", "play-intro", Modifier.height(40.dp)) { onPlayIntro() }
                 if (onLookAndArt != null) BrassButton("Look & art", "look-and-art", Modifier.height(40.dp)) { onLookAndArt(setup) }
@@ -208,14 +219,17 @@ private fun Panel(modifier: Modifier, scroll: Boolean = false, content: @Composa
 
 /** One of seats 2-4: Friend / Bot / Empty, then the bot level and what it means. */
 @Composable
-private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit) {
+private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, stacked: Boolean = false, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit) {
     Column(
         modifier.background(androidx.compose.ui.graphics.Color(0x47000000), RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 7.dp).testTag("seat-$i"),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, Wood.SEAT_TEXT[i]))
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        // Stacked, the seat's name sits beside its choices to keep each seat short.
+        val title = @Composable { m: Modifier -> Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, Wood.SEAT_TEXT[i]), modifier = m) }
+        if (!stacked) title(Modifier)
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (stacked) title(Modifier.width(56.dp))
             for (k in SeatKind.entries) Choice(k.label, seat.kind == k, "seat-$i-${k.name}", Modifier.weight(1f).height(28.dp),
                 radius = 7.dp, size = 12.sp) { onKind(k) }
         }

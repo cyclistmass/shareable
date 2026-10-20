@@ -63,13 +63,14 @@ scroll_to() { on "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm si
   [ "$w" -lt "$h" ] && read -r w h <<< "$h $w"
   for x in $((w * 3 / 4)) $((w / 4)); do for _ in 1 2 3; do "$ADB" shell input swipe $x $((h * 3 / 4)) $x $((h / 4)) 400; sleep 1; on "$1" && return 0; done; done; return 1; }
 go() { scroll_to "$1"; tap_text "$1" && on "$2" || { bad "\"$1\" didn't open its screen"; [ $fail = 0 ] || { echo "keyboard: FAILED"; exit 1; }; }; }
-go "New game" "Base game"
-# Game-start screen (marked by its Base game choice); leaving goes back to the start screen.
-up_back 1 "Base game" "game-start name"
-go "New game" "Base game"
-enter_back 1 "Base game" "game-start name" "Duo" line
+go "New game" "Players"
+# Game-start screen (marked by its Players heading: on a narrow screen the stacked seats push Base game below the fold);
+# leaving goes back to the start screen.
+up_back 1 "Players" "game-start name"
+go "New game" "Players"
+enter_back 1 "Players" "game-start name" "Duo" line
 # Online needs a real name ("You" keeps Join a room off): type one and stay.
-go "New game" "Base game"
+go "New game" "Players"
 open_box 1 "game-start name" && { "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in 1 2 3 4 5 6 7 8; do "$ADB" shell input keyevent KEYCODE_DEL; done
   "$ADB" shell input text Duo; key ENTER; }
 # Join screen (marked by Room code): name, then code; each leave goes back to the game-start screen.

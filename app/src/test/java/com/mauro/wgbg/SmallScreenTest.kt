@@ -20,6 +20,23 @@ class SmallScreenTest {
         assertTrue("Panel(Modifier.width(300.dp), scroll = true)" in screen, "the right panel (dice, Play, Host, Join) scrolls")
         val buttons = screen.substringAfter("FlowRow(").substringBefore("\n            }\n")
         for (b in listOf("\"Report\"", "\"Intro\"", "\"Look & art\"", "\"Card tester\"")) assertTrue(b in buttons, "$b wraps with the others")
+        // Points shares that row, so on a phone the panel needs no scroll to show the buttons.
+        assertTrue("\"Points\"" in buttons)
+    }
+
+    @Test
+    fun `seats stack on a narrow panel so their choices keep their names`() {
+        val screen = text("NewGameScreen.kt")
+        val seats = screen.substringAfter("BoxWithConstraints(").substringBefore("\n            }\n")
+        assertTrue("maxWidth >=" in seats && "stacked = true" in seats, "below the width three seats need, they stack")
+    }
+
+    @Test
+    fun `the game-over panel and the dice histogram scroll`() {
+        assertTrue("chest().verticalScroll(rememberScrollState())" in text("Congrats.kt"), "six players (v3) outgrow 320 dp")
+        assertTrue("chest().verticalScroll(rememberScrollState())" in text("Histogram.kt"), "with the event die it outgrows 320 dp")
+        // ci_reach.sh finds the dice by this name to double-tap them.
+        assertTrue("contentDescription = \"Dice\"" in text("Hud.kt"))
     }
 
     @Test

@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /** Card-border colors for Timber, Clay, Fleece, Grain, Stone (matches the card designs). */
 internal val CARD_COLORS = listOf(Color(0xFF2E7D32), Color(0xFFBF5B30), Color(0xFF6E9A45), Color(0xFFC9962C), Color(0xFF4A5E80))
@@ -87,7 +89,8 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PL
     ) {
         val doubleTapNow = androidx.compose.runtime.rememberUpdatedState(onDiceDoubleTap)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.testTag("dice-row").then(if (onDiceDoubleTap != null) Modifier.pointerInput(Unit) {
+            // Named for screen readers (and for tools/ci_reach.sh, which double-taps it for the histogram).
+            modifier = Modifier.testTag("dice-row").semantics { contentDescription = "Dice" }.then(if (onDiceDoubleTap != null) Modifier.pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = { doubleTapNow.value?.invoke() })   // today's handler, not the first one (#122)
             } else Modifier)) {
             val color = PLAYER_COLORS[report.player]

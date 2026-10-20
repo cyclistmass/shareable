@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,8 +68,9 @@ internal fun CongratsScreen(
     }
     Box(Modifier.fillMaxSize().background(Color(0x66000000)).testTag("congrats")) {
         if (winner >= 0) Confetti(PLAYER_COLORS[winner])
+        // Scrolls: four players and the buttons just fit 320 dp tall (CI's screen); six (v3) would not.
         Column(
-            Modifier.align(Alignment.Center).widthIn(min = 320.dp, max = 460.dp).chest(),
+            Modifier.align(Alignment.Center).widthIn(min = 320.dp, max = 460.dp).chest().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
