@@ -339,6 +339,11 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                 }
             }
         }
+        // #85: the trademark notice, where players look for it in a game too (the full About board is on the start screen).
+        SettingsGroup("About", "about") {
+            Text("Working German Board Game ${appVersion()} · GPL-3.0", style = Wood.sans(13.sp))
+            Text(Splash.TRADEMARK, style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("settings-trademark"))
+        }
     }
 }
 

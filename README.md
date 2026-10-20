@@ -2,7 +2,7 @@
 
 Open-source Android hex-trading board game, compatible with the rules of the
 classic German settlement-building game, for up to 4 players plus AI.
-Not affiliated with or endorsed by Catan GmbH.
+Not affiliated with or endorsed by Catan GmbH. See [Trademarks](#trademarks).
 
 ![Four bots playing the base game at 1x: tilted board with rendered towns, roads and the bandit](docs/gameplay-1x.gif)
 
@@ -54,3 +54,14 @@ Secrets (`google-services.json`, keystores, `.env`) are gitignored and must neve
 Online play data model, AppRoot wiring, test plan and rules deployment: [docs/online-play.md](docs/online-play.md).
 
 Every test and test script, what CI runs, and the known gaps: [docs/testing/README.md](docs/testing/README.md).
+
+## Trademarks
+
+Working German Board Game is an original, independent game. It is not affiliated with, endorsed by or sponsored by
+Catan GmbH, Catan Studio or any of their licensees. CATAN and Cities & Knights are trademarks of Catan GmbH. We name
+them here, and Catanatron (the open-source bot project we cross-check our rules against), only to say that we are not
+them.
+
+Game rules and mechanics are not protected by copyright, so this game can play by compatible rules, but everything you
+see and read is our own: the name, every resource, piece and card name (see the expansion, Age of Chivalry), the rules
+text and all the art, which is either made for this game or CC0 (sources in [CREDITS.md](CREDITS.md)).

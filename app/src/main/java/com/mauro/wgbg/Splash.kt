@@ -88,8 +88,13 @@ object Splash {
         "Software" to "Kotlin, Jetpack Compose and AndroidX, Firebase, ZXing and Filament (Apache License 2.0).",
         "Thanks" to "To everyone who playtested and sent in-app reports.",
     )
-    const val DISCLAIMER = "An independent game with rules compatible with the classic German settlement-building game; " +
-        "not affiliated with or endorsed by its publishers. All names, card text and art are our own."
+    /**
+     * The trademark notice (#85, Mauro's wording): the only place the app names the original game's publisher, and
+     * only to say we're not them (it replaced the vaguer "its publishers" line). Shown on the About board and in
+     * Settings › About.
+     */
+    const val TRADEMARK = "An original game. Not affiliated with or endorsed by Catan GmbH or Catan Studio. " +
+        "CATAN is a trademark of Catan GmbH. All names, rules text and art are our own."
     const val ABOUT_LINE = "Made by Mauro DiBenedetto, with art and music built for the game. No ads, no tracking."
 }
 
@@ -246,7 +251,7 @@ fun AboutScreen(onClose: () -> Unit) {
                     pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = Wood.BRASS_LIGHT)); append("$head. "); pop()
                     append(body)
                 }, style = Wood.sans(14.sp))
-            Text(Splash.DISCLAIMER, style = Wood.sans(13.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("disclaimer"))
+            Text(Splash.TRADEMARK, style = Wood.sans(13.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("trademark"))
             BottomLink("Full credits and licence texts", "full-credits") { openLink(context, Splash.CREDITS_URL) }
         }
     }
