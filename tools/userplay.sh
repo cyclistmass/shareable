@@ -79,7 +79,7 @@ type_into() { [ -n "$3" ] || fail "no text box to type \"$1\" into"; tap $1 $2; 
 "$ADB" shell am force-stop $PKG
 # RESUME=1 keeps the saved game (an update over the last release, or a relaunch mid-game) and goes in through the
 # splash's Resume game instead of a new game.
-[ -n "$RESUME" ] || "$ADB" shell pm clear $PKG >/dev/null
+[ -n "${RESUME:-}" ] || "$ADB" shell pm clear $PKG >/dev/null
 "$ADB" logcat -c; "$ADB" logcat -b crash -c 2>/dev/null || true
 # Tap the launcher icon. Android may still be tidying up after the clear and close the new window right away, so
 # make sure the app is really running (relaunch if not).
@@ -98,7 +98,7 @@ if echo "$d" | grep -q 'text="Tap to skip"'; then tap 1200 540; sleep 2
   for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="New game"' && break; sleep 1; done; fi
 echo "$d" | grep -q 'text="New game"' || fail "the splash never appeared"
 shot splash
-if [ -n "$RESUME" ]; then
+if [ -n "${RESUME:-}" ]; then
   tap_text "Resume game" "$d" || fail "no Resume game button"
 else
 # The splash's New game opens the game-start screen (players, ruleset, Play, Host and Join).
