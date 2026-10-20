@@ -3,6 +3,8 @@ package com.mauro.wgbg
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 
 /** One tune in the set list (#17, #58): its title and its recording in res/raw (tools/make_sounds.py). */
 data class Song(val title: String, val res: Int)
@@ -18,6 +20,11 @@ class MusicPlayer(private val context: Context, private val songs: List<Song>) :
     private var volume = 0f
     private var paused = false
     private var held = false
+    /** Bumped by every start and stop: a song still loading when it changes is let go instead of played. */
+    private var generation = 0
+    private var loading = false
+    private var closed = false
+    private val main = Handler(Looper.getMainLooper())
     /** Told the index of each song as it starts. */
     var onSong: (Int) -> Unit = {}
     /** Whether song i is ticked in the set list (#131); unticked songs are passed over, unless tapped. */
@@ -55,23 +62,37 @@ class MusicPlayer(private val context: Context, private val songs: List<Song>) :
     }
     private fun log(m: String) { runCatching { android.util.Log.i("WGBG-MUSIC", m) } }
 
+    /**
+     * Loads the song on a background thread (#111: MediaPlayer.create reads and prepares the file, which held up the
+     * main thread as a game opened), then starts it on the main thread if it's still wanted.
+     */
     private fun start(tapped: Boolean = false) {
-        if (songs.isEmpty()) return
+        if (songs.isEmpty() || closed || (loading && !tapped)) return
         index = if (tapped) index else nextOn(index % songs.size, songs.size, enabled).takeIf { it >= 0 } ?: return
         val song = songs[index]
-        runCatching {
-            val p = MediaPlayer.create(context, song.res, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(), 0) ?: return
-            p.setVolume(musicLevel(volume), musicLevel(volume))
-            p.setOnCompletionListener { it.release(); player = null; playing = null; index++; if (!paused && !held && volume > 0f) start() }
-            p.setOnErrorListener { mp, _, _ -> mp.release(); player = null; playing = null; true }
-            p.start(); player = p; playing = song; onSong(index)
-        }
+        val gen = ++generation; loading = true
+        Thread({
+            val p = runCatching {
+                MediaPlayer.create(context, song.res, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(), 0)
+            }.getOrNull()
+            main.post {
+                if (gen == generation) loading = false
+                if (p == null) return@post
+                if (!musicStillWanted(gen, generation, paused, held, volume, closed)) { runCatching { p.release() }; return@post }
+                runCatching {
+                    p.setVolume(musicLevel(volume), musicLevel(volume))
+                    p.setOnCompletionListener { it.release(); player = null; playing = null; index++; if (!paused && !held && volume > 0f) start() }
+                    p.setOnErrorListener { mp, _, _ -> mp.release(); player = null; playing = null; true }
+                    p.start(); player = p; playing = song; onSong(index)
+                }.onFailure { runCatching { p.release() } }
+            }
+        }, "music-load").apply { isDaemon = true }.start()
     }
 
-    private fun stop() { runCatching { player?.release() }; player = null; playing = null }
+    private fun stop() { generation++; loading = false; runCatching { player?.release() }; player = null; playing = null }
 
-    override fun close() = stop()
+    override fun close() { closed = true; stop() }
 }
 
 /**
@@ -87,3 +108,7 @@ internal fun nextOn(from: Int, size: Int, on: (Int) -> Boolean): Int {
     for (k in 0 until size) { val i = ((from + k) % size + size) % size; if (on(i)) return i }
     return -1
 }
+
+/** Whether a song that finished loading should play: nothing newer was asked for, and the music is on and not paused. */
+internal fun musicStillWanted(gen: Int, current: Int, paused: Boolean, held: Boolean, volume: Float, closed: Boolean): Boolean =
+    gen == current && !paused && !held && volume > 0f && !closed

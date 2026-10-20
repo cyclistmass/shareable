@@ -19,7 +19,9 @@ centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n
 at() { dump | grep "\(text\|content-desc\)=\"$1\"" | centre; }
 tap_text() { local xy; xy=$(at "$1"); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
 # A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
+# wm size gives the portrait size; the app is landscape, so the long side is the width (a swipe from below the screen does nothing).
 panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
+  [ "$w" -lt "$h" ] && read -r w h <<< "$h $w"
   for _ in 1 2 3 4; do "$ADB" shell input swipe $((w * 7 / 10)) $((h * 4 / 5)) $((w * 7 / 10)) $((h * 3 / 10)) 400; sleep 0.8; tap_text "$1" && return 0; done; return 1; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }

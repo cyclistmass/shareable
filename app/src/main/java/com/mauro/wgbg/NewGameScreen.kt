@@ -14,8 +14,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,10 +29,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -106,7 +108,8 @@ fun NewGameScreen(
         modifier.fillMaxSize().tableTop().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Panel(Modifier.weight(1f)) {
+        // Scrolls too: at 320 dp tall (CI's screen) Points, Report and Intro were cut off the bottom.
+        Panel(Modifier.weight(1f), scroll = true) {
             Text("Players", style = Wood.title(22.sp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PhotoToken(setup.photo, setup.name, PLAYER_COLORS[0]) {
@@ -118,32 +121,40 @@ fun NewGameScreen(
                 }
                 Text("Tap photo to pick one", style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.width(90.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.weight(1f),
-                    onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+            // Side by side when each seat gets about 120 dp; on a narrower panel (CI's 640x320 screen) "Greedy" read "Gr",
+            // so the seats stack, each with its choices across the panel.
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 380.dp) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.weight(1f),
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                } else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.fillMaxWidth(), stacked = true,
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                }
             }
             Text("Game", style = Wood.title(18.sp), modifier = Modifier.padding(top = 4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (r in Ruleset.entries) Choice(r.label, setup.ruleset == r, "ruleset-${r.name}",
                     Modifier.weight(1f).height(40.dp), radius = 9.dp, size = 15.sp) { setup = setup.withRuleset(r) }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Points", style = Wood.sans(14.sp, color = Wood.INK_SOFT), modifier = Modifier.width(70.dp))
-                Choice("−", false, "points-down", Modifier.size(34.dp), size = 18.sp,
-                    enabled = setup.points > GameSetup.POINTS_RANGE.first) { setup = setup.withPoints(setup.points - 1) }
-                Text("${setup.points}", style = Wood.sans(18.sp, FontWeight.Bold), modifier = Modifier.width(28.dp).testTag("points"),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Choice("+", false, "points-up", Modifier.size(34.dp), size = 18.sp,
-                    enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
+            // Points and the buttons share a row that wraps: on a phone (914 dp wide) they fit in one row so the panel needs
+            // no scroll; on a narrow panel (CI's 640x320 screen) the buttons wrap below instead of running off the edge.
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                itemVerticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Points", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
+                    Choice("−", false, "points-down", Modifier.size(34.dp), size = 18.sp,
+                        enabled = setup.points > GameSetup.POINTS_RANGE.first) { setup = setup.withPoints(setup.points - 1) }
+                    Text("${setup.points}", style = Wood.sans(18.sp, FontWeight.Bold), modifier = Modifier.width(28.dp).testTag("points"),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Choice("+", false, "points-up", Modifier.size(34.dp), size = 18.sp,
+                        enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
+                }
                 Spacer(Modifier.weight(1f))
                 if (onFeedback != null) WoodButton("Report", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
-                if (onFeedback != null) Spacer(Modifier.width(8.dp))
                 if (onPlayIntro != null) WoodButton("Intro", "play-intro", Modifier.height(40.dp)) { onPlayIntro() }
-                if (onPlayIntro != null) Spacer(Modifier.width(8.dp))
                 if (onLookAndArt != null) BrassButton("Look & art", "look-and-art", Modifier.height(40.dp)) { onLookAndArt(setup) }
-            }
-            if (onCardTester != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                WoodButton("Card tester", "card-tester", Modifier.height(40.dp)) { onCardTester() }
+                if (onCardTester != null) WoodButton("Card tester", "card-tester", Modifier.height(40.dp)) { onCardTester() }
             }
         }
         // Scrolls when it can't fit: a saved game's Resume used to push Host and Join off the bottom (2026-10-12).
@@ -208,14 +219,17 @@ private fun Panel(modifier: Modifier, scroll: Boolean = false, content: @Composa
 
 /** One of seats 2-4: Friend / Bot / Empty, then the bot level and what it means. */
 @Composable
-private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit) {
+private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, stacked: Boolean = false, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit) {
     Column(
         modifier.background(androidx.compose.ui.graphics.Color(0x47000000), RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 7.dp).testTag("seat-$i"),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, Wood.SEAT_TEXT[i]))
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        // Stacked, the seat's name sits beside its choices to keep each seat short.
+        val title = @Composable { m: Modifier -> Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, Wood.SEAT_TEXT[i]), modifier = m) }
+        if (!stacked) title(Modifier)
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (stacked) title(Modifier.width(56.dp))
             for (k in SeatKind.entries) Choice(k.label, seat.kind == k, "seat-$i-${k.name}", Modifier.weight(1f).height(28.dp),
                 radius = 7.dp, size = 12.sp) { onKind(k) }
         }
@@ -254,20 +268,37 @@ private fun DiceChoice(title: String, note: String, selected: Boolean, tag: Stri
 @Composable
 private fun NameField(name: String, onChange: (String) -> Unit) = ParchmentField(name, onChange, "name")
 
+/** What Back does in a text box: keyboard up, only put it away (#121); keyboard down, the screen's own Back (#146). */
+internal enum class TextBoxBack { PUT_KEYBOARD_AWAY, PASS_ON }
+
+internal fun textBoxBack(keyboardUp: Boolean) = if (keyboardUp) TextBoxBack.PUT_KEYBOARD_AWAY else TextBoxBack.PASS_ON
+
 /**
  * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
- * left the screen, closing the app from the start screen. Only while the keyboard is up does Back let go of the box;
- * once it's down (Done, or Android 16's keyboard eating the Back itself) the next Back leaves as usual. Focus is never
- * dropped just because the keyboard hid: a hardware Enter then put it straight back on the first box, reopening the
- * keyboard, and Back stopped working on the Join screen.
+ * left the screen, closing the app from the start screen. Back is taken as a key on the box itself: an
+ * OnBackPressedCallback added here sat under the screen's own BackHandler and never ran, and a Back the box didn't take
+ * became Compose's "exit focus" move, which ate the key so leaving took one more Back after a hardware Enter (#146).
+ * Whether the keyboard is up is asked of the window when Back arrives. With it down Back goes straight to the screen,
+ * without letting go of the box first: a hardware Enter could put focus back on the first box, reopening the keyboard,
+ * and Back stopped working on the Join screen.
  */
 @Composable
 internal fun Modifier.backPutsKeyboardAway(): Modifier {
-    var focused by remember { mutableStateOf(false) }
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    val ime = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
-    androidx.activity.compose.BackHandler(enabled = focused && ime) { focus.clearFocus() }
-    return onFocusChanged { focused = it.isFocused }
+    val view = androidx.compose.ui.platform.LocalView.current
+    val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    return onPreviewKeyEvent { e ->
+        if (e.key != androidx.compose.ui.input.key.Key.Back) return@onPreviewKeyEvent false
+        if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) {
+            val keyboardUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)
+                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            when (textBoxBack(keyboardUp)) {
+                TextBoxBack.PUT_KEYBOARD_AWAY -> focus.clearFocus()
+                TextBoxBack.PASS_ON -> dispatcher?.onBackPressed()
+            }
+        }
+        true
+    }
 }
 
 /** A one-line parchment text box with a brass edge (name, room code). */

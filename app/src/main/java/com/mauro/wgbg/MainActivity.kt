@@ -212,17 +212,17 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Painted tile faces (Mauro's ChatGPT art) by resource; the desert last. */
-private val TILE_FACES = listOf(R.drawable.tile_timber, R.drawable.tile_clay, R.drawable.tile_fleece, R.drawable.tile_grain, R.drawable.tile_stone)
-private val TILE_DESERT = R.drawable.tile_desert
+internal val TILE_FACES = listOf(R.drawable.tile_timber, R.drawable.tile_clay, R.drawable.tile_fleece, R.drawable.tile_grain, R.drawable.tile_stone)
+internal val TILE_DESERT = R.drawable.tile_desert
 /** The original painted faces with their coloured frame (Tile edges: Classic frame). */
-private val TILE_FACES_FRAMED = listOf(R.drawable.tile_timber_framed, R.drawable.tile_clay_framed, R.drawable.tile_fleece_framed, R.drawable.tile_grain_framed, R.drawable.tile_stone_framed)
-private val TILE_DESERT_FRAMED = R.drawable.tile_desert_framed
+internal val TILE_FACES_FRAMED = listOf(R.drawable.tile_timber_framed, R.drawable.tile_clay_framed, R.drawable.tile_fleece_framed, R.drawable.tile_grain_framed, R.drawable.tile_stone_framed)
+internal val TILE_DESERT_FRAMED = R.drawable.tile_desert_framed
 
-private val KNIGHTS_PIRATE = listOf(
+internal val KNIGHTS_PIRATE = listOf(
     R.drawable.knight_pirate_l1_inactive, R.drawable.knight_pirate_l1_active, R.drawable.knight_pirate_l2_inactive,
     R.drawable.knight_pirate_l2_active, R.drawable.knight_pirate_l3_inactive, R.drawable.knight_pirate_l3_active,
 )
-private val KNIGHTS_NORMAL = listOf(
+internal val KNIGHTS_NORMAL = listOf(
     R.drawable.knight_normal_l1_inactive, R.drawable.knight_normal_l1_active, R.drawable.knight_normal_l2_inactive,
     R.drawable.knight_normal_l2_active, R.drawable.knight_normal_l3_inactive, R.drawable.knight_normal_l3_active,
 )
@@ -665,33 +665,32 @@ fun WatchGameScreen(
     // One sea for the whole session: it depends only on the board's shape, and at Max speed a new
     // game starts several times a second, which would otherwise wipe splashes and clouds.
     val oceanRes = LocalContext.current.resources
-    val cliff = listOf(R.drawable.cliff_top_1, R.drawable.cliff_top_2, R.drawable.cliff_top_3).map { ImageBitmap.imageResource(it) }
-    val raiders = ImageBitmap.imageResource(R.drawable.raiders_ship)
+    // Decoded in the background (#111): until the fixed art and the theme's buildings are ready the game shows a light
+    // first frame instead of decoding them all on the main thread before its window can come up.
+    val art = rememberLoaded(oceanRes) { GameArt.load(oceanRes) }
+    val buildingsLoaded = rememberLoaded(oceanRes, env.art, state.ck != null, inventory) {
+        BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null || inventory, env.art.pirate(ArtObject.KNIGHTS), env.art)
+    }
+    // The V3 3D tiles (Settings › Tiles › 3D preview): loaded only when chosen.
+    val tiles3dLoaded = rememberLoaded(oceanRes, env.tiles3d) { Tile3dArt.TERRAINS.takeIf { env.tiles3d }?.map { t -> t.map { ImageBitmap.imageResource(oceanRes, it) } } ?: emptyList() }
+    if (art == null || buildingsLoaded == null || tiles3dLoaded == null) { SettingTheTable(); return }
+    val cliff = art.cliff
+    val raiders = art.raiders
     // Retain the list; cover a screen-wide sprite, including inventory and zoom.
     val screen = androidx.compose.ui.platform.LocalConfiguration.current
     // Decoded in the background: until all 8 tilt steps are ready the drawn robber stands in (never a partial set).
     val banditSprites = rememberDiceFrames(BANDIT_SPRITES, maxOf(screen.screenWidthDp, screen.screenHeightDp)).takeIf { it.size == BANDIT_SPRITES.size }
     // Knight art per theme: index (level - 1) * 2 + (active ? 1 : 0).
-    val knightsPirate = KNIGHTS_PIRATE.map { ImageBitmap.imageResource(it) }
-    val knightsNormal = KNIGHTS_NORMAL.map { ImageBitmap.imageResource(it) }
-    val plainFaces = TILE_FACES.withIndex().associate { (r, id) -> r to ImageBitmap.imageResource(id) } + (Resource.NONE to ImageBitmap.imageResource(TILE_DESERT))
-    val framedFaces = TILE_FACES_FRAMED.withIndex().associate { (r, id) -> r to ImageBitmap.imageResource(id) } + (Resource.NONE to ImageBitmap.imageResource(TILE_DESERT_FRAMED))
-    val tileFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) framedFaces else plainFaces
+    val knightsPirate = art.knightsPirate
+    val knightsNormal = art.knightsNormal
+    val tileFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) art.framedFaces else art.plainFaces
     val tileLine = env.tileEdge == EnvSettings.TileEdge.THIN
     // Rendered buildings (#41) for the chosen theme; Age of Chivalry pieces only load in those games.
     val space = remember(env.art) { SpaceSprites(oceanRes, env.art) }
-    val buildings = remember(env.art, state.ck != null, inventory) { BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null || inventory, env.art.pirate(ArtObject.KNIGHTS), env.art) }
-    // The V3 3D tiles (Settings › Tiles › 3D preview): loaded only when chosen.
-    val tiles3d = remember(env.tiles3d) { if (env.tiles3d) Tile3dArt.TERRAINS.map { t -> t.map { ImageBitmap.imageResource(oceanRes, it) } } else null }
-    val gullFlap = ImageBitmap.imageResource(R.drawable.gull_flap)
-    val gullGlide = ImageBitmap.imageResource(R.drawable.gull_glide)
-    val gullShadow = ImageBitmap.imageResource(R.drawable.gull_shadow)
-    val boatWake = ImageBitmap.imageResource(R.drawable.boat_wake)
-    // Boat sails in the players' colours (Red, Blue, Orange, White), then the extra two.
-    val boatSprites = listOf(R.drawable.boat_red, R.drawable.boat_blue, R.drawable.boat_orange, R.drawable.boat_white, R.drawable.boat_green, R.drawable.boat_brown)
-        .map { ImageBitmap.imageResource(it) }
-    val sea = remember { Sea(state.board).also { it.oceanBitmap = BitmapFactory.decodeResource(oceanRes, R.drawable.ocean_tile); it.boatColors = PLAYER_COLORS } }
-    sea.gullFlap = gullFlap; sea.gullGlide = gullGlide; sea.gullShadow = gullShadow; sea.boatWake = boatWake; sea.boatSprites = boatSprites
+    val buildings = buildingsLoaded
+    val tiles3d = tiles3dLoaded.takeIf { env.tiles3d && it.isNotEmpty() }
+    val sea = remember { Sea(state.board).also { it.oceanBitmap = art.ocean; it.boatColors = PLAYER_COLORS } }
+    sea.gullFlap = art.gullFlap; sea.gullGlide = art.gullGlide; sea.gullShadow = art.gullShadow; sea.boatWake = art.boatWake; sea.boatSprites = art.boatSprites
     if (sea.sprites3d == null) sea.sprites3d = SeaSprites3d(oceanRes)
     // The sea's critters (#130 modules, the whale first): rolled once per game from the board, so both phones in an online game agree.
     var spaceCritters by remember { mutableStateOf<List<SeaCritter>>(emptyList()) }
@@ -989,7 +988,7 @@ fun WatchGameScreen(
             val l = if (sz.minDimension > 0f) Layout.fit(state.board, sz.width, sz.height, camera) else null
             AgentHooks.announce(online?.id ?: "local", state, legal, prompt(state, legal, names),
                 l?.let { lay -> { a: Action -> spotOf(state.board, a)?.let {
-                    (if (liveBoard) liveProjection(sz.width, sz.height).project(it) else lay.project(it.x, it.y)) + boardOrigin
+                    (if (liveBoard) liveProjection(sz.width, sz.height).project(it, liveBoardTop(env.art)) else lay.project(it.x, it.y)) + boardOrigin
                 } } })
         }
         androidx.compose.runtime.DisposableEffect(Unit) {
@@ -1191,7 +1190,7 @@ fun WatchGameScreen(
                         val l = Layout.fit(boardNow, size.width.toFloat(), size.height.toFloat(), camera)
                         // The 3D collection lays its rows out on its own projection, not the board's.
                         val p = if (liveBoardNow && inventory) liveProjection(size.width.toFloat(), size.height.toFloat()).unproject(at)
-                            else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at) else l.unproject(at)
+                            else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at, liveBoardTop(env.art)) else l.unproject(at)
                         val picking = cardPickNow.isNotEmpty()
                         val tapped = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow) else tapMoves(stateNow, boardLegalNow, legalNow, p, me, buildModeNow != null)
                         // The Tinkerer swaps two tiles: the first tap narrows to that tile's swaps, the second picks the other tile.
@@ -1239,14 +1238,15 @@ fun WatchGameScreen(
                     drawContext.canvas.nativeCanvas.drawText(text, at.x, at.y, paint)
                 }
             } else if (inventory) drawInventory(measurer, wood, banditSprites, tileFaces, tileLine,
-                InventoryArt(if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, raiders, cliff, boatSprites, gullGlide, buildings, sea.sprites3d),
+                InventoryArt(if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, raiders, cliff, art.boatSprites, art.gullGlide, buildings, sea.sprites3d),
                 bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art, space = space) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
                 if (!env.art.space(ArtObject.BOARD)) drawLivePorts(state.board, projection, measurer, wood, buildings)
-                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels) { v ->
+                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels,
+                    liveBoardTop(env.art)) { v ->
                     env.art.space(ArtObject.KNIGHTS) || liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
-                if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
-                if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, top = liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             } else {
                 val knights = if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal
                 val layerDensity = androidx.compose.ui.unit.Density(density, fontScale)
@@ -1537,13 +1537,16 @@ fun WatchGameScreen(
         // The Trade button is always there in Play mode; it lights up when a trade waits on you.
         // The build menu down the right edge, on your turn: an icon per thing you can build or do to a knight; also while
         // placing your first pieces (Mauro: "add the build menu during setup"), showing the homestead, town or road due.
-        if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && tick.let {
+        // Both are drawn after the sheets above, so they hide while one is open: on a narrow screen (CI's 640x320) the
+        // build menu sat over the card guide and the Leave dialog, and could still be tapped through them.
+        val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen
+        if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && !sheetOpen && tick.let {
                 (state.phase == Phase.PLAY_TURN && state.currentPlayer == me || inSetup(state)) && state.actingPlayer == me })
             BuildMenu(state.ck != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
                 Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
         // Zoom, Tilt and Turn bars on the right edge, only when switched on under the gear (#137, Mauro: gestures by
         // default). Pinch zooms, two-finger drag tilts and a two-finger twist turns the 3D board without them.
-        if (env.viewBars && !inventory && !panelOpen && !settingsOpen && boardSize.minDimension > 0f) ViewBarsPanel(camera,
+        if (env.viewBars && !inventory && !panelOpen && !settingsOpen && !sheetOpen && boardSize.minDimension > 0f) ViewBarsPanel(camera,
             onZoom = { z -> camera = camera.transform(Offset(boardSize.width / 2f, boardSize.height / 2f), Offset.Zero, z / camera.zoom, boardSize) },
             onTilt = { t -> camera = camera.copy(tilt = t) },
             // The 3D board also turns (Mauro: "a rotate slider - start it in the middle"); the flat board doesn't.

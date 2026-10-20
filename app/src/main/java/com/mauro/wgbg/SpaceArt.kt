@@ -97,7 +97,19 @@ object SpaceArt {
     fun resourceCard(card: Int) = card(resourceCards, card)
     fun fortuneCard(card: Int) = card(fortuneCards, card)
     fun progressCard(card: Int) = card(progressCards, card)
-    fun deckBack(track: Int) = card(listOf("platinum_exchange_back", "nano_alliance_back", "data_network_back"), track)
+    /**
+     * Each back shows its commodity (art catalog: data_network_back = data_slate, nano_alliance_back = nano_cloth,
+     * platinum_exchange_back = platinum_coin), so a deck takes the back of the commodity it's paid in. The catalog's own
+     * deck labels pair trade with platinum and politics with nano-cloth, the other way round from the rules; going by
+     * those put the coin back on Guilds and the cloth back on Crown.
+     */
+    private val commodityBacks = mapOf(wgbg.engine.Commodity.PAPER to "data_network_back",
+        wgbg.engine.Commodity.CLOTH to "nano_alliance_back", wgbg.engine.Commodity.COIN to "platinum_exchange_back")
+    /** Engine track order: Guilds, Crown, Academy. */
+    fun deckBack(track: Int): Int {
+        require(track in 0..2)
+        return cards.getValue(commodityBacks.getValue(wgbg.engine.Track.commodity(track)))
+    }
     val cardBack get() = cards.getValue("card_back")
     /** Complete neutral preview, including the banner/body, from the supplied full render. */
     fun knightCard(level: Int): Int {

@@ -61,13 +61,21 @@ internal data class LiveProjection(val center: Offset, val scale: Float, val til
             ((s * p.x + c * p.y) * cos(tilt) - height * sin(tilt)) * scale)
     }
 
-    fun unproject(p: Offset): Offset {
+    /** The board point under screen point [p], on the plane [height] up (the inverse of [project]). */
+    fun unproject(p: Offset, height: Float = 0f): Offset {
         val q = (p - center) / scale
-        val z = q.y / cos(tilt)
+        val z = (q.y + height * sin(tilt)) / cos(tilt)
         val c = cos(rotation); val s = sin(rotation)
         return Offset(c * q.x + s * z, -s * q.x + c * z)
     }
 }
+
+/**
+ * Height of the board surface the player sees and taps: the Space board stands its tiles on a deck [SpaceArt.TILE_DECK_HEIGHT]
+ * up and lifts every piece with it, so rings, knight and merchant sprites, and taps on the board use this height. At
+ * height 0 they sat 0.22 * sin(tilt) tile units below the tiles: nothing when flat, plainly low at full tilt.
+ */
+internal fun liveBoardTop(choice: ArtChoice) = if (choice.space(ArtObject.BOARD)) SpaceArt.TILE_DECK_HEIGHT else 0f
 
 internal fun woodTint(materialName: String): Boolean = materialName == "WoodBody"
 
@@ -155,12 +163,27 @@ internal fun liveStalled(now: Long, since: Long, lastFrame: Long): Boolean =
 /** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
 internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
 
+/** Number plates and their digits (Space bakes the digit into its own plate model). */
+internal fun liveNumber(model: String): Boolean = model == "number_plate" || model.startsWith("digit_") || model.startsWith("space_number_")
+
 /**
- * How far pieces are drawn toward the camera (hex units), beating the tallest terrain prop in front of them: a stone
+ * How far roads are drawn toward the camera (hex units), beating the tallest terrain prop in front of them: a stone
  * peak is 1.09 high and at the steepest tilt covers up to ~1.9 along the view ray (#95: "the first road draws over its
  * homestead", then peaks and trees over homesteads).
  */
 internal const val LIVE_PIECE_DEPTH_BIAS = 2.5f
+/** Number plates come nearer than roads, so no road (2.5x tall since 0.3.2) ever hides a number at any tilt. */
+internal const val LIVE_NUMBER_DEPTH_BIAS = 3.5f
+/** Standing pieces come nearer still: a building or knight stays whole, and the Bandit stands on its tile's plate. */
+internal const val LIVE_STANDING_DEPTH_BIAS = 4.5f
+
+/** The layer [model] is drawn in, nearest first: standing pieces, numbers, roads, then the board itself (0). */
+internal fun liveDepthBias(model: String): Float = when {
+    liveStanding(model) -> LIVE_STANDING_DEPTH_BIAS
+    liveNumber(model) -> LIVE_NUMBER_DEPTH_BIAS
+    livePiece(model) -> LIVE_PIECE_DEPTH_BIAS
+    else -> 0f
+}
 
 /**
  * Slides column-major [m]'s translation [d] toward the orthographic camera at [tilt] and [rotation] (the eye direction
@@ -256,7 +279,7 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         if (walled) add(LivePlacement("${theme}_ramparts", at, scale = BUILDING_SCALE, owner = owner))
         val metro = ck?.metroVertex?.indexOf(v) ?: -1
         val kind = when {
-            metro >= 0 -> "capital_${listOf("guilds", "academy", "crown")[metro]}"
+            metro >= 0 -> liveCapital(metro)
             s.vertexBuilding[v] == Piece.CITY -> "town"
             else -> "homestead"
         }
@@ -282,6 +305,12 @@ internal fun liveInventoryThemeAt(p: Offset): Boolean? = when {
 
 private const val LIVE_SET_ROW_Y = 1.3f
 private const val LIVE_SET_ROW_GAP = 2f
+
+/**
+ * The Capital model for engine track [track] (metroVertex is indexed by track: Guilds, Crown, Academy). It used to index
+ * a Guilds, Academy, Crown list, so the 3D board stood a Crown Capital on the Academy's town and the other way round.
+ */
+internal fun liveCapital(track: Int) = "capital_" + DECK_NAMES[track].lowercase()
 
 /** Side-by-side imported models for maintainer review; never mixed into a game state. */
 internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {

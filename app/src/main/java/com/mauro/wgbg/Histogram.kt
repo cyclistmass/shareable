@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,7 +48,8 @@ fun eventBars(counts: IntArray): List<Bar> {
  */
 @Composable
 fun DiceHistogram(rollCounts: IntArray, eventCounts: IntArray, chivalry: Boolean, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.widthIn(max = 520.dp).chest().testTag("dice-histogram"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Scrolls: with the event die it is about as tall as CI's 320 dp screen.
+    Column(modifier.widthIn(max = 520.dp).chest().verticalScroll(rememberScrollState()).testTag("dice-histogram"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Dice this game · ${rollCounts.sum()} rolls", color = CHEST_INK, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             IconPlateButton(MoveIcon.CLOSE, "Close", "histogram-close", width = 44.dp, height = 40.dp) { onClose() }

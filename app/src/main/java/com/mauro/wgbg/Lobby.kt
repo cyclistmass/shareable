@@ -8,6 +8,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,8 +71,10 @@ fun LobbyScreen(
     var bigQr by remember { mutableStateOf(false) }
     Box(modifier.fillMaxSize().tableTop().testTag("lobby")) {
         Row(Modifier.fillMaxSize().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Both sides scroll when they can't fit: at 320 dp tall (CI's screen) four seats fill the left, and the Recent row
+            // and the right side's last lines went off the bottom.
             Column(
-                Modifier.weight(1f).fillMaxHeight().brassEdgedWood().padding(horizontal = 14.dp, vertical = 10.dp),
+                Modifier.weight(1f).fillMaxHeight().brassEdgedWood().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -101,7 +105,7 @@ fun LobbyScreen(
             }
             Column(Modifier.width(250.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(
-                    Modifier.weight(1f).fillMaxWidth().brassEdgedWood().padding(10.dp),
+                    Modifier.weight(1f).fillMaxWidth().brassEdgedWood().verticalScroll(rememberScrollState()).padding(10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
