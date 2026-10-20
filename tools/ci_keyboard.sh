@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Back and the keyboard on every text box outside a game (#121 and its 0.3.2 regression), by real taps and keys:
-#   keyboard up:     Back only puts the keyboard away and the screen stays; the next Back leaves.
+#   keyboard up:     Back only puts the keyboard away and the screen stays; the next Back leaves (#146).
 #   typed + Enter:   a one-line box closes the keyboard and Back leaves; a note (several lines) gets a new line, then
 #                    Back only closes the keyboard and the next Back leaves.
 # 0.3.2 before e57e1f7 failed "typed + Enter" on the Join screen: the keyboard came back and Back did nothing.
+# 0.3.2 on Android 14 needed one extra Back to leave the Report note after a new line (#146).
 # Boxes: game-start name, Join name and room code, Report note. (The card tester's note sits in a game; check by hand.)
 # Usage: tools/ci_keyboard.sh   (the app installed on $ANDROID_SERIAL or the only device)
 set -uo pipefail
@@ -24,10 +25,12 @@ bad() { echo "keyboard: FAILED: $*"; fail=1; "$ADB" exec-out screencap -p > "${O
 open_box() { local xy; xy=$(box "$1"); [ -n "$xy" ] || { bad "$2: no text box $1"; return 1; }; "$ADB" shell input tap $xy; sleep 1.5
   kb || { bad "$2: tapping box $1 didn't bring up the keyboard"; return 1; }; }
 
-# Keyboard up, Back: the keyboard goes, the screen (marked by $2) stays.
+# Keyboard up, Back: the keyboard goes, the screen (marked by $2) stays; the next Back leaves it.
 up_back() { open_box "$1" "$3" || return 1; key BACK
   kb && { bad "$3: Back left the keyboard up"; return 1; }
-  on "$2" || { bad "$3: Back with the keyboard up left the screen"; return 1; }; echo "keyboard: $3, keyboard up + Back: ok"; }
+  on "$2" || { bad "$3: Back with the keyboard up left the screen"; return 1; }
+  key BACK; kb && { bad "$3: the Back after brought the keyboard back"; return 1; }
+  on "$2" && { bad "$3: with the keyboard put away, Back didn't leave the screen (#146)"; return 1; }; echo "keyboard: $3, keyboard up + Back + Back: ok"; }
 # Typed + Enter, then Back (twice for a note): the screen marked by $2 is left.
 enter_back() { open_box "$1" "$3" || return 1
   "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in 1 2 3 4 5 6 7 8; do "$ADB" shell input keyevent KEYCODE_DEL; done
@@ -40,9 +43,8 @@ enter_back() { open_box "$1" "$3" || return 1
     kb && { bad "$3: Enter left the keyboard up"; return 1; }
   fi
   key BACK; kb && { bad "$3: after Enter, Back brought back or kept the keyboard"; return 1; }
-  # Known (#146): on Android 14, after a new line in a note, leaving takes one extra Back. Allow exactly that one.
-  [ "$5" = note ] && on "$2" && { echo "keyboard: $3: one extra Back to leave (#146)"; key BACK; }
-  on "$2" && { bad "$3: after Enter, Back didn't leave the screen"; return 1; }; echo "keyboard: $3, typed + Enter + Back: ok"; }
+  # #146: on Android 14, after a new line in a note, leaving took one extra Back. No extra Back is allowed.
+  on "$2" && { bad "$3: after Enter, Back didn't leave the screen (#146)"; return 1; }; echo "keyboard: $3, typed + Enter + Back: ok"; }
 
 "$ADB" shell am force-stop $PKG
 "$ADB" shell pm clear $PKG >/dev/null
@@ -57,6 +59,7 @@ go() { tap_text "$1" && on "$2" || { bad "\"$1\" didn't open its screen"; [ $fai
 go "New game" "Base game"
 # Game-start screen (marked by its Base game choice); leaving goes back to the start screen.
 up_back 1 "Base game" "game-start name"
+go "New game" "Base game"
 enter_back 1 "Base game" "game-start name" "Duo" line
 # Online needs a real name ("You" keeps Join a room off): type one and stay.
 go "New game" "Base game"
@@ -65,13 +68,16 @@ open_box 1 "game-start name" && { "$ADB" shell input keyevent KEYCODE_MOVE_END; 
 # Join screen (marked by Room code): name, then code; each leave goes back to the game-start screen.
 go "Join a room" "Room code"
 up_back 1 "Room code" "join name"
+go "Join a room" "Room code"
 up_back 2 "Room code" "join code"
+go "Join a room" "Room code"
 enter_back 2 "Room code" "join code" "ROVER-42" line
 go "Join a room" "Room code"
 enter_back 1 "Room code" "join name" "Duo" line
 # Report (marked by Add a picture): the note has several lines.
 go "Report" "Add a picture"
 up_back 1 "Add a picture" "report note"
+go "Report" "Add a picture"
 enter_back 1 "Add a picture" "report note" "Test" note
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || bad "the app crashed"

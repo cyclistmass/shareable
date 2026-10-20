@@ -49,7 +49,7 @@ requests, and skips changes that only touch Markdown or `docs/`.
 | play-to-end: `tools/play_to_end.sh chivalry 4 900` | a whole 4-player Age of Chivalry game to the end screen | stuck for 60 s, no end in 900 s |
 | trade: `tools/ci_trade.sh` | bank and player trades by touch | a trade not taken |
 | withdraw: `tools/ci_withdraw.sh` | withdrawing an open offer by touch, both rulesets | the offer stays open |
-| trade: `tools/ci_keyboard.sh` (after the trade script) | Back and the keyboard on the game-start name, Join name and room code, and Report note: keyboard up + Back, typed + Enter + Back | Back leaves with the keyboard up, Enter or Back leaves the keyboard up, Back doesn't leave (one extra allowed on the note, #146) |
+| trade: `tools/ci_keyboard.sh` (after the trade script) | Back and the keyboard on the game-start name, Join name and room code, and Report note: keyboard up + Back + Back, typed + Enter + Back | Back leaves with the keyboard up, Enter or Back leaves the keyboard up, Back doesn't leave once the keyboard is away (no extra Back, #146) |
 | online: `tools/ci_online.sh`: `OnlineTwoClientTest` | two clients host and join a room on the Firebase emulators; bots play a whole game | the two end states differ |
 | online: `tools/ci_online.sh`: `LiveBoardDeviceTest` | real touch on the 3D board: twist, pinch, tilt, pan, place a homestead and a road | gesture or placement not taken |
 | `firebase/rules-test` | Firestore security rules and push delivery | a rule lets the wrong player write |

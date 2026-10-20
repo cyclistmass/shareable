@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
@@ -254,20 +252,44 @@ private fun DiceChoice(title: String, note: String, selected: Boolean, tag: Stri
 @Composable
 private fun NameField(name: String, onChange: (String) -> Unit) = ParchmentField(name, onChange, "name")
 
+/** What Back does in a text box: keyboard up, only put it away (#121); keyboard down, the screen's own Back (#146). */
+internal enum class TextBoxBack { PUT_KEYBOARD_AWAY, PASS_ON }
+
+internal fun textBoxBack(keyboardUp: Boolean) = if (keyboardUp) TextBoxBack.PUT_KEYBOARD_AWAY else TextBoxBack.PASS_ON
+
 /**
  * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
- * left the screen, closing the app from the start screen. Only while the keyboard is up does Back let go of the box;
- * once it's down (Done, or Android 16's keyboard eating the Back itself) the next Back leaves as usual. Focus is never
- * dropped just because the keyboard hid: a hardware Enter then put it straight back on the first box, reopening the
- * keyboard, and Back stopped working on the Join screen.
+ * left the screen, closing the app from the start screen. Whether the keyboard is up is asked of the window when Back
+ * arrives: Compose's IME inset could still say "up" after the keyboard had gone (Android 14, Report note after a new
+ * line), so that Back only let go of the box and leaving took one more (#146). With the keyboard down Back goes
+ * straight on to the screen, without letting go of the box first: a hardware Enter could put focus back on the first
+ * box, reopening the keyboard, and Back stopped working on the Join screen.
  */
 @Composable
 internal fun Modifier.backPutsKeyboardAway(): Modifier {
-    var focused by remember { mutableStateOf(false) }
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    val ime = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
-    androidx.activity.compose.BackHandler(enabled = focused && ime) { focus.clearFocus() }
-    return onFocusChanged { focused = it.isFocused }
+    val view = androidx.compose.ui.platform.LocalView.current
+    val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val back = remember(view, dispatcher) {
+        object : androidx.activity.OnBackPressedCallback(false) {
+            lateinit var clearFocus: () -> Unit
+            var focused = false
+            override fun handleOnBackPressed() {
+                val keyboardUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)
+                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+                when (textBoxBack(keyboardUp)) {
+                    TextBoxBack.PUT_KEYBOARD_AWAY -> clearFocus()
+                    TextBoxBack.PASS_ON -> { isEnabled = false; try { dispatcher?.onBackPressed() } finally { isEnabled = focused } }
+                }
+            }
+        }
+    }
+    back.clearFocus = { focus.clearFocus() }
+    androidx.compose.runtime.DisposableEffect(back) {
+        dispatcher?.addCallback(back)
+        onDispose { back.remove() }
+    }
+    return onFocusChanged { back.focused = it.isFocused; back.isEnabled = it.isFocused }
 }
 
 /** A one-line parchment text box with a brass edge (name, room code). */
