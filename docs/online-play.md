@@ -188,7 +188,7 @@ history (a rejected prediction) rebuilds the screen from the room.
 ### Two phones against the Firebase emulators (no deploy needed)
 
 ```
-firebase emulators:start --only firestore,auth --project workinggermangame   # Java 21+ on PATH
+firebase emulators:start --only firestore,auth --project demo-wgbg   # Java 21+ on PATH; no google-services.json needed
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/emulator.ps1 -Lane 1   # and -Lane 2
 ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug   # and 5556
 tools/online_sim.sh base        # or chivalry

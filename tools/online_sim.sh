@@ -4,7 +4,8 @@
 # fingerprint when the game ends; the script fails unless both phones report the same one.
 #
 # Needs: both emulator lanes up (tools/emulator.ps1 -Lane 1 / -Lane 2), the debug APK installed on both, and
-#   firebase emulators:start --only firestore,auth --project workinggermangame   (Java 21+ on PATH)
+#   firebase emulators:start --only firestore,auth --project demo-wgbg   (Java 21+ on PATH; the debug build needs no
+#   google-services.json for this: --es firebase emu sets up the demo project in code)
 # Usage (Git Bash, project root): [FIREBASE=live] tools/online_sim.sh [ruleset: base|chivalry] [timeout seconds]
 set -eEuo pipefail
 trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR

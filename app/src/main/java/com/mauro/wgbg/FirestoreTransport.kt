@@ -3,6 +3,7 @@ package com.mauro.wgbg
 import android.content.Context
 import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
@@ -23,13 +24,22 @@ object LobbyRepository {
     private val localStore = MemoryStore()
     private var transport: GameTransport? = null
     /**
-     * [emulatorHost]: debug builds only (`--es firebase emu`): talk to the Firebase emulators on the dev PC
-     * (10.0.2.2 from an Android emulator) instead of the live project, so two emulators can play online
-     * against our real firestore.rules without deploying anything.
+     * Debug builds only (`--es firebase emu`): talk to the Firebase emulators on the dev PC (10.0.2.2 from an Android
+     * emulator) instead of the live project, so two emulators can play online against our real firestore.rules without
+     * deploying anything. Set at launch, before anything creates the transport: the splash, account and crash reporter
+     * create it too, and the first one made is the one every caller gets.
      */
-    @Synchronized fun create(context: Context, emulatorHost: String? = null): GameTransport {
+    @Volatile var emulatorHost: String? = null
+    /** The emulators' demo project: no google-services.json needed, so any checkout and CI can play online. */
+    const val EMULATOR_PROJECT = "demo-wgbg"
+    internal val emulatorOptions: FirebaseOptions get() = FirebaseOptions.Builder().setProjectId(EMULATOR_PROJECT)
+        .setApplicationId("1:000000000000:android:0000000000000000").setApiKey("demo-api-key-for-the-emulators").build()
+
+    @Synchronized fun create(context: Context): GameTransport {
         transport?.let { return it }
+        val emulatorHost = emulatorHost
         val app = FirebaseApp.getApps(context).firstOrNull() ?: FirebaseApp.initializeApp(context)
+            ?: emulatorHost?.let { FirebaseApp.initializeApp(context, emulatorOptions) }
         val result = if (app == null) InMemoryTransport("local-host", localStore) else {
             val db = FirebaseFirestore.getInstance(app)
             val auth = FirebaseAuth.getInstance(app)

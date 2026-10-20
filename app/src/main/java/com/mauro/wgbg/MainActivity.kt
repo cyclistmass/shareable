@@ -191,6 +191,7 @@ class MainActivity : ComponentActivity() {
                 val start = if (debug) intent.getStringExtra("start") else null
                 // Debug builds: `--es firebase emu` plays online against the Firebase emulators on the dev PC.
                 val firebaseEmu = debug && intent.getStringExtra("firebase") == "emu"
+                LobbyRepository.emulatorHost = if (firebaseEmu) "10.0.2.2" else null
                 // Debug builds: `--ez autoplay true` lets a bot play your seat in online games (two-phone sims, #35).
                 val autoplay = debug && intent.getBooleanExtra("autoplay", false)
                 // Debug builds: `--ez autosetup true` lets a bot place your opening pieces (scripted UI tests).
@@ -205,7 +206,7 @@ class MainActivity : ComponentActivity() {
                 val players = if (debug) intent.getIntExtra("players", 0) else 0
                 // An invite link (wgbg://join/ROOM-42) opens the Join screen with that code filled in.
                 val inviteCode = joinCodeFrom(intent.dataString)
-                AppRoot(debugCamera(), start, firebaseEmu, autoplay, autoSetup, watch, crashTest, players, inviteCode, quickBots)
+                AppRoot(debugCamera(), start, autoplay, autoSetup, watch, crashTest, players, inviteCode, quickBots)
             }
         }
     }
@@ -300,7 +301,7 @@ private enum class Screen { START, LOBBY, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME,
  * The in-game Exit goes back to game start (leaving the room).
  */
 @Composable
-fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseEmu: Boolean = false, autoplay: Boolean = false, autoSetup: Boolean = false, watch: Boolean = false,
+fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay: Boolean = false, autoSetup: Boolean = false, watch: Boolean = false,
             crashTest: Boolean = false, players: Int = 0, inviteCode: String? = null, quickBots: Boolean = false) {
     var screen by rememberSaveable { mutableStateOf(if (start != null) Screen.GAME else if (inviteCode != null) Screen.JOIN else Screen.START) }
     val context0 = LocalContext.current.applicationContext
@@ -327,7 +328,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, firebaseE
     val context = LocalContext.current.applicationContext
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Created on first online use only: offline play never touches Firebase.
-    val transport = remember { lazy { LobbyRepository.create(context, if (firebaseEmu) "10.0.2.2" else null) } }
+    val transport = remember { lazy { LobbyRepository.create(context) } }
     var session by remember { mutableStateOf<LobbySession?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
