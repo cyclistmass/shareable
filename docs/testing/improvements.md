@@ -57,3 +57,7 @@ move it to **Done** with the commit when it lands.
 - 2026-10-20, bugs: `tools/ci_reach.sh` takes about 8 min on lane 2, nearly all of it `uiautomator dump` (~2 s each, it
   waits for the animated board to idle). Read the screen from a cheaper source (one dump per screen and computed scroll
   offsets, or a debug-only semantics dump) to bring it under 2 min; CI's slower emulator will feel it most.
+- 2026-10-20, bugs: checking the knight pick on a device took about an hour of driven Age of Chivalry games (bots usually
+  win before seat 0 has an active knight with a free corner to move to). A debug-only launch extra that loads a stored
+  position (a seed plus a move list, as the save store already records) would reach any mid-game state in seconds for
+  on-device checks of knights, Raiders, cards and ports.
