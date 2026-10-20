@@ -80,7 +80,7 @@ honestly. Never call something done with failing or skipped tests.
 ## Build and run
 
 - JDK 17 and the Android SDK (`local.properties` with `sdk.dir`, not committed).
-- `./gradlew :engine:test :ai:test :net:test :app:testDebugUnitTest :app:assembleDebug`
+- `./gradlew :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest :app:assembleDebug`
 - Online play needs `app/google-services.json` from your own Firebase project (never committed), or the
   Firebase emulators: `firebase emulators:start --only firestore,auth --project demo-wgbg`, then launch with
   `--es firebase emu`. See `docs/online-play.md`.

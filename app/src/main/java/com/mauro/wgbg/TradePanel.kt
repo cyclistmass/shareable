@@ -104,6 +104,13 @@ fun canPayOffer(s: GameState, me: Int): Boolean {
     return give.indices.all { give[it] <= holding(s, me, it) }
 }
 
+/** The Recent moves line for an offer [me] couldn't pay, declined for them (#26). */
+fun autoNoText(s: GameState, me: Int, names: List<String>): String {
+    val short = Rules.offerShortfall(s, me)
+    val missing = short.indices.filter { short[it] > 0 }.joinToString(", ") { "${short[it]} ${ALL_CARD_NAMES[it]}" }
+    return "No to ${names[s.currentPlayer]}'s offer, given for you: you don't hold $missing"
+}
+
 /** How long an offer you can't pay waits before it is declined for you, seconds (Mauro: 5). */
 const val AUTO_NO_SECONDS = 5
 

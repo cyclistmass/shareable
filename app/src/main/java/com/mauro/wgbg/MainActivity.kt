@@ -1086,10 +1086,12 @@ fun WatchGameScreen(
         autoNo = null
         if (offerKey == null) return@LaunchedEffect
         hostView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-        if (canPayOffer(state, me) || isOpenAsk(state)) { sounds.tradeChime(sound.soundVolume); return@LaunchedEffect }
+        if (!Rules.cantPayOffer(state, me)) { sounds.tradeChime(sound.soundVolume); return@LaunchedEffect }
         for (left in AUTO_NO_SECONDS downTo 1) { autoNo = left; delay(1000) }
         autoNo = null
-        humanMoves.trySend(Action.REJECT_TRADE)   // checked against the rules like a tap; ignored if the offer moved on
+        // #26: say why, in Recent moves; the No is checked against the rules like a tap, ignored if the offer moved on.
+        if (Rules.cantPayOffer(state, me)) { log.add(0, autoNoText(state, me, names)); if (log.size > 4) log.removeRange(4, log.size) }
+        humanMoves.trySend(Action.REJECT_TRADE)
     }
     // The trade chest: open when you opened it, or when a trade waits on you (or you wait on answers to yours).
     val chestOpen = me >= 0 && !inventory && tick.let {

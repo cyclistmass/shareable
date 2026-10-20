@@ -114,3 +114,34 @@ class DiceStats(private val sums: List<Int>) {
         }
     }
 }
+
+/**
+ * Fairness checks for a sample of real throws (#26): the totals and each die's faces. A check fails only once in
+ * 10,000 samples of truly fair dice.
+ */
+object DiceFairness {
+    /** Upper 0.0001 tail of chi-square with 5 degrees of freedom (one die's six faces). */
+    const val FACE_CRITICAL = 25.74
+
+    fun faceChiSquare(faces: List<Int>): Double {
+        require(faces.all { it in 1..6 })
+        val expected = faces.size / 6.0
+        return (1..6).sumOf { f -> (faces.count { it == f } - expected).let { it * it } / expected }
+    }
+
+    /** Checks the totals (throws if they look loaded) and each die's faces, and returns the numbers as text. */
+    fun check(sums: List<Int>, vararg dice: List<Int>): String {
+        val d = DiceStats(sums)
+        val faces = dice.map { faceChiSquare(it) }
+        val text = buildString {
+            appendLine("rolls ${d.rolls}")
+            for (i in 0 until 11) appendLine("%3d %6d  expected %.1f".format(i + 2, d.counts[i], d.expected[i]))
+            appendLine("7s ${d.sevens} (%.2f%%), longest run of 7s ${d.longestSevenRun}".format(100.0 * d.sevens / d.rolls))
+            appendLine("totals chi-square %.2f (10 df), p = %.3f".format(d.chiSquare, d.pValue))
+            appendLine("per-die chi-square (5 df, 0.0001 cut-off $FACE_CRITICAL): " + faces.joinToString { "%.2f".format(it) })
+        }
+        check(d.pValue > 0.0001) { "totals look loaded:\n$text" }
+        check(faces.all { it < FACE_CRITICAL }) { "a die looks loaded:\n$text" }
+        return text
+    }
+}

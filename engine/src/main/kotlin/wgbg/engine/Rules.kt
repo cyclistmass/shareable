@@ -250,6 +250,28 @@ object Rules {
         return gives > 0 && wants > 0
     }
 
+    /**
+     * The cards [p] would have to hand over for the open offer but doesn't hold, per card (resources, then commodities
+     * in Age of Chivalry); all zero when [p] can pay or no offer is open.
+     */
+    fun offerShortfall(s: GameState, p: Int): IntArray {
+        val types = if (s.ck != null) CK_CARD_TYPES else CARD_TYPES
+        val out = IntArray(types)
+        if (s.phase != Phase.DECIDE_TRADE) return out
+        for (c in 0 until types) {
+            val asked = if (c < CARD_TYPES) s.tradeOffer[CARD_TYPES + c] else s.ck!!.offer[Commodity.COUNT + c - CARD_TYPES]
+            out[c] = maxOf(0, asked - s.card(p, c))
+        }
+        return out
+    }
+
+    /**
+     * #26: [p] is answering a two-sided offer they can't pay, so their No is given for them instead of waiting on them.
+     * An open ask ("who has grain?") still waits: a counter is the way to answer it.
+     */
+    fun cantPayOffer(s: GameState, p: Int): Boolean = s.phase == Phase.DECIDE_TRADE && s.actingPlayer == p &&
+        p != s.currentPlayer && isTwoSided(s) && offerShortfall(s, p).any { it > 0 }
+
     /** 1-for-1 counters (offerer gives g, gets w), enumerated only for bots and fuzzing. */
     private fun counterActions(s: GameState, p: Int, out: ActionBuffer) {
         val o = s.currentPlayer
