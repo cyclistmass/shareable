@@ -23,6 +23,9 @@ dump() { for _ in 1 2 3; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiau
   local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; }
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 tap_text() { local xy; xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
+# A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
+panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
+  for _ in 1 2 3 4; do "$ADB" shell input swipe $((w * 7 / 10)) $((h * 4 / 5)) $((w * 7 / 10)) $((h * 3 / 10)) 400; sleep 0.8; tap_text "$1" && return 0; done; return 1; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }
 move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "$1" >/dev/null; }
@@ -48,8 +51,9 @@ for ruleset in $RULESETS; do
   ts_open; "$ADB" logcat -b crash -c 2>/dev/null || true
   timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
   sleep 4
-  # Bots at full speed, quick pace (Menu › Settings › This game, by touch), so a turn with two lots comes up sooner.
-  tap_text "Menu" && tap_text "Settings" && tap_text "This game" && tap_text "2×" && tap_text "4×" && tap_text "8×" && tap_text "Quick"; tap_text "Hide" || true
+  # Bots at full speed (Menu › Settings › This game, the speed button cycles 2× 4× 8× Max, by touch), so a turn with two lots comes up sooner.
+  tap_text "Menu" && tap_text "Settings" && panel_tap "This game" && panel_tap "2×" && panel_tap "4×" && panel_tap "8×" ||
+    say "couldn't set full speed in Settings"; tap_text "Hide" || true
   done_ab=0; done_c=0; done_d=0; again=0; games=1; start=$(date +%s); ts_alive
   while [ $(( $(date +%s) - start )) -lt "$SECS" ] && { [ $done_c = 0 ] || [ $done_d = 0 ]; } && [ $fail = 0 ]; do
     crashed && { bad "crash"; break; }
