@@ -23,6 +23,10 @@ class TextBoxBackTest {
         assertTrue("isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())" in helper)
         // With the keyboard down Back is passed on, never spent letting go of the box.
         assertTrue("onBackPressed()" in helper)
+        // Back is taken as a key on the box: a callback added here sat under the screen's BackHandler and never ran,
+        // and a Back left to Compose became an "exit focus" move that ate the key after a hardware Enter (#146).
+        assertTrue("onPreviewKeyEvent" in helper && "Key.Back" in helper)
+        assertTrue("OnBackPressedCallback" !in helper && "BackHandler" !in helper)
         // Focus is never dropped just because the keyboard hid (the Join screen regression after a hardware Enter).
         assertTrue("LaunchedEffect" !in helper)
     }

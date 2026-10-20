@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -259,37 +261,30 @@ internal fun textBoxBack(keyboardUp: Boolean) = if (keyboardUp) TextBoxBack.PUT_
 
 /**
  * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
- * left the screen, closing the app from the start screen. Whether the keyboard is up is asked of the window when Back
- * arrives: Compose's IME inset could still say "up" after the keyboard had gone (Android 14, Report note after a new
- * line), so that Back only let go of the box and leaving took one more (#146). With the keyboard down Back goes
- * straight on to the screen, without letting go of the box first: a hardware Enter could put focus back on the first
- * box, reopening the keyboard, and Back stopped working on the Join screen.
+ * left the screen, closing the app from the start screen. Back is taken as a key on the box itself: an
+ * OnBackPressedCallback added here sat under the screen's own BackHandler and never ran, and a Back the box didn't take
+ * became Compose's "exit focus" move, which ate the key so leaving took one more Back after a hardware Enter (#146).
+ * Whether the keyboard is up is asked of the window when Back arrives. With it down Back goes straight to the screen,
+ * without letting go of the box first: a hardware Enter could put focus back on the first box, reopening the keyboard,
+ * and Back stopped working on the Join screen.
  */
 @Composable
 internal fun Modifier.backPutsKeyboardAway(): Modifier {
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val view = androidx.compose.ui.platform.LocalView.current
     val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    val back = remember(view, dispatcher) {
-        object : androidx.activity.OnBackPressedCallback(false) {
-            lateinit var clearFocus: () -> Unit
-            var focused = false
-            override fun handleOnBackPressed() {
-                val keyboardUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)
-                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-                when (textBoxBack(keyboardUp)) {
-                    TextBoxBack.PUT_KEYBOARD_AWAY -> clearFocus()
-                    TextBoxBack.PASS_ON -> { isEnabled = false; try { dispatcher?.onBackPressed() } finally { isEnabled = focused } }
-                }
+    return onPreviewKeyEvent { e ->
+        if (e.key != androidx.compose.ui.input.key.Key.Back) return@onPreviewKeyEvent false
+        if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) {
+            val keyboardUp = androidx.core.view.ViewCompat.getRootWindowInsets(view)
+                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            when (textBoxBack(keyboardUp)) {
+                TextBoxBack.PUT_KEYBOARD_AWAY -> focus.clearFocus()
+                TextBoxBack.PASS_ON -> dispatcher?.onBackPressed()
             }
         }
+        true
     }
-    back.clearFocus = { focus.clearFocus() }
-    androidx.compose.runtime.DisposableEffect(back) {
-        dispatcher?.addCallback(back)
-        onDispose { back.remove() }
-    }
-    return onFocusChanged { back.focused = it.isFocused; back.isEnabled = it.isFocused }
 }
 
 /** A one-line parchment text box with a brass edge (name, room code). */
