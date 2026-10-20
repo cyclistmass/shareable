@@ -27,6 +27,10 @@ if [ -f "$OUT/run.pid" ] && kill -0 "$(cat "$OUT/run.pid")" 2>/dev/null; then
   echo "USERPLAY: another run (pid $(cat "$OUT/run.pid")) is already driving $ANDROID_SERIAL; stop it first"; exit 1
 fi
 echo $$ > "$OUT/run.pid"; trap 'rm -f "$OUT/run.pid"' EXIT
+# Stopping the shell that started a run (a background task stopped) leaves this script tapping on, holding the device:
+# quit once that shell is gone.
+PARENT=$PPID
+orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (the shell that started it is gone)"; exit 1; }; }
 
 # The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
 dump() {
@@ -134,6 +138,7 @@ else
       mkdir -p "$(dirname "$ROOM_FILE")"; rm -f "$ROOM_FILE.failed"; echo "$code" > "$ROOM_FILE"; echo "USERPLAY $TAG: hosting $code"
       shot lobby
       for _ in $(seq 1 90); do
+        orphaned
         "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break
         [ -e "$ROOM_FILE.failed" ] && break
         d=$(dump); echo "$d" | grep -q 'text="Duo"' && tap_text "Start game" "$d"; sleep 3
@@ -170,6 +175,7 @@ fi
 
 start=$(date +%s); moves=0; last=""; prev=""; same=0; tries=0; changed=$(date +%s)
 while true; do
+  orphaned
   [ $(( $(date +%s) - start )) -gt $((MINUTES * 60)) ] && fail "game not over after $MINUTES minutes ($moves moves)"
   crashed && fail "crash after $moves moves"
   if "$ADB" logcat -d -s WGBG-GAME:I WGBG-ONLINE:I | grep -q -E "over|game over"; then
