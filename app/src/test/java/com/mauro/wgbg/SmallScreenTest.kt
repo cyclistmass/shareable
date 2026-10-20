@@ -11,7 +11,7 @@ import java.io.File
  */
 class SmallScreenTest {
     private val src = File("src/main/java/com/mauro/wgbg")
-    private fun text(name: String) = File(src, name).readText()
+    private fun text(name: String) = File(src, name).readText().replace("\r\n", "\n")
 
     @Test
     fun `the game-start screen's panels scroll and its buttons wrap`() {

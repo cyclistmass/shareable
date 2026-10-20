@@ -1369,7 +1369,7 @@ fun WatchGameScreen(
             if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
                 TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
                     eventDie = state.ck != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
-                    width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false })
+                    width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false })
             }
             if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
                 modifier = Modifier.fillMaxSize())
@@ -1462,7 +1462,7 @@ fun WatchGameScreen(
             if (tick.let { state.isOver }) {
                 var folded by remember(seed) { mutableStateOf(false) }
                 CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it },
-                    if (online == null) ({ seed++; playing = true }) else null, onExit)
+                    if (online == null) ({ seed++; playing = true; panelOpen = false }) else null, onExit)
             }
         }
       }
@@ -1481,7 +1481,7 @@ fun WatchGameScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Turn ${players.first().turn}  ·  v${appVersion()}", style = Wood.title(16.sp), modifier = Modifier.weight(1f))
                     // A real red plate, not a small word; it still asks before leaving (Fable review T10, Mauro: "i cant exit the game").
-                    StopButton("Leave game", "menu-exit") { confirmExit = true }
+                    StopButton("Leave game", "menu-exit") { confirmExit = true; panelOpen = false }
                 }
                 // Actions only (Fable review W7); every setting, and this game's own controls, are behind Settings.
                 // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
@@ -1500,7 +1500,8 @@ fun WatchGameScreen(
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 3.dp).testTag("debug-badge"))
         BrassButton(if (panelOpen || settingsOpen) "Hide" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp).height(40.dp)) {
-            if (settingsOpen) settingsOpen = false else panelOpen = !panelOpen
+            // The Menu comes up over a clear board: the roll chart closes (0.3.3 test: it stayed open behind the menu).
+            if (settingsOpen) settingsOpen = false else { panelOpen = !panelOpen; histogramOpen = false }
         }
         // The Report button under Menu, switched on in the gear menu (#128): a bug report with a screenshot, in one tap.
         if (env.bugButton && !feedbackOpen && !reportCapture && !panelOpen && !settingsOpen)
@@ -1528,8 +1529,11 @@ fun WatchGameScreen(
             gameControls = if (!lookAndArt) {
                 { CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (online == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        WoodButton(if (playing) "Pause" else "Play", "menu-pause") { playing = !playing }
-                        WoodButton(if (speed == MAX_SPEED) "Max" else "${speed}×", "menu-speed") { speed = if (speed == MAX_SPEED) 1 else speed * 2 }
+                        // A finished game you played has nothing left to pause or speed up.
+                        if (!(human && tick.let { state.isOver })) {
+                            WoodButton(if (playing) "Pause" else "Play", "menu-pause") { playing = !playing }
+                            WoodButton(if (speed == MAX_SPEED) "Max" else "${speed}×", "menu-speed") { speed = if (speed == MAX_SPEED) 1 else speed * 2 }
+                        }
                         WoodButton(if (human) "Watch bots" else "Play", "menu-watch") { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; seed++; playing = true }
                         if (!human) WoodButton(if (oneGame) "One game" else "Nonstop", "menu-one-game") {
                             oneGame = !oneGame
@@ -1561,6 +1565,16 @@ fun WatchGameScreen(
         ) {
             // Keep playing is the safe green one and Leave for now neutral brass (it keeps the game); only the button that ends
             // the game is red, on its own line under a caption (Fable review W10 / T3: three red buttons side by side).
+            // A finished game has nothing to leave for now, resume or quit (0.3.3 test): a new game, the start screen, or stay.
+            if (tick.let { state.isOver }) {
+                Text("This game is over", style = Wood.title(20.sp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (online == null) GoButton("New game", "exit-new-game", true, Modifier.heightIn(min = 44.dp)) { confirmExit = false; seed++; playing = true }
+                    BrassButton("Back to start", "exit-yes", Modifier.heightIn(min = 44.dp), size = 15.sp) { confirmExit = false; onExit() }
+                    WoodButton("See the board", "exit-no") { confirmExit = false }
+                }
+                return@Column
+            }
             val keeps = online != null || (saveStore != null && human)
             Text("Leave this game?", style = Wood.title(20.sp))
             Text(if (keeps) "Leave for now and Resume it from the start screen any time" + (if (online != null) ", until the host ends it." else ".")

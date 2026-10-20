@@ -17,7 +17,7 @@ import kotlin.random.Random
  * clouds into 3D and use Codex's water"). LiveSeaTest has Codex's own checks of the water and its poses.
  */
 class LiveSeaPortTest {
-    private val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+    private val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText().replace("\r\n", "\n")
 
     @Test
     fun `the painted 3D board floats on the animated water with surf on every coast edge, and no flat sea under it`() {
@@ -100,7 +100,7 @@ class LiveSeaPortTest {
         for (call in listOf("noteSeaView(sea", "sea.drawLiveSplashes(", "sea.drawLiveCritters(", "sea.drawSky(")) assertTrue(call in live, call)
         assertTrue("includeBirds = false" in live, "gulls are 3D models there, not sprites too")
         // Every critter layer is drawn on the 3D board: water layers by drawLiveCritters, air and sky by drawSky.
-        val sea = File("src/main/java/com/mauro/wgbg/Sea.kt").readText()
+        val sea = File("src/main/java/com/mauro/wgbg/Sea.kt").readText().replace("\r\n", "\n")
         val critters = sea.substringAfter("internal fun drawLiveCritters").substringBefore("\n    }\n")
         for (layer in listOf("\"under\"", "\"underwater\"", "\"surface\"")) assertTrue(layer in critters, layer)
         val sky = sea.substringAfter("fun drawSky(").substringBefore("\n    }\n")
@@ -109,12 +109,12 @@ class LiveSeaPortTest {
 
     @Test
     fun `Codex is credited for the water and the MIT shader references ship with the app`() {
-        val credits = File("../CREDITS.md").readText()
+        val credits = File("../CREDITS.md").readText().replace("\r\n", "\n")
         assertTrue("Codex" in credits)
         for (f in listOf("MIT-water-stylized.txt", "MIT-water-boujie.txt")) {
             assertTrue(File("src/main/assets/licenses/$f").isFile, f)
             assertTrue(File("../docs/licenses/$f").isFile, f)
-            assertTrue("MIT" in File("src/main/assets/licenses/$f").readText())
+            assertTrue("MIT" in File("src/main/assets/licenses/$f").readText().replace("\r\n", "\n"))
         }
         for (m in listOf("live_water_mesh.glb", "live_water.filamat", "coast_a.glb", "live_sloop.glb", "live_raiders.glb", "live_gull_0.glb",
                 "live_gull_15.glb", "sea_wake.glb", "sea_wavelet.glb", "sea_shadow.glb")) assertTrue(File("src/main/assets/filament/$m").isFile, m)

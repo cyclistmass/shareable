@@ -96,13 +96,13 @@ class SeaLoopTest {
 
     @Test
     fun `the 3D board follows the screen's lifecycle and the 2D sea loop never ends`() {
-        val view = File("src/main/java/com/mauro/wgbg/LiveBoardView.kt").readText()
+        val view = File("src/main/java/com/mauro/wgbg/LiveBoardView.kt").readText().replace("\r\n", "\n")
         assertTrue("holder[0]?.running = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)" in view, "every lifecycle event sets running")
         val frame = view.substringAfter("override fun doFrame").substringBefore("\n    }\n")
         assertTrue("if (!loop.frame()) return" in frame)
         assertTrue("liveStalled(System.nanoTime(), loop.since, lastFrameAt)" in frame)
         assertTrue("frameStep(now, critterTime, .1f)" in view, "Space critters step like the sea")
-        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText().replace("\r\n", "\n")
         val sea = main.substringAfter("LaunchedEffect(sea) {").substringBefore("\n    }\n")
         assertTrue("while (true)" in sea)
         assertFalse("break" in sea || "return@LaunchedEffect" in sea, "the sea loop can end")

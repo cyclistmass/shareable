@@ -12,7 +12,7 @@ import java.io.File
  * tilt or pan, then catch up").
  */
 class LiveLagTest {
-    private val view = File("src/main/java/com/mauro/wgbg/LiveBoardView.kt").readText()
+    private val view = File("src/main/java/com/mauro/wgbg/LiveBoardView.kt").readText().replace("\r\n", "\n")
 
     private fun times(a: FloatArray, b: FloatArray) = FloatArray(16) { i ->
         val col = i / 4; val row = i % 4
@@ -24,7 +24,7 @@ class LiveLagTest {
     fun `each frame reads the camera as it is then, not as the last recomposition left it`() {
         val frame = view.substringAfter("override fun doFrame").substringBefore("\n    }\n")
         assertTrue("projectionNow?.invoke() ?: projection" in frame, "doFrame takes the live camera first")
-        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText().replace("\r\n", "\n")
         val call = main.substringAfter("LiveBoardView(placements").substringBefore("{ reason ->")
         assertTrue("projectionNow = {" in call, "the game screen passes its live camera")
     }

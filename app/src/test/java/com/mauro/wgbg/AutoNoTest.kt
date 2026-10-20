@@ -60,7 +60,7 @@ class AutoNoTest {
 
     @Test
     fun `the countdown uses the engine's rule, logs the line, then sends No as a tap would`() {
-        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+        val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText().replace("\r\n", "\n")
         val effect = main.substringAfter("LaunchedEffect(offerKey) {").substringBefore("\n    }\n")
         assertTrue("if (!Rules.cantPayOffer(state, me)) { sounds.tradeChime" in effect)
         val logged = effect.indexOf("log.add(0, autoNoText(state, me, names))")
