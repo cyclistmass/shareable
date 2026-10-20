@@ -119,7 +119,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private var width = 0
     private var height = 0
     private var closed = false
-    private var scheduled = false
+    private val loop = FrameLoop({ Choreographer.getInstance().postFrameCallback(this) }, { Choreographer.getInstance().removeFrameCallback(this) })
     var placements = emptyList<LivePlacement>()
     var batch = emptyList<SpaceLayer>()
     private val batchAssets = mutableMapOf<SpaceLayer, FilamentAsset>()
@@ -154,16 +154,12 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private var windowStart = 0L
     private var skipped = 0
     private var timedProjection: LiveProjection? = null
-    /** When the board last started running and last put a frame on screen (System.nanoTime), for [liveStalled]. */
-    private var runningSince = 0L
+    /** When the board last put a frame on screen (System.nanoTime), for [liveStalled]. */
     private var lastFrameAt = 0L
-    var running = false
-        set(value) {
-            if (value && !field) runningSince = System.nanoTime()
-            field = value
-            if (value && !closed && !scheduled) { scheduled = true; Choreographer.getInstance().postFrameCallback(this) }
-            if (!value) { Choreographer.getInstance().removeFrameCallback(this); scheduled = false; resetTiming() }
-        }
+    /** On while the screen is started: frames run (#134: they stop for a pause and come back on resume). */
+    var running: Boolean
+        get() = loop.running
+        set(value) { if (value) loop.start(System.nanoTime()) else { loop.stop(); resetTiming() } }
 
     init {
         view.scene = scene; view.camera = camera
@@ -357,11 +353,9 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     }
 
     override fun doFrame(frameTimeNanos: Long) {
-        scheduled = false
-        if (!running || closed) return
-        scheduled = true; Choreographer.getInstance().postFrameCallback(this)
+        if (!loop.frame()) return
         val p = projectionNow?.invoke() ?: projection ?: return
-        if (liveStalled(System.nanoTime(), runningSince, lastFrameAt)) {
+        if (liveStalled(System.nanoTime(), loop.since, lastFrameAt)) {
             // Nothing on screen for a while (no surface, or every frame skipped): the flat board rather than a blank one.
             running = false
             Log.e("WGBG-3D", "No frame for ${LIVE_STALL_NANOS / 1_000_000_000} s; reverting to sprites")
@@ -399,7 +393,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     }
 
     private fun updateCritters(now: Long, p: LiveProjection) {
-        val dt = if (critterTime == 0L || !animate) 0f else ((now - critterTime) / 1e9f).coerceAtMost(.1f)
+        val dt = frameStep(now, critterTime, .1f).takeIf { animate } ?: 0f
         critterTime = now
         val corners = listOf(Offset.Zero, Offset(width.toFloat(), 0f), Offset(0f, height.toFloat()), Offset(width.toFloat(), height.toFloat())).map(p::unproject)
         val bounds = androidx.compose.ui.geometry.Rect(corners.minOf { it.x }, corners.minOf { it.y }, corners.maxOf { it.x }, corners.maxOf { it.y })
@@ -449,6 +443,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         surfaceView.holder.removeCallback(this)
         surfaceDestroyed(surfaceView.holder)
         closed = true
+        loop.close()
         scene.removeEntities(lights.toIntArray())
         for (i in active) scene.removeEntities(i.entities)
         for (i in critterInstances) scene.removeEntities(i.entities)

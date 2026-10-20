@@ -167,6 +167,44 @@ internal const val LIVE_STALL_NANOS = 5_000_000_000L
 internal fun liveStalled(now: Long, since: Long, lastFrame: Long): Boolean =
     since != 0L && now - maxOf(since, lastFrame) > LIVE_STALL_NANOS
 
+/**
+ * Seconds of animation for a frame at [now] after one at [last] (nanoseconds; 0 = no frame yet, so none): never
+ * negative, since some phones' frame clocks step back a little (crash reports 2026-10-11), and at most [max], so a
+ * resume after a long pause or time in the background doesn't jump the sea or critters ahead (#134).
+ */
+internal fun frameStep(now: Long, last: Long, max: Float): Float = if (last == 0L) 0f else ((now - last) / 1e9f).coerceIn(0f, max)
+
+/**
+ * Starts and stops a per-frame callback with the screen (#134): at most one frame is ever pending, a pause drops it,
+ * a resume posts exactly one, and nothing is posted once closed. [post] and [remove] are Choreographer's.
+ */
+internal class FrameLoop(private val post: () -> Unit, private val remove: () -> Unit) {
+    var running = false; private set
+    var closed = false; private set
+    private var pending = false
+    /** When it last started running (System.nanoTime), for [liveStalled]; 0 = never. */
+    var since = 0L; private set
+
+    fun start(now: Long) {
+        if (closed) return
+        if (!running) since = now
+        running = true
+        if (!pending) { pending = true; post() }
+    }
+
+    fun stop() { running = false; pending = false; remove() }
+
+    /** The posted frame arrived: true to draw it, with the next one already posted; false when stopped or closed. */
+    fun frame(): Boolean {
+        pending = false
+        if (!running || closed) return false
+        pending = true; post()
+        return true
+    }
+
+    fun close() { stop(); closed = true }
+}
+
 /** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
 internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
 

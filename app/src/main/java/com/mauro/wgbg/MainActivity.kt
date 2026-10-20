@@ -723,7 +723,7 @@ fun WatchGameScreen(
             sea.clouds01 = env.clouds; sea.birds01 = env.birds; sea.boats01 = env.boats; sea.waves01 = env.waves; sea.density01 = env.density
             // Clamp both ends: on some phones (Pixel 9/10, Android 17) the frame clock can step back a little,
             // and a negative step crashed the gulls' turn limit (crash reports 2026-10-11).
-            if (last != 0L) sea.update(((now - last) / 1e9f).coerceIn(0f, 0.05f))
+            if (last != 0L) sea.update(frameStep(now, last, 0.05f))
             last = now
             seaTick++
             }
