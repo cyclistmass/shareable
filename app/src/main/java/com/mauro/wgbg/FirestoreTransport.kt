@@ -62,6 +62,7 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
     private val uid get() = auth.currentUser?.uid ?: error("Sign in first")
     /** The account calls for Settings' Google sign-in (#83). */
     val account: GoogleAccount.Ops get() = GoogleAccount.FirebaseOps(auth)
+    override val google: Boolean get() = account.isGoogle
     /** After a Google sign-in or sign-out: forget the cached sign-in so the next call uses the new user. */
     @Synchronized fun accountChanged() { signingIn = null }
     @Synchronized override fun signIn(): CompletableFuture<String> {
@@ -81,7 +82,7 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
         val ref = games.document(room.id)
         return db.runTransaction { t ->
             check(!t.get(ref).exists()) { "Room code already used" }
-            t.set(ref, room.wire() + mapOf("createdAt" to FieldValue.serverTimestamp(), "lastMove" to "")); room
+            t.set(ref, room.wire() + mapOf("createdAt" to FieldValue.serverTimestamp(), "lastMove" to "", "expireAt" to expiresIn(LOBBY_DAYS))); room
         }.future()
     }
     /** Adds one crash report to `crashes` (write-only for players; see firestore.rules). */
@@ -102,25 +103,26 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
     }
 
     override fun listOpen() = games.whereEqualTo("status", "lobby").get().future().thenApply { q -> q.documents.mapNotNull { runCatching { room(it.id, it.data!!) }.getOrNull() } }   // another version's rooms are left out, not an error
-    private fun change(id: String, f: (Room) -> Room): CompletableFuture<Unit> {
+    /** [extra]: fields beside the room's own, such as a new expiry. */
+    private fun change(id: String, extra: Map<String, Any> = emptyMap(), f: (Room) -> Room): CompletableFuture<Unit> {
         val ref = games.document(id)
         return db.runTransaction { t ->
             val old = room(id, t.get(ref).data ?: error("Unknown room")); val next = f(old)
-            t.update(ref, next.wire()); Unit
+            t.update(ref, next.wire() + extra); Unit
         }.future()
     }
     override fun join(id: String, seat: Int, name: String) = change(id) { r ->
         require(r.status == Status.lobby && seat in 1..3 && name.isNotBlank())
         require(r.seats.none { it.uid == uid } && r.seats[seat].uid == null && r.seats[seat].open)
-        r.copy(seats = r.seats.toMutableList().also { it[seat] = it[seat].copy(uid = uid, name = uniqueSeatName(name, r.seats.filter { it.uid != null }.map { it.name }), open = false, ready = false) })
+        r.copy(seats = r.seats.toMutableList().also { it[seat] = it[seat].copy(uid = uid, name = uniqueSeatName(name, r.seats.filter { it.uid != null }.map { it.name }), open = false, ready = false, google = google) })
     }
     override fun leave(id: String) = change(id) { r ->
         require((r.status == Status.lobby || r.status == Status.playing) && uid != r.host)
         val i = r.seats.indexOfFirst { it.uid == uid }; require(i > 0)
         r.copy(seats = r.seats.toMutableList().also {
             // In the lobby the seat reopens; in a running game a bot takes it over (the host's phone plays it).
-            it[i] = if (r.status == Status.lobby) it[i].copy(uid = null, name = "", ready = false, open = true)
-                else it[i].copy(uid = null, name = "", ready = false, open = false, bot = it[i].bot ?: BotLevel.GREEDY.name)
+            it[i] = if (r.status == Status.lobby) it[i].copy(uid = null, name = "", ready = false, open = true, google = false)
+                else it[i].copy(uid = null, name = "", ready = false, open = false, bot = it[i].bot ?: BotLevel.GREEDY.name, google = false)
         })
     }
     override fun editLobby(id: String, seats: List<Seat>, expectedSeats: List<Seat>?) = change(id) { r ->
@@ -128,7 +130,7 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
         require(expectedSeats == null || expectedSeats == r.seats) { "Lobby changed; try again" }
         r.copy(seats = seats)
     }
-    override fun start(id: String) = change(id) { r ->
+    override fun start(id: String) = change(id, mapOf("expireAt" to expiresIn(GAME_DAYS))) { r ->
         require(r.host == uid && r.status == Status.lobby && r.seats.all { it.uid == null || it.ready })
         r.copy(config = r.config.copy(numPlayers = r.players.size), status = Status.playing)
     }
@@ -137,12 +139,46 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
         // No reads, transaction, room-counter write, or local-log replay on the write path.
         return games.document(id).collection("moves").document(moveId(seq)).set(mapOf(
             "seq" to seq, "seat" to seat.toString(), "uid" to uid, "action" to action,
-            "prev" to if (seq == 0L) "" else moveId(seq - 1)
+            "prev" to if (seq == 0L) "" else moveId(seq - 1), "expireAt" to expiresIn(GAME_DAYS)
         )).future().thenApply<Unit> { Unit }
     }
-    override fun finish(id: String) = change(id) { r ->
+    override fun finish(id: String) = change(id, mapOf("expireAt" to expiresIn(DONE_DAYS))) { r ->
         require(r.host == uid && r.status == Status.playing); r.copy(status = Status.done)
     }
+    override fun invite(id: String, uids: List<String>) = change(id) { r ->
+        require(r.host == uid && r.status == Status.lobby && uids.size <= 3 && uid !in uids); r.copy(invited = uids)
+    }
+    override fun setNext(id: String, next: String) = change(id) { r ->
+        require(r.host == uid && r.status == Status.done && r.next == null); r.copy(next = next)
+    }
+    override fun observeInvites(onRooms: (List<Room>) -> Unit, onError: (Throwable) -> Unit): Subscription {
+        val lock = Any()
+        var closed = false
+        var listener: com.google.firebase.firestore.ListenerRegistration? = null
+        signIn().whenComplete { me, e ->
+            synchronized(lock) {
+                if (closed) return@whenComplete
+                if (e != null) { onError(e); return@whenComplete }
+                // Any state may come back (the rules let the invited read it): only rooms still taking players count.
+                listener = games.whereArrayContains("invited", me).addSnapshotListener { q, failure ->
+                    if (failure != null) onError(failure)
+                    else onRooms(q!!.documents.mapNotNull { runCatching { room(it.id, it.data!!) }.getOrNull() }.filter { it.status == Status.lobby })
+                }
+            }
+        }
+        return Subscription { synchronized(lock) { closed = true; listener?.remove() } }
+    }
+    private fun met() = db.collection("users").document(uid).collection("met")
+    override fun friends(): CompletableFuture<List<Friend>> = signIn().thenCompose { met().get().future() }.thenApply { q ->
+        q.documents.mapNotNull { d -> runCatching {
+            Friend(d.id, d.getString("name")!!, d.getTimestamp("lastPlayed")!!.toDate().time, d.getLong("games")!!.toInt(), d.getBoolean("starred")!!)
+        }.getOrNull() }
+    }
+    override fun putFriend(f: Friend): CompletableFuture<Unit> = signIn().thenCompose {
+        met().document(f.uid).set(mapOf("name" to f.name.take(80), "lastPlayed" to com.google.firebase.Timestamp(java.util.Date(f.lastPlayed)),
+            "games" to f.games.toLong(), "starred" to f.starred)).future()
+    }.thenApply { }
+    override fun forgetFriend(uid: String): CompletableFuture<Unit> = signIn().thenCompose { met().document(uid).delete().future() }.thenApply { }
     override fun observe(id: String, onSnapshot: (Snapshot) -> Unit, onError: (Throwable) -> Unit): Subscription {
         val log = java.util.TreeMap<Long, Move>()
         return observeMoves(id, -1, { update ->
@@ -191,22 +227,30 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
     }
 }
 
+/** Rooms and moves delete themselves this many days on (a Firestore TTL policy on `expireAt`, #72): a lobby nobody
+ *  started, a game since its last move, a finished game. */
+internal const val LOBBY_DAYS = 1
+internal const val GAME_DAYS = 30
+internal const val DONE_DAYS = 7
+private fun expiresIn(days: Int) = com.google.firebase.Timestamp(java.util.Date(System.currentTimeMillis() + days * 24L * 60 * 60 * 1000))
+
 internal fun Room.wire(): Map<String, Any?> = mapOf(
     "host" to host, "status" to status.name, "seed" to seed.toString(), "nextSeq" to nextSeq, "decks" to decks,
-    "seats" to seats.mapIndexed { i, s -> i.toString() to mapOf("uid" to s.uid, "name" to s.name, "bot" to s.bot, "open" to s.open, "ready" to s.ready) }.toMap(),
+    "seats" to seats.mapIndexed { i, s -> i.toString() to mapOf("uid" to s.uid, "name" to s.name, "bot" to s.bot, "open" to s.open, "ready" to s.ready, "google" to s.google) }.toMap(),
     "options" to mapOf("expansion" to config.expansion.name, "numPlayers" to config.numPlayers, "vpToWin" to config.vpToWin,
         "layout" to config.layout.name, "avoidAdjacentRedNumbers" to config.avoidAdjacentRedNumbers, "discardLimit" to config.discardLimit,
         "maxTurns" to config.maxTurns, "randomDiscard" to config.randomDiscard, "generateTradeOffers" to config.generateTradeOffers,
         "randomFirstPlayer" to config.randomFirstPlayer),
-    "version" to ROOM_VERSION,
-)
+    "version" to ROOM_VERSION, "invited" to invited,
+) + listOfNotNull(rematchOf?.let { "rematchOf" to it }, next?.let { "next" to it })
 
 /**
  * The room format's version. 2 from 0.2.10 (Mauro, 2026-10-13): a random first player (#126) plays differently, so a
- * 0.2.9 phone (which only reads 1) is kept out of 0.2.10 rooms and this one out of theirs. Bump it, and let the rules'
- * `valid()` accept it, whenever two versions of the app would play the same room differently.
+ * 0.2.9 phone (which only reads 1) is kept out of 0.2.10 rooms and this one out of theirs. 3 from 0.3.4: invites, the
+ * rematch link and the Google mark on seats (#72), which an older phone would drop when it rewrites the room. Bump it,
+ * and let the rules' `valid()` accept it, whenever two versions of the app would play the same room differently.
  */
-internal const val ROOM_VERSION = 2
+internal const val ROOM_VERSION = 3
 
 /** A room made by a different version of the app; its message is what the player sees. */
 internal class RoomVersionException(val version: Int) :
@@ -223,7 +267,8 @@ internal fun room(id: String, d: Map<String, Any?>): Room {
             o["avoidAdjacentRedNumbers"] as Boolean, n("discardLimit"), n("maxTurns"), o["randomDiscard"] as Boolean, o["generateTradeOffers"] as Boolean,
             o["randomFirstPlayer"] as Boolean? ?: false),   // rooms made before #126: seat 0 starts
         (d["seed"] as String).toLong(), List(4) { i -> val s = seats[i.toString()]!!
-            Seat(s["uid"] as String?, s["name"] as String, s["bot"] as String?, s["open"] as Boolean, s["ready"] as Boolean) },
-        Status.valueOf(d["status"] as String), (d["nextSeq"] as Number).toLong(), (d["decks"] as Number).toInt())
+            Seat(s["uid"] as String?, s["name"] as String, s["bot"] as String?, s["open"] as Boolean, s["ready"] as Boolean, s["google"] as Boolean? ?: false) },
+        Status.valueOf(d["status"] as String), (d["nextSeq"] as Number).toLong(), (d["decks"] as Number).toInt(),
+        (d["invited"] as List<String>?) ?: emptyList(), d["rematchOf"] as String?, d["next"] as String?)
 }
 

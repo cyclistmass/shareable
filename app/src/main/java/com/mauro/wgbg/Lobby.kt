@@ -266,7 +266,7 @@ private fun copyLink(context: Context, link: String) {
 fun inviteText(lobby: Lobby, to: String? = null) =
     "${to?.let { "$it, j" } ?: "J"}oin my game: room ${lobby.code}, ${lobby.setup.ruleset.label}. ${lobby.link}"
 
-private fun shareLink(context: Context, lobby: Lobby, to: String? = null) {
+internal fun shareLink(context: Context, lobby: Lobby, to: String? = null) {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, inviteText(lobby, to))
     context.startActivity(Intent.createChooser(send, "Invite to room ${lobby.code}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }

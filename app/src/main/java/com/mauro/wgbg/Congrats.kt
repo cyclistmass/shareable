@@ -59,6 +59,8 @@ internal fun congratsTitle(winner: Int, me: Int, names: List<String>): String = 
 internal fun CongratsScreen(
     players: List<PlayerInfo>, names: List<String>, winner: Int, me: Int, turns: Int,
     folded: Boolean, onFold: (Boolean) -> Unit, onPlayAgain: (() -> Unit)?, onExit: () -> Unit,
+    /** Online, a guest: "Join rematch" once the host has opened one (#72). */
+    playAgainLabel: String = "Play again",
 ) {
     if (folded) {
         Box(Modifier.fillMaxSize()) {
@@ -98,7 +100,7 @@ internal fun CongratsScreen(
             }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (onPlayAgain != null) BrassButton("Play again", "play-again", Modifier.height(44.dp), onClick = onPlayAgain)
+                if (onPlayAgain != null) BrassButton(playAgainLabel, "play-again", Modifier.height(44.dp), onClick = onPlayAgain)
                 WoodButton("See the board", "congrats-board") { onFold(true) }
                 WoodButton("Exit", "game-over-exit", onClick = onExit)
             }

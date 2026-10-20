@@ -13,6 +13,17 @@ class OnlineLobbyTest {
             assertEquals(r, room(r.id, r.wire()))
         }
     }
+    @Test fun `#72 invites, the rematch link and the Google mark survive the wire, and rooms without them read as none`() {
+        val seats = listOf(Seat("host", "Host", google = true), Seat("erin", "Erin", open = false, google = true), Seat(), Seat())
+        val r = Room("ROVER-42", "host", GameSetup().config(), 9, seats, Status.done, 0, 0, listOf("erin", "bo"), "OAK-12", "ELM-310")
+        assertEquals(r, room(r.id, r.wire()))
+        val plain = r.copy(invited = emptyList(), rematchOf = null, next = null)
+        assertFalse("next" in plain.wire() || "rematchOf" in plain.wire())
+        @Suppress("UNCHECKED_CAST")
+        val bare = plain.wire().toMutableMap().also { w -> w.remove("invited")
+            w["seats"] = (w["seats"] as Map<String, Map<String, Any?>>).mapValues { it.value - "google" } }
+        assertEquals(plain.copy(seats = seats.map { it.copy(google = false) }), room(r.id, bare))
+    }
     @Test fun `#126 online games start from the seed's seat, and a room made before #126 reads as seat 0 starting`() {
         assertTrue(GameSetup().config().randomFirstPlayer)
         val r = Room("ROVER-42", "host", GameSetup().config(), 9, listOf(Seat("host", "Host"), Seat(), Seat(), Seat()), Status.playing, 0, 0)

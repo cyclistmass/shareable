@@ -4,11 +4,17 @@ import wgbg.engine.*
 import java.util.concurrent.CompletableFuture
 import java.security.SecureRandom
 
-data class Seat(val uid: String? = null, val name: String = "", val bot: String? = null, val open: Boolean = true, val ready: Boolean = false)
+/** [google]: the person in this seat is signed in with Google (#72: only they go on friends lists; a guest's id is lost on sign-out). */
+data class Seat(val uid: String? = null, val name: String = "", val bot: String? = null, val open: Boolean = true, val ready: Boolean = false,
+    val google: Boolean = false)
 enum class Status { lobby, playing, done }
+/**
+ * [invited]: people the host asked in (#72), who see the room on their start screen. [rematchOf]: the finished room this
+ * one plays again; [next]: set on a finished room once its host opens the rematch, so its players can follow.
+ */
 data class Room(val id: String, val host: String, val config: GameConfig, val seed: Long,
     val seats: List<Seat>, val status: Status = Status.lobby, val nextSeq: Long = 0,
-    val decks: Int = 0) {
+    val decks: Int = 0, val invited: List<String> = emptyList(), val rematchOf: String? = null, val next: String? = null) {
     init { require(seats.size == 4); require(seats[0].uid == host) }
     val players get() = seats.indices.filter { seats[it].uid != null || seats[it].bot != null }
 }
@@ -41,6 +47,18 @@ interface GameTransport {
     fun finish(id: String): CompletableFuture<Unit>
     fun submit(id: String, seq: Long, seat: Int, action: String): CompletableFuture<Unit>
     fun observe(id: String, onSnapshot: (Snapshot) -> Unit, onError: (Throwable) -> Unit): Subscription
+    /** This player is signed in with Google (#72); a guest never is. */
+    val google: Boolean get() = false
+    /** Host, in the lobby: the people invited to room [id] (#72). */
+    fun invite(id: String, uids: List<String>): CompletableFuture<Unit> = unsupported()
+    /** Host, on a finished room: the rematch's code, for its players to follow (#72). */
+    fun setNext(id: String, next: String): CompletableFuture<Unit> = unsupported()
+    /** Rooms still in the lobby that invite this player, as they change (#72). */
+    fun observeInvites(onRooms: (List<Room>) -> Unit, onError: (Throwable) -> Unit): Subscription = Subscription { }
+    /** This player's people played with (#72), any order. */
+    fun friends(): CompletableFuture<List<Friend>> = unsupported()
+    fun putFriend(f: Friend): CompletableFuture<Unit> = unsupported()
+    fun forgetFriend(uid: String): CompletableFuture<Unit> = unsupported()
     fun observeMoves(id: String, afterSeq: Long, onUpdate: (MoveUpdate) -> Unit, onError: (Throwable) -> Unit): Subscription {
         var last = afterSeq
         return observe(id, { s ->
@@ -48,6 +66,46 @@ interface GameTransport {
             if (delta.isNotEmpty()) last = delta.maxOf { it.seq }
             onUpdate(MoveUpdate(s.room, delta))
         }, onError)
+    }
+}
+
+private fun <T> unsupported(): CompletableFuture<T> = CompletableFuture.failedFuture(UnsupportedOperationException("Not on this connection"))
+
+/** Someone you played an online game with (#72): kept on your account, starred to keep for good. */
+data class Friend(val uid: String, val name: String, val lastPlayed: Long, val games: Int = 1, val starred: Boolean = false)
+
+object Friends {
+    /** Unstarred people drop off the list this long after your last game together. */
+    const val KEEP_MS = 90L * 24 * 60 * 60 * 1000
+
+    /**
+     * The entries to write when [room] starts with [me] in it: everyone else seated and signed in with Google, with
+     * their name in this room, [now] as the last game and one more game together than [known] says.
+     */
+    fun met(room: Room, me: String, known: Map<String, Friend>, now: Long): List<Friend> =
+        room.seats.filter { it.uid != null && it.uid != me && it.google }.map { s ->
+            val old = known[s.uid]
+            Friend(s.uid!!, s.name.ifBlank { old?.name ?: "" }, now, (old?.games ?: 0) + 1, old?.starred ?: false)
+        }
+
+    /** The list to show: starred first, then the most recent; unstarred people not seen for [KEEP_MS] are left out. */
+    fun shown(all: List<Friend>, now: Long): List<Friend> =
+        all.filter { it.starred || now - it.lastPlayed <= KEEP_MS }
+            .sortedWith(compareByDescending<Friend> { it.starred }.thenByDescending { it.lastPlayed })
+
+    /**
+     * The rematch of finished room [old], hosted again by its host as room [id]: the same settings and bots, the
+     * people's seats open again, and those people invited.
+     */
+    fun rematch(old: Room, id: String, seed: Long): Room {
+        val people = old.seats.drop(1).mapNotNull { it.uid }
+        return Room(id, old.host, old.config, seed, old.seats.mapIndexed { i, s ->
+            when {
+                i == 0 -> s.copy(ready = true)
+                s.uid != null -> Seat()
+                else -> s.copy(ready = false)
+            }
+        }, decks = old.decks, invited = people, rematchOf = old.id)
     }
 }
 
