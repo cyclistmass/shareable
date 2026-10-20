@@ -1027,12 +1027,18 @@ fun WatchGameScreen(
     val cardSecondNow by rememberUpdatedState(cardSecond)
     // The build menu (right edge): a picked kind narrows the board to just its spots; it lets go when it can't be done.
     var buildMode by remember { mutableStateOf<BuildKind?>(null) }
-    if (buildMode != null && legal.none { it.type == buildMode!!.kind }) buildMode = null
+    if (buildMode != null && legal.none { buildMode!!.offers(it) }) buildMode = null
     val boardLegal = boardMoves(legal, buildMode)
     val boardLegalNow by rememberUpdatedState(boardLegal)
     val buildModeNow by rememberUpdatedState(buildMode)
-    val targets = if (cardPick.isNotEmpty()) Targets.ofCards(cardPick, cardSecond) else Targets.of(boardLegal)
+    // The knight picked to move: only its moves glow (see knightTargets); let go once it can't move (it moved, the turn ended).
+    var knightPick by remember { mutableStateOf<Int?>(null) }
+    if (knightPick != null && knightPick !in movableKnights(boardLegal)) knightPick = null
+    val knightPickNow by rememberUpdatedState(knightPick)
+    val targets = if (cardPick.isNotEmpty()) Targets.ofCards(cardPick, cardSecond) else knightTargets(boardLegal, knightPick)
     val chosen = pending.filter { it in legal } // a stale pick (the turn moved on) is dropped
+    // White: the move waiting for its second tap, and the knight picked to move.
+    val chosenTargets = Targets.of(chosen).let { t -> knightPick?.let { Targets(t.vertices + it, t.edges, t.hexes) } ?: t }
     // Turn and trade alerts (#44): a tick when it becomes your move, a chime when an offer asks for cards you
     // hold, and an offer you can't pay is declined for you after a short countdown so turns keep flowing.
     val hostView = androidx.compose.ui.platform.LocalView.current
@@ -1193,7 +1199,11 @@ fun WatchGameScreen(
                         val p = if (liveBoardNow && inventory) liveProjection(size.width.toFloat(), size.height.toFloat()).unproject(at)
                             else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at, liveBoardTop(env.art)) else l.unproject(at)
                         val picking = cardPickNow.isNotEmpty()
-                        val tapped = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow) else tapMoves(stateNow, boardLegalNow, legalNow, p, me, buildModeNow != null)
+                        // A tap on a knight that can move picks it (or lets it go), and only its moves glow.
+                        val knight = if (inventory || picking) knightPickNow else knightPickAt(stateNow, boardLegalNow, p, knightPickNow)
+                        if (knight != knightPickNow) { knightPick = knight; pending = emptyList(); hostView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); return@detectTapGestures }
+                        val tapped = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow)
+                            else tapMoves(stateNow, withKnightPick(boardLegalNow, knightPickNow), legalNow, p, me, buildModeNow != null)
                         // The Tinkerer swaps two tiles: the first tap narrows to that tile's swaps, the second picks the other tile.
                         if (picking && !cardSecondNow && tapped.size > 1 && tapped.all { it.a == wgbg.engine.Progress.INVENTOR }) {
                             cardPick = tapped; cardSecond = true; return@detectTapGestures
@@ -1208,6 +1218,7 @@ fun WatchGameScreen(
                             }
                             moves.isNotEmpty() -> { pending = moves; pendingAt = p; hostView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }
                             pending.isNotEmpty() -> pending = emptyList() // tapping elsewhere cancels
+                            knightPickNow != null -> knightPick = null      // and lets go of a picked knight
                             !inventory && boardTapHint(boardNow, legalNow, stateNow.robberHex, p) != null -> tapHint = boardTapHint(boardNow, legalNow, stateNow.robberHex, p)
                             !inventory && seaNow.isWater(p) -> seaNow.splash(p)
                             // The 3D collection: tap a piece set to play with it (#119: "useless if I can't pick").
@@ -1247,7 +1258,7 @@ fun WatchGameScreen(
                     liveBoardTop(env.art)) { v ->
                     env.art.space(ArtObject.KNIGHTS) || liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
                 if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
-                if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, top = liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (!chosenTargets.isEmpty) drawLiveTargets(state.board, chosenTargets, projection, Color.White, top = liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             } else {
                 val knights = if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal
                 val layerDensity = androidx.compose.ui.unit.Density(density, fontScale)
@@ -1271,7 +1282,7 @@ fun WatchGameScreen(
                 drawLayer(boardLayer)
                 drawGame(state, measurer, wood, camera, sea.takeIf { env.animating }, tileFaces, cliff, tileLine, knights, raiders, BoardPart.OVER, banditSprites, space = space)
                 if (!targets.isEmpty) drawTargets(state.board, targets, camera, targetPulse(sea.time), targetGlow(me), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
-                if (chosen.isNotEmpty()) drawTargets(state.board, Targets.of(chosen), camera, 1f, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (!chosenTargets.isEmpty) drawTargets(state.board, chosenTargets, camera, 1f, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             }
         }
         if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {

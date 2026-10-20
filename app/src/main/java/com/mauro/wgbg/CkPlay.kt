@@ -214,6 +214,35 @@ fun tapMoves(s: GameState, boardLegal: List<Action>, legal: List<Action>, p: and
     else if (kotlin.math.hypot(boardPos.x - p.x, boardPos.y - p.y) < kotlin.math.hypot(townPos.x - p.x, townPos.y - p.y)) board else town
 }
 
+/**
+ * Moves that carry a knight to another corner. They light up only once the player picks that knight (0.3.4, Mauro: with
+ * a knight that could move, every corner lit up as a move target and it wasn't clear what for).
+ */
+val KNIGHT_MOVES: Set<ActionKind> = setOf(CkActionType.MOVE_KNIGHT, CkActionType.DISPLACE_KNIGHT)
+
+/** The corners of the knights in [legal] that can move now. */
+fun movableKnights(legal: List<Action>): Set<Int> = legal.filter { it.type in KNIGHT_MOVES }.map { it.a }.toSet()
+
+/** [boardLegal] as the board offers it while knight [picked] is chosen (null: none): only that knight's moves. */
+fun withKnightPick(boardLegal: List<Action>, picked: Int?): List<Action> = boardLegal.filter { it.type !in KNIGHT_MOVES || it.a == picked }
+
+/**
+ * The knight a tap at lattice point [p] picks or lets go of: a movable knight within reach, unless another move is
+ * offered right there (Supply or Promote on that knight come first; the build menu's Move knight offers only moves).
+ * Returns the new pick, null to let go, or [picked] unchanged when the tap isn't on a movable knight.
+ */
+fun knightPickAt(s: GameState, boardLegal: List<Action>, p: androidx.compose.ui.geometry.Offset, picked: Int?): Int? {
+    fun d(v: Int) = vertexLattice(s.board, v).let { kotlin.math.hypot(it.x - p.x, it.y - p.y) }
+    val knight = movableKnights(boardLegal).filter { d(it) < TAP_RADIUS }.minByOrNull { d(it) } ?: return picked
+    if (boardLegal.any { it.type !in KNIGHT_MOVES && it.type in CK_VERTEX_KINDS && ckVertex(it) == knight }) return picked
+    return if (picked == knight) null else knight
+}
+
+/** The board's glowing spots with knight [picked] chosen: its targets, or with none picked, each knight that can move. */
+fun knightTargets(boardLegal: List<Action>, picked: Int?): Targets = Targets.of(withKnightPick(boardLegal, picked)).let {
+    if (picked != null) it else Targets(it.vertices + movableKnights(boardLegal), it.edges, it.hexes)
+}
+
 /** Track of the improvement an IMPROVE_CITY action raises (for colouring its button). */
 fun improveTrack(a: Action) = if (a.type == CkActionType.IMPROVE_CITY) a.a else -1
 

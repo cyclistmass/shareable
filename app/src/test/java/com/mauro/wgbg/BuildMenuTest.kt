@@ -15,7 +15,7 @@ class BuildMenuTest {
     @Test
     fun `each ruleset gets its own entries, Fortune cards only in the base game`() {
         assertEquals(listOf("Road", "Homestead", "Town", "Fortune card"), BuildKind.forRuleset(false).map { it.label })
-        assertEquals(listOf("Road", "Homestead", "Town", "New knight", "Supply knight", "Promote knight", "Ramparts"), BuildKind.forRuleset(true).map { it.label })
+        assertEquals(listOf("Road", "Homestead", "Town", "New knight", "Supply knight", "Promote knight", "Move knight", "Ramparts"), BuildKind.forRuleset(true).map { it.label })
     }
 
     @Test
