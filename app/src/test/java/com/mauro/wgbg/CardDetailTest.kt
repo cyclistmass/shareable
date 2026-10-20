@@ -28,6 +28,16 @@ class CardDetailTest {
         assertTrue(TERRAIN_NAMES.none { it in original })
         val main = java.io.File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
         for (w in original) assertFalse("\"$w\"" in main, "MainActivity shows \"$w\"")
+        // Every player-facing string: the progress hints and the Card tester's lines too (0.3.4 sweep).
+        val words = Regex("""\b(forest|hills?|pasture|fields?|mountains?)\b""", RegexOption.IGNORE_CASE)
+        for (h in PROGRESS_HINTS) assertFalse(words.containsMatchIn(h), h)
+        // Every string literal in the files that show cards and hints; "Corner the Field" is our card's own name, and
+        // "field.…" are its Card tester ids.
+        val literal = Regex(""""(?:[^"\\]|\\.)*"""")
+        for (f in listOf("BoardHud.kt", "CardTester.kt", "CkPlay.kt", "Guide.kt", "MainActivity.kt", "NewGameScreen.kt"))
+            for (s in literal.findAll(java.io.File("src/main/java/com/mauro/wgbg/$f").readText()).map { it.value })
+                if (!s.startsWith("\"field.")) assertFalse(words.containsMatchIn(s.replace("Corner the Field", "")), "$f: $s")
+        assertEquals("Grainfield", TERRAIN_NAMES[wgbg.engine.Resource.WHEAT]); assertEquals("Quarry", TERRAIN_NAMES[wgbg.engine.Resource.ORE])
     }
 
     @Test

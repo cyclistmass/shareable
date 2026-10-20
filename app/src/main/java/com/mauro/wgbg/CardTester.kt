@@ -734,13 +734,13 @@ private fun chivalryScenarios(): List<CardScenario> {
             then(play(P.INVENTOR, lo, hi))
         }
     }
-    // Waterworks (Grain) and Deep Shafts (Stone): 2 per field / mountain by your pieces.
+    // Waterworks (Grain) and Deep Shafts (Stone): 2 per Grainfield / Quarry by your pieces.
     for ((card, r) in listOf(P.IRRIGATION to Resource.WHEAT, P.MINING to Resource.ORE)) {
         val key = if (card == P.IRRIGATION) "waterworks" else "deep-shafts"
-        val land = if (card == P.IRRIGATION) "field" else "mountain"
+        val land = TERRAIN_NAMES[r].lowercase()
         val res = RESOURCE_NAMES[r]
         fun Bench.lands() = (0 until b.hexCount).count { b.hexResource[it] == r && touches(it, 0) }
-        add("$key.by-your-$land", card, "2 $res per $land by your pieces") {
+        add("$key.by-your-$land", card, "2 $res per ${TERRAIN_NAMES[r]} by your pieces") {
             opening(true, mine = near(r)).apply {
                 progress(0, card)
                 val k = lands()

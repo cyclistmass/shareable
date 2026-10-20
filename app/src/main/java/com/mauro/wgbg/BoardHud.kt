@@ -376,7 +376,7 @@ internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
             else "the players it would hit hold fewer than 2 cards"
         P.IRRIGATION, P.MINING -> {
             val r = if (c == P.IRRIGATION) wgbg.engine.Resource.WHEAT else wgbg.engine.Resource.ORE
-            if (s.bank[r] == 0) "the bank is out of ${RESOURCE_NAMES[r]}" else "none of your buildings touch a ${if (c == P.IRRIGATION) "field" else "mountain"}"
+            if (s.bank[r] == 0) "the bank is out of ${RESOURCE_NAMES[r]}" else "none of your buildings touch a ${TERRAIN_NAMES[r]}"
         }
         P.WARLORD -> if (knights(me) == 0) "you have no knights" else "your knights are all raised already"
         P.SMITH -> "no knight of yours can be promoted"
