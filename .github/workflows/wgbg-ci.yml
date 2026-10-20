@@ -156,7 +156,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [monkey, selfplay, touch-base, touch-chivalry, play-to-end, trade, withdraw, online]
+        shard: [monkey, selfplay, touch-base, touch-chivalry, play-to-end, trade, withdraw, reach, online]
     env:
       SHARD: ${{ matrix.shard }}
     steps:
@@ -247,10 +247,14 @@ jobs:
             [ "$SHARD" != touch-chivalry ] || bash tools/ci_touchplay.sh 100 10 "chivalry:3 chivalry:4"
             # A whole game to the end screen, seat 0 driven by hooks; a stalled game fails within 60 s with the reason.
             [ "$SHARD" != play-to-end ] || STALL=60 bash tools/play_to_end.sh chivalry 4 900
+            # Then, on that finished game, the game-over panel and the dice histogram can be reached by touch at 640x320.
+            [ "$SHARD" != play-to-end ] || bash tools/ci_reach.sh end
             # Trades by touch (#122, #135, #114): bank trades, several lots, open offers, withdrawing an offer, in both rulesets.
             [ "$SHARD" != trade ] || bash tools/ci_trade.sh
             [ "$SHARD" != trade ] || bash tools/ci_keyboard.sh
             [ "$SHARD" != withdraw ] || bash tools/ci_withdraw.sh 300 "base chivalry"
+            # Every button outside the board can be reached by touch on this 640x320 screen, scrolling like a player.
+            [ "$SHARD" != reach ] || bash tools/ci_reach.sh
             # Online play end to end (#35): two clients, one room, a whole game on the Firebase emulators.
             [ "$SHARD" != online ] || bash tools/ci_online.sh apk/app-debug-androidTest.apk demo-wgbg
 
