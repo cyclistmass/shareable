@@ -34,8 +34,11 @@ class EndGameMenuTest {
 
     @Test
     fun `opening the Menu closes the roll chart, and the chart closes the Menu`() {
-        val toggle = main.substringAfter("BrassButton(if (panelOpen || settingsOpen) \"Hide\" else \"Menu\"").substringBefore("\n        }\n")
+        val toggle = main.substringAfter("\"menu-toggle\"").substringBefore("\n        }\n")
         assertTrue("panelOpen = !panelOpen; histogramOpen = false" in toggle, toggle)
+        // Look & art (#91): no game Menu there, but its Settings still show and hide (the first cut left them stuck open).
+        assertTrue("if (lookAndArt) \"Settings\" else \"Menu\"" in main.substringBefore("\"menu-toggle\"").takeLast(200))
+        assertTrue("if (settingsOpen || lookAndArt) settingsOpen = !settingsOpen" in toggle, toggle)
         assertTrue("onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false }" in main)
         // The Leave dialog and a new game come up without the Menu left open over them (device check, 0.3.4).
         assertTrue("StopButton(\"Leave game\", \"menu-exit\") { confirmExit = true; panelOpen = false }" in main)
@@ -44,7 +47,7 @@ class EndGameMenuTest {
 
     @Test
     fun `Settings hides Pause and speed once a game you played is over`() {
-        val controls = main.substringAfter("gameControls = if (!lookAndArt) {").substringBefore("PlayerPanel(players, names)")
+        val controls = main.substringAfter("gameControls = if (!lookAndArt) {").substringBefore("} else null,")
         val guarded = controls.substringAfter("if (!(human && tick.let { state.isOver })) {").substringBefore("\n                        }\n")
         assertTrue("\"menu-pause\"" in guarded && "\"menu-speed\"" in guarded)
     }

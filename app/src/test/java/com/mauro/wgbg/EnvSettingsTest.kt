@@ -92,6 +92,23 @@ class EnvSettingsTest {
     }
 
     @Test
+    fun `Reset all puts the look back too, and no Animations switch outlives it (#91)`() {
+        val store = MapStore()
+        EnvSettings(store).apply {
+            art = ArtChoice(ArtSet.PIRATE); tiles3d = true; seeThrough = true; bugButton = true; liveBoard = true; density = 0f
+        }
+        val env = EnvSettings(store)
+        assertEquals(false, env.animating, "Density 0 is the one off switch")
+        env.reset()
+        val again = EnvSettings(store)
+        assertEquals(ArtChoice(ArtSet.DEFAULT), again.art)
+        assertEquals(false, again.tiles3d); assertEquals(false, again.seeThrough); assertEquals(false, again.bugButton)
+        assertEquals(false, again.liveBoard); assertEquals(true, again.animating)
+        // An "Animations off" saved by 0.3.3 no longer freezes the scenery with no switch left to undo it.
+        assertEquals(true, EnvSettings(MapStore().apply { map["animations"] = 0f }).animating)
+    }
+
+    @Test
     fun `knight theme is saved and reset goes back to Normal`() {
         val store = MapStore()
         EnvSettings(store).pirateTheme = true

@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +58,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 /**
  * The lobby (#19), ported from docs/design/LobbyA.dc.html with Lobby B's thin brass edge:
  * room code, invite link (copy, share, QR), the four seats with ready state and a bot picker
- * on open seats, recent players, and Start / New game settings. State is hoisted: every
+ * on open seats, recent players, and Start / Leave room. State is hoisted: every
  * change goes through [onChange]; OnlineLobbyScreen connects this seam to the transport.
  */
 @Composable
@@ -69,6 +72,9 @@ fun LobbyScreen(
 ) {
     val context = LocalContext.current
     var bigQr by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+    var confirmLeave by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) { if (copied) { kotlinx.coroutines.delay(2000); copied = false } }
     Box(modifier.fillMaxSize().tableTop().testTag("lobby")) {
         Row(Modifier.fillMaxSize().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             // Both sides scroll when they can't fit: at 320 dp tall (CI's screen) four seats fill the left, and the Recent row
@@ -85,7 +91,7 @@ fun LobbyScreen(
                     if (reconnecting) Text("Reconnecting…", style = Wood.sans(12.sp, color = Wood.INK_MUTED))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    BrassButton("Copy link", "copy-link", Modifier.height(34.dp)) { copyLink(context, lobby.link) }
+                    BrassButton(if (copied) "Copied" else "Copy link", "copy-link", Modifier.height(34.dp)) { copyLink(context, lobby.link); copied = true }
                     BrassButton("Share…", "share-link", Modifier.height(34.dp)) { shareLink(context, lobby) }
                     BrassButton("Show QR", "show-qr", Modifier.height(34.dp)) { bigQr = true }
                 }
@@ -124,8 +130,20 @@ fun LobbyScreen(
                         Text(it, style = Wood.sans(13.sp, FontWeight.Bold, Wood.WAITING), modifier = Modifier.testTag("waiting-on"))
                     }
                     GoButton("Start game", "start", lobby.canStart, Modifier.fillMaxWidth().height(46.dp)) { onStart(lobby.gameSetup()) }
-                    BrassButton("New game settings…", "settings", Modifier.fillMaxWidth().height(36.dp)) { onSettings() }
+                    BrassButton("Leave room", "leave-room", Modifier.fillMaxWidth().height(36.dp)) { confirmLeave = true }
                 } else Text("Waiting for ${lobby.seats[0].label} to start", style = Wood.sans(14.sp, FontWeight.Bold, Wood.INK_MUTED))
+            }
+        }
+        if (confirmLeave) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
+            androidx.activity.compose.BackHandler { confirmLeave = false }
+            Column(Modifier.widthIn(max = 440.dp).brassEdgedWood().padding(18.dp).testTag("leave-room-confirm"),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Leave room ${lobby.code}?", style = Wood.title(20.sp))
+                Text("You go back to the game settings.", style = Wood.sans(14.sp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GoButton("Stay", "leave-room-no", true, Modifier.heightIn(min = 44.dp)) { confirmLeave = false }
+                    StopButton("Leave room", "leave-room-yes", Modifier.heightIn(min = 44.dp)) { confirmLeave = false; onSettings() }
+                }
             }
         }
         if (bigQr) Box(
@@ -253,10 +271,4 @@ private fun shareLink(context: Context, lobby: Lobby, to: String? = null) {
     context.startActivity(Intent.createChooser(send, "Invite to room ${lobby.code}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
-/** The lobby running on its own stubbed state (until #7), e.g. for the Inventory screen. */
-@Composable
-fun StubLobbyScreen(onStart: (GameSetup) -> Unit = {}, onSettings: () -> Unit = {}, modifier: Modifier = Modifier) {
-    var lobby by remember { mutableStateOf(Lobby.sample()) }
-    LobbyScreen(lobby, { lobby = it }, onStart, onSettings, modifier)
-}
 

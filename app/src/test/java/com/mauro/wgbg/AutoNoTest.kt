@@ -18,7 +18,7 @@ import wgbg.engine.Resource
 import wgbg.engine.Rules
 import java.io.File
 
-/** #26: the app's No to an offer you can't pay (after its 5-second countdown) says in Recent moves what you lacked. */
+/** #26: the app's No to an offer you can't pay (after its 5-second countdown) says in the turn history what you lacked. */
 class AutoNoTest {
     private val names = listOf("Ann", "Bea", "Cy")
 
@@ -36,7 +36,7 @@ class AutoNoTest {
     }
 
     @Test
-    fun `the line names the offerer and every card you were short of`() {
+    fun `the reason names every card you were short of`() {
         val s = playing(Expansion.BASE)
         val from = s.currentPlayer; val to = (from + 1) % 3
         s.hands[from * CARD_TYPES + Resource.WOOD] = 1
@@ -44,7 +44,7 @@ class AutoNoTest {
         Rules.applyChecked(s, offerFor(s, IntArray(5).also { it[Resource.WOOD] = 1 }, IntArray(5).also { it[Resource.WHEAT] = 2; it[Resource.ORE] = 1 })!!)
         assertEquals(to, s.actingPlayer)
         assertTrue(Rules.cantPayOffer(s, to)); assertFalse(canPayOffer(s, to))
-        assertEquals("No to ${names[from]}'s offer, given for you: you don't hold 1 Grain, 1 Stone", autoNoText(s, to, names))
+        assertEquals("1 Grain, 1 Stone", shortfallText(s, to))
     }
 
     @Test
@@ -55,16 +55,17 @@ class AutoNoTest {
         val get = IntArray(CK_CARD_TYPES).also { it[Commodity.COIN] = 1 }
         Rules.applyChecked(s, offerFor(s, IntArray(CK_CARD_TYPES).also { it[Resource.WOOD] = 1 }, get)!!)
         assertTrue(Rules.cantPayOffer(s, to))
-        assertEquals("No to ${names[from]}'s offer, given for you: you don't hold 1 Silver", autoNoText(s, to, names))
+        assertEquals("1 Silver", shortfallText(s, to))
     }
 
     @Test
-    fun `the countdown uses the engine's rule, logs the line, then sends No as a tap would`() {
+    fun `the countdown uses the engine's rule, then sends No as a tap would`() {
         val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText().replace("\r\n", "\n")
         val effect = main.substringAfter("LaunchedEffect(offerKey) {").substringBefore("\n    }\n")
         assertTrue("if (!Rules.cantPayOffer(state, me)) { sounds.tradeChime" in effect)
-        val logged = effect.indexOf("log.add(0, autoNoText(state, me, names))")
-        assertTrue(logged > 0 && logged < effect.indexOf("humanMoves.trySend(Action.REJECT_TRADE)"), "the line goes in before the No")
+        assertTrue(effect.indexOf("delay(1000)") < effect.indexOf("humanMoves.trySend(Action.REJECT_TRADE)"), "No only after the countdown")
+        // The Menu's move log is gone (#91): the reason is the turn history's, from TurnTracker.
+        assertFalse("log.add" in effect, effect)
     }
 
     @Test

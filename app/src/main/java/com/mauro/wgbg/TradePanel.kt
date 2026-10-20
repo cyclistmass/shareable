@@ -104,10 +104,6 @@ fun canPayOffer(s: GameState, me: Int): Boolean {
     return give.indices.all { give[it] <= holding(s, me, it) }
 }
 
-/** The Recent moves line for an offer [me] couldn't pay, declined for them (#26). */
-fun autoNoText(s: GameState, me: Int, names: List<String>) =
-    "No to ${names[s.currentPlayer]}'s offer, given for you: you don't hold ${shortfallText(s, me)}"
-
 /** The cards [p] lacks to pay the open offer, e.g. "1 Grain, 1 Stone" (#26). */
 fun shortfallText(s: GameState, p: Int): String {
     val short = Rules.offerShortfall(s, p)

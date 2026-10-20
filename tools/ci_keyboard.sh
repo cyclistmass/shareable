@@ -84,9 +84,9 @@ go "Join a room" "Room code"
 enter_back 1 "Room code" "join name" "Duo" line
 # Report (marked by Add a picture): the note has several lines. On CI's 640x320 screen it's below the fold of the
 # left panel, which scrolls (0.3.1 and 0.3.2 cut it off, so this was skipped there).
-go "Report" "Add a picture"
+go "Report a bug or idea" "Add a picture"
 up_back 1 "Add a picture" "report note"
-go "Report" "Add a picture"
+go "Report a bug or idea" "Add a picture"
 enter_back 1 "Add a picture" "report note" "Test" note
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || bad "the app crashed"

@@ -151,7 +151,7 @@ fun NewGameScreen(
                         enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
                 }
                 Spacer(Modifier.weight(1f))
-                if (onFeedback != null) WoodButton("Report", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
+                if (onFeedback != null) WoodButton("Report a bug or idea", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
                 if (onPlayIntro != null) WoodButton("Intro", "play-intro", Modifier.height(40.dp)) { onPlayIntro() }
                 if (onLookAndArt != null) BrassButton("Look & art", "look-and-art", Modifier.height(40.dp)) { onLookAndArt(setup) }
                 if (onCardTester != null) WoodButton("Card tester", "card-tester", Modifier.height(40.dp)) { onCardTester() }

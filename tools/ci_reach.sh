@@ -78,8 +78,8 @@ if [ "$MODE" = screens ]; then
   all "start menu" "New game" "Settings" "ⓘ  About and credits"
   go "Settings" "Close"; all "start menu settings" "Close"; tap "Close"
   go "New game" "Players"
-  all "game-start" "Base game" "Age of Chivalry" "Report" "Intro" "Look &amp; art" "Play" "Host a room" "Join a room"
-  go "Report" "Add a picture"; all "Report" "Bug" "Idea" "Add a picture" "Send" "Close"; tap "Close"
+  all "game-start" "Base game" "Age of Chivalry" "Report a bug or idea" "Intro" "Look &amp; art" "Play" "Host a room" "Join a room"
+  go "Report a bug or idea" "Add a picture"; all "Report" "Bug" "Idea" "Add a picture" "Send" "Close"; tap "Close"
   go "Look &amp; art" "Done"; all "Look & art" "Done" "Card guide"; tap "Done"
   # Online needs a real name: type one (the name box is the screen's first text box, at the left panel's top).
   box() { fits "$(dump | grep 'class="android.widget.EditText"' | head -1 | bounds)"; }
@@ -90,7 +90,7 @@ if [ "$MODE" = screens ]; then
   "$ADB" shell input text Duo; "$ADB" shell input keyevent KEYCODE_ENTER; sleep 1
   go "Join a room" "Room code"; all "Join" "Join" "Back"; tap "Back"
   on "Players" || go "New game" "Players"
-  go "Host a room" "Start game"; all "lobby" "Copy link" "Share…" "Show QR" "Start game" "New game settings…"
+  go "Host a room" "Start game"; all "lobby" "Copy link" "Share…" "Show QR" "Start game" "Leave room"
   "$ADB" shell input keyevent KEYCODE_BACK; sleep 2; leave
   on "Players" || go "New game" "Players"
   # Age of Chivalry: its eight cards are the card guide's widest row.

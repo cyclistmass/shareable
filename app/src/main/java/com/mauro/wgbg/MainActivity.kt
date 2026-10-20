@@ -294,7 +294,7 @@ private fun polygon(points: List<Offset>) = Path().apply {
 private fun pips(n: Int) = 6 - kotlin.math.abs(7 - n)
 
 // START is the splash (#132); SETUP is the game-start screen (players, ruleset, dice, online) behind its New game.
-private enum class Screen { START, LOBBY, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME, LOOK, SETUP, CARD_TEST }
+private enum class Screen { START, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME, LOOK, SETUP, CARD_TEST }
 
 /**
  * Splash (#132) -> New game -> game start (#3) -> the game, or online: host a room (lobby #19) or join one by code -> the online game (#7).
@@ -314,7 +314,6 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
         mutableStateOf(if (players in 2..GameSetup.MAX_SEATS) base.copy(seats = List(GameSetup.MAX_SEATS) { i ->
             when { i == 0 -> base.seats[0]; i < players -> SeatSetup(SeatKind.BOT); else -> SeatSetup(SeatKind.EMPTY) } }) else base)
     }
-    var lobby by remember { mutableStateOf<Lobby?>(null) }
     var gameNo by rememberSaveable { mutableIntStateOf(0) }
     // Your local game, saved after every move (#82). Android brought the app back on the game screen (it had stopped
     // it in the background): carry on with the saved game, never a fresh one over it.
@@ -470,10 +469,6 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
                     } }
                 }, onBack = { screen = Screen.SETUP })
             }
-            Screen.LOBBY -> lobby?.let { l ->
-                BackHandler { screen = Screen.SETUP } // back to the game-start screen it came from (#132)
-                LobbyScreen(l, onChange = { lobby = it }, onStart = { setup = it; gameNo++; screen = Screen.GAME }, onSettings = { screen = Screen.SETUP })
-            } ?: run { screen = Screen.START }
             Screen.ONLINE_LOBBY -> session?.let { s ->
                 BackHandler { leaveRoom() }
                 OnlineLobbyScreen(s, onPlaying = { if (screen == Screen.ONLINE_LOBBY) { gameNo++; screen = Screen.ONLINE_GAME } },
@@ -599,7 +594,6 @@ fun WatchGameScreen(
             if (s.kind == SeatKind.BOT && s.bot == BotLevel.EASY) EasyBot(r) else GreedyBot(r)
         }
     }
-    val log = remember(seed, seats) { mutableStateListOf<String>() }
     val tracker = remember(seed, seats, human, epoch) { TurnTracker(names) }
     // Every move applied to this game, in order: a bug report carries them so the game replays exactly.
     val played = remember(seed, seats, human, epoch) { mutableListOf<Action>() }
@@ -608,10 +602,7 @@ fun WatchGameScreen(
     remember(seed, seats, human) {
         val resumed = online == null && resume != null && seed == resume.seed
         if (resumed) resume!!.replay(state) { who, a, applyIt -> tracker.apply(state, who, a, applyIt); played += a }
-        if (saveStore != null && online == null && !lookAndArt) when {
-            !human -> saveStore.clear()
-            !resumed -> saveStore.start(setup, seed)
-        }
+        if (saveStore != null && online == null && !lookAndArt && human && !resumed) saveStore.start(setup, seed)
         0
     }
     /** The last [Hit] notice the player dismissed. A resumed game's hits were seen before it was closed. */
@@ -626,8 +617,7 @@ fun WatchGameScreen(
     var pendingAt by remember { mutableStateOf<Offset?>(null) }
     val responses = remember(seed, seats) { mutableStateMapOf<Int, String>() }
     // Dice setting cycles: random, then deck stacks of 1-4 x 36 cards (asked per game once the new-game screen exists).
-    var diceSetting by remember { mutableIntStateOf(setup.decks) } // 0 = random, n = n decks
-    val dice = remember(diceSetting) { if (diceSetting == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, diceSetting) }
+    val dice = remember { if (setup.decks == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, setup.decks) }
     var tick by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(true) }
     var speed by remember { mutableIntStateOf(if (human) 2 else MAX_SPEED) }
@@ -745,13 +735,6 @@ fun WatchGameScreen(
     }
     fun logMove(who: Int, action: Action) {
         CrashReport.note("turn ${state.turn} ${state.phase} p$who ${action.type}:${action.payload}")
-        when (action.type) {
-            ActionType.REJECT_TRADE, ActionType.ACCEPT_TRADE, ActionType.COUNTER_TRADE, wgbg.engine.CkActionType.COUNTER_TRADE_CK, ActionType.END_TURN, ActionType.OFFER_TRADE -> {}
-            ActionType.ROLL -> log.add(0, "${names[who]} rolled ${state.lastRoll}")
-            wgbg.engine.CkActionType.PLAY_PROGRESS -> log.add(0, if ((action.payload and 0xff).toInt() == wgbg.engine.Progress.ALCHEMIST) "${names[who]} set the dice: ${state.lastRoll}" else "${names[who]}: ${describe(action.type)}")
-            else -> log.add(0, "${names[who]}: ${describe(action.type)}")
-        }
-        if (log.size > 4) log.removeRange(4, log.size)
     }
 
     LaunchedEffect(seed, seats, playing, speed, human) {
@@ -825,7 +808,6 @@ fun WatchGameScreen(
             wins[if (state.winner >= 0) state.winner else 4]++
             // One line per finished game: CI self-play counts these and checks every game ends (#46).
             runCatching { android.util.Log.i("WGBG-GAME", "over ruleset=${if (state.ck != null) "chivalry" else "base"} winner=${state.winner} turns=${state.turn} hash=${state.stateHash()}") }
-            if (state.winner >= 0) log.add(0, "${names[state.winner]} wins!")
             tick++
             if (speed == MAX_SPEED && playing && !human && !oneGame) seed++ // straight into the next game
         }
@@ -957,6 +939,7 @@ fun WatchGameScreen(
         else Screenshot.capture(hostActivity) { reportShot = it; feedbackOpen = true; reportCapture = false }
     }
     var histogramOpen by remember { mutableStateOf(false) }
+    var confirmWatch by remember { mutableStateOf(false) }
     var hudTopRight by remember { mutableStateOf<Offset?>(null) }
     var diceFlying by remember { mutableStateOf(false) }
     var diceSlots by remember { mutableStateOf<Pair<androidx.compose.ui.geometry.Rect, androidx.compose.ui.geometry.Rect>?>(null) }
@@ -1090,8 +1073,7 @@ fun WatchGameScreen(
         if (!Rules.cantPayOffer(state, me)) { sounds.tradeChime(sound.soundVolume); return@LaunchedEffect }
         for (left in AUTO_NO_SECONDS downTo 1) { autoNo = left; delay(1000) }
         autoNo = null
-        // #26: say why, in Recent moves; the No is checked against the rules like a tap, ignored if the offer moved on.
-        if (Rules.cantPayOffer(state, me)) { log.add(0, autoNoText(state, me, names)); if (log.size > 4) log.removeRange(4, log.size) }
+        // #26: the turn history says why; the No is checked against the rules like a tap, ignored if the offer moved on.
         humanMoves.trySend(Action.REJECT_TRADE)
     }
     // The trade chest: open when you opened it, or when a trade waits on you (or you wait on answers to yours).
@@ -1335,9 +1317,6 @@ fun WatchGameScreen(
             GoButton("Done", "look-done", true, Modifier.width(120.dp).height(44.dp)) { onExit() }
             BrassButton("Card guide", "look-guide", Modifier.height(44.dp)) { guideOpen = true; settingsOpen = false }
         }
-        // Opened from the in-game Menu ("3D collection"): Done returns to the game (#115: "no way to leave"; Back already did).
-        if (inventory && !lookAndArt)
-            GoButton("Done", "collection-done", true, Modifier.align(Alignment.TopStart).padding(12.dp).width(120.dp).height(44.dp)) { inventory = false }
         if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((r, art) in CARD_ART.withIndex()) androidx.compose.foundation.Image(
                 artPainter(art), RESOURCE_NAMES[r], Modifier.size(width = 76.dp, height = 110.dp))
@@ -1488,6 +1467,7 @@ fun WatchGameScreen(
                 // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
                 WoodButton("Card guide", "menu-guide") { guideOpen = true; panelOpen = false; settingsOpen = false }
                 WoodButton("Fit the board", "menu-fit") { camera = Camera.FIT; panelOpen = false }
+                WoodButton("Dice stats", "menu-dice-stats") { histogramOpen = true; panelOpen = false; settingsOpen = false }
                 WoodButton("Settings", "menu-settings") { settingsOpen = true; panelOpen = false }
                 // A bug or an idea, typed or spoken, with this whole game attached (Mauro, 2026-10-12).
                 WoodButton("Report a bug or idea", "menu-feedback") { panelOpen = false; settingsOpen = false; reportCapture = true }
@@ -1500,13 +1480,14 @@ fun WatchGameScreen(
             color = Color(0xFFFFB4A0), fontSize = 12.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 3.dp).testTag("debug-badge"))
-        BrassButton(if (panelOpen || settingsOpen) "Hide" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp).height(40.dp)) {
+        // Look & art has no game Menu (#91), only its Settings to show and hide.
+        BrassButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp).height(40.dp)) {
             // The Menu comes up over a clear board: the roll chart closes (0.3.3 test: it stayed open behind the menu).
-            if (settingsOpen) settingsOpen = false else { panelOpen = !panelOpen; histogramOpen = false }
+            if (settingsOpen || lookAndArt) settingsOpen = !settingsOpen else { panelOpen = !panelOpen; histogramOpen = false }
         }
         // The Report button under Menu, switched on in the gear menu (#128): a bug report with a screenshot, in one tap.
         if (env.bugButton && !feedbackOpen && !reportCapture && !panelOpen && !settingsOpen)
-            BrassButton("Report", "bug-report", Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = 8.dp).height(36.dp)) { reportCapture = true }
+            BrassButton("Report a bug or idea", "bug-report", Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = 8.dp).height(36.dp)) { reportCapture = true }
         // Settings open from the gear inside the Menu, so the board stays clean.
         if (histogramOpen) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // Copies, so each move's new counts reach the screen (the arrays themselves never change identity).
@@ -1533,28 +1514,39 @@ fun WatchGameScreen(
                         // A finished game you played has nothing left to pause or speed up.
                         if (!(human && tick.let { state.isOver })) {
                             WoodButton(if (playing) "Pause" else "Play", "menu-pause") { playing = !playing }
-                            WoodButton(if (speed == MAX_SPEED) "Max" else "${speed}×", "menu-speed") { speed = if (speed == MAX_SPEED) 1 else speed * 2 }
+                            if (!human) WoodButton(if (speed == MAX_SPEED) "Max" else "${speed}×", "menu-speed") { speed = if (speed == MAX_SPEED) 1 else speed * 2 }
                         }
-                        WoodButton(if (human) "Watch bots" else "Play", "menu-watch") { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; seed++; playing = true }
+                        WoodButton(if (human) "Watch bots" else "Play a new game", "menu-watch") {
+                            if (human && online == null) { confirmWatch = true; settingsOpen = false }
+                            else { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; seed++; playing = true }
+                        }
                         if (!human) WoodButton(if (oneGame) "One game" else "Nonstop", "menu-one-game") {
                             oneGame = !oneGame
                             if (!oneGame && state.isOver) seed++
                         }
                         if (!human && oneGame && tick.let { state.isOver }) WoodButton("Next game", "menu-next-game") { seed++ }
                     }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (env.liveBoard) WoodButton("3D collection (test)", "menu-live-collection") { inventory = true; panelOpen = false; settingsOpen = false; camera = Camera.FIT; boardRotation = 0f }
-                        if (online == null) WoodButton(if (diceSetting == 0) "Dice: random" else "Dice: ${36 * diceSetting} deck · ${(dice as? DiceDeck)?.remaining ?: ""}", "menu-dice") {
-                            diceSetting = (diceSetting + 1) % 5
-                        }
-                    }
-                    PlayerPanel(players, names)
-                    Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
-                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                    for (line in log) Text(line, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    if (!human) Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
+                        style = Wood.sans(13.sp, FontWeight.Bold), modifier = Modifier.testTag("menu-wins"))
                 } } }
             } else null,
             lookAndArt = lookAndArt)
+        if (confirmWatch) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
+            BackHandler { confirmWatch = false }
+            Column(Modifier.widthIn(max = 460.dp).brassEdgedWood().padding(18.dp).testTag("watch-confirm"),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Watch the bots play?", style = Wood.title(20.sp))
+                Text(if (state.isOver) "A new game starts with bots in every seat."
+                    else "This game stops here and bots play a new one. Your game is kept: Resume it from the start screen.",
+                    style = Wood.sans(14.sp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GoButton("Keep playing", "watch-no", true, Modifier.heightIn(min = 44.dp)) { confirmWatch = false }
+                    BrassButton("Watch bots", "watch-yes", Modifier.heightIn(min = 44.dp), size = 15.sp) {
+                        confirmWatch = false; human = false; speed = MAX_SPEED; tradeOpen = false; seed++; playing = true
+                    }
+                }
+            }
+        }
         if (confirmEnd) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
             BackHandler { confirmEnd = false }
             EndGameConfirm(onKeep = { confirmEnd = false }, onEnd = { confirmEnd = false; saveStore?.clear(); onExit() })
@@ -1605,7 +1597,7 @@ fun WatchGameScreen(
         // placing your first pieces (Mauro: "add the build menu during setup"), showing the homestead, town or road due.
         // Both are drawn after the sheets above, so they hide while one is open: on a narrow screen (CI's 640x320) the
         // build menu sat over the card guide and the Leave dialog, and could still be tapped through them.
-        val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen
+        val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen || confirmWatch
         if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && !sheetOpen && tick.let {
                 (state.phase == Phase.PLAY_TURN && state.currentPlayer == me || inSetup(state)) && state.actingPlayer == me })
             BuildMenu(state.ck != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
@@ -1848,30 +1840,6 @@ internal data class PlayerInfo(
                 road = s.longestRoadOwner == p, army = s.largestArmyOwner == p, winner = s.winner == p,
                 hand = if (secret) emptyList() else List(RESOURCE_NAMES.size) { s.hand(p, it) },
             )
-        }
-    }
-}
-
-@Composable
-private fun PlayerPanel(players: List<PlayerInfo>, names: List<String>) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        for (pl in players) {
-            Row(
-                Modifier.fillMaxWidth()
-                    // The player whose turn it is gets a brass-rimmed highlight.
-                    .then(if (pl.active) Modifier.background(Color(0x33C9A04A), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0xFFC9A04A), RoundedCornerShape(8.dp)) else Modifier)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(12.dp).background(PLAYER_COLORS[pl.seat], CircleShape))
-                Spacer(Modifier.width(6.dp))
-                Text(names[pl.seat], Modifier.width(58.dp), maxLines = 1, fontWeight = if (pl.active) FontWeight.Bold else FontWeight.Normal)
-                Text("${pl.vp} VP", Modifier.width(54.dp), maxLines = 1, fontWeight = FontWeight.Bold)
-                MiniHand(pl.hand, pl.dev, Modifier.weight(1f), facedown = if (pl.hand.isEmpty()) pl.cards else 0)
-                val badges = listOfNotNull("Hwy".takeIf { pl.road }, "Watch".takeIf { pl.army }, "WIN".takeIf { pl.winner })
-                Text(badges.joinToString(" "), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
@@ -2484,7 +2452,7 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
         Offset(size.width / 2f, 5.15f * scale))
     // Row 1: the six terrains with sample numbers.
     val terrains = listOf(Resource.WOOD to 5, Resource.BRICK to 6, Resource.SHEEP to 8, Resource.WHEAT to 9, Resource.ORE to 10, Resource.NONE to 0)
-    val names = listOf("Forest", "Hills", "Pasture", "Fields", "Mountains", "Desert")
+    val names = TERRAIN_NAMES + "Desert"
     terrains.forEachIndexed { i, (res, n) ->
         val c = Offset(left + i * 2.05f * scale, 1.25f * scale)
         // The same faces and edge setting as the board (it showed the old procedural art before).

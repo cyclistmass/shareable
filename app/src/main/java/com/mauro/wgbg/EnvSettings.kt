@@ -110,18 +110,11 @@ class EnvSettings(private val store: FloatStore) {
         get() = seeThroughState.floatValue > 0.5f
         set(v) { seeThroughState.floatValue = if (v) 1f else 0f; store.put(SEE_THROUGH, seeThroughState.floatValue) }
 
-    private val animationsState = mutableFloatStateOf(store.get(ANIMATIONS, 1f))
-
     /**
-     * Scenery animations (sea, clouds, birds, boats, the rolling dice). Off, or Density at 0, and none of that code
-     * runs at all, so a bug in it can't stop a game (Mauro, 2026-10-11). Saved.
+     * True when the scenery animates (sea, clouds, birds, boats, the rolling dice): Density above 0. At 0 none of that
+     * code runs at all, so a bug in it can't stop a game (Mauro, 2026-10-11).
      */
-    var animations: Boolean
-        get() = animationsState.floatValue > 0.5f
-        set(v) { animationsState.floatValue = if (v) 1f else 0f; store.put(ANIMATIONS, animationsState.floatValue) }
-
-    /** True when the scenery animates: the switch is on and Density is above 0. */
-    val animating: Boolean get() = animations && density > 0f
+    val animating: Boolean get() = density > 0f
 
     private val tiles3dState = mutableFloatStateOf(store.get(TILES_3D, 0f))
 
@@ -190,8 +183,12 @@ class EnvSettings(private val store: FloatStore) {
         get() = eventDie.floatValue.toInt().coerceIn(0, DiceArt.EVENT_STYLES.size - 1)
         set(v) { eventDie.floatValue = v.coerceIn(0, DiceArt.EVENT_STYLES.size - 1).toFloat(); store.put(EVENT_DIE, eventDie.floatValue) }
 
-    /** Back to the defaults (saved). */
-    fun reset() { for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; animations = true; pirateTheme = false; tileEdge = TileEdge.THIN; eventDieStyle = 0; liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false }
+    /** Every setting back to its default (saved): scenery, board, look and play. */
+    fun reset() {
+        for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; pirateTheme = false; tileEdge = TileEdge.THIN; eventDieStyle = 0
+        liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false
+        art = ArtChoice(ArtSet.DEFAULT); tiles3d = false; seeThrough = false; bugButton = false
+    }
 
     val clouds get() = this[Item.CLOUDS]
     val birds get() = this[Item.BIRDS]
@@ -210,7 +207,6 @@ class EnvSettings(private val store: FloatStore) {
         const val LIVE_BOARD = "live-board"
         const val LIVE_LOD = "live-board-lod"
         const val FACE_PIECES = "live-face-pieces"
-        const val ANIMATIONS = "animations"
         const val AI_PACE = "ai-pace"
         const val AI_PACE_DEFAULT = 1f
         const val AI_PACE_MIN = 1f
@@ -226,17 +222,17 @@ object Pace {
     fun fallMs(factor: Float = 1f): Int = (DiceSprites.FALL_S * 1000 * factor).toInt()
 }
 
-/** The 3D board (test) On/Off switch and its detail level; in the game's Menu, and in Settings on Look & art. */
+/** The 3D board On/Off switch and its detail level (High = the full models, Low = the lighter ones), in Settings. */
 @Composable
 fun LiveBoardChoice(env: EnvSettings) {
-    Text("3D board (test)", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
+    Text("3D board", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Choice("On", selected = env.liveBoard, tag = "live-board-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = true }
         Choice("Off", selected = !env.liveBoard, tag = "live-board-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = false }
     }
     if (env.liveBoard) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Choice("Detail: LOD0", selected = env.liveLod == 0, tag = "live-lod-0", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 0 }
-        Choice("Detail: LOD1", selected = env.liveLod == 1, tag = "live-lod-1", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 1 }
+        Choice("Detail: High", selected = env.liveLod == 0, tag = "live-lod-0", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 0 }
+        Choice("Detail: Low", selected = env.liveLod == 1, tag = "live-lod-1", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 1 }
     }
     if (env.liveBoard) {
         Text("Buildings face me when I turn the board", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
@@ -261,9 +257,8 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Settings", style = Wood.title(18.sp), modifier = Modifier.weight(1f))
-            ResetButton { env.reset(); sound.reset() }
+            ResetButton("Reset all") { env.reset(); sound.reset() }
         }
-        AccountSection()
         // In a game: Pause, speed and Watch bots first (Mauro, 2026-10-12: "should be under the gear menu").
         if (gameControls != null) SettingsGroup("This game", "game") { gameControls() }
         SettingsGroup("Sound", "sound") { SoundBody(sound) }
@@ -335,12 +330,6 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                     Text("%.1f s".format(env.aiPace), style = Wood.sans(12.sp), modifier = Modifier.width(100.dp))
                     BrassSlider(env.aiPace, { env.aiPace = Math.round(it * 2) / 2f }, "ai-pace", 220.dp,
                         EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7)
-                }
-            }
-            Setting("Animations", "Off, or Density at 0: nothing moves.") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Choice("On", selected = env.animations, tag = "animations-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = true }
-                    Choice("Off", selected = !env.animations, tag = "animations-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = false }
                 }
             }
             Setting("Report button", "On the game screen: a bug report with a screenshot, in one tap.") {
@@ -596,13 +585,15 @@ private fun SongTick(sound: SoundSettings, i: Int) {
     }
 }
 
-/** Reset to defaults: the brass circular-arrow icon (Mauro's art), darker while pressed. */
+/** Reset to defaults: the brass circular-arrow icon (Mauro's art), darker while pressed, with its [label] beside it (#91). */
 @Composable
-private fun ResetButton(onClick: () -> Unit) {
+private fun ResetButton(label: String, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    Image(
-        painterResource(if (pressed) R.drawable.reset_arrow_pressed else R.drawable.reset_arrow), "Reset to defaults",
-        Modifier.size(44.dp).clickable(interactionSource = source, indication = null, onClick = onClick).testTag("settings-reset"),
-    )
+    Row(Modifier.clickable(interactionSource = source, indication = null, onClick = onClick).testTag("settings-reset"),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
+        Image(painterResource(if (pressed) R.drawable.reset_arrow_pressed else R.drawable.reset_arrow), "Reset every setting to its default",
+            Modifier.size(44.dp))
+    }
 }

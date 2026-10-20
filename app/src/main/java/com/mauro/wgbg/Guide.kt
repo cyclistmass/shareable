@@ -50,9 +50,11 @@ fun buildCosts(chivalry: Boolean): List<BuildCost> = buildList {
     }
 }
 
+/** Our names for the five producing terrains, in engine resource order (not the original game's, #91). */
+val TERRAIN_NAMES = listOf("Woodland", "Clay pit", "Meadow", "Grainfield", "Quarry")
+
 /** Where each card comes from (card index order). */
-val CARD_SOURCES = listOf("Forest", "Hills", "Pasture", "Fields", "Mountains",
-    "Towns on Forest", "Towns on Pasture", "Towns on Mountains")
+val CARD_SOURCES = TERRAIN_NAMES + listOf("Towns on ${TERRAIN_NAMES[0]}", "Towns on ${TERRAIN_NAMES[2]}", "Towns on ${TERRAIN_NAMES[4]}")
 
 /** The three progress decks in engine card order: (deck name, track, first card, last card). */
 private val DECKS = listOf(Triple("Academy", Track.SCIENCE, 0..9), Triple("Guilds", Track.TRADE, 10..15), Triple("Crown", Track.POLITICS, 16 until Progress.COUNT))

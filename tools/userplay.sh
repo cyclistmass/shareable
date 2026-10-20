@@ -159,18 +159,18 @@ shot start
 for _ in $(seq 1 120); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
 "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started (still on the start screen?)"
 # Animations off from the menu, like a player can (Mauro: test games skip the animation; it also makes reading the
-# screen fast, since a still screen needs no waiting): Menu, Settings, Play, Animations Off, Hide (it saves as you tap).
-# Settings opens with its groups shut (Fable review T4), so open Play first; only its Off is then on screen.
+# screen fast, since a still screen needs no waiting): Menu, Settings, Scenery, drag Density to 0, Hide (it saves as
+# you go). Settings opens with its groups shut (Fable review T4); Density is the first slider in Scenery. (0.3.4 dropped
+# the Animations switch and, in your own games, the bots' speed button: AI pace, at its fastest by default, is it, #91.)
 if tap_text "Menu"; then
-  tap_desc "Settings" && tap_text "Play" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
+  if tap_desc "Settings" && tap_text "Scenery"; then
+    b=$(dump | grep -o 'class="android.widget.SeekBar"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | grep -o '[0-9]*' | tr '
+' ' ')
+    if [ -n "$b" ]; then set -- $b; "$ADB" shell input swipe $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 )) $(( $1 - 40 )) $(( ($2 + $4) / 2 )) 400 </dev/null; sleep 0.5
+      dump | grep -q 'text="Density 0%"' || echo "USERPLAY $TAG: Density didn't go to 0"
+    else echo "USERPLAY $TAG: no Density slider"; fi
+  fi
   tap_text "Hide"
-fi
-# Local games: speed the bots up like a player can (Menu, the gear, This game, tap the speed button up to Max, Hide).
-if [ "$MODE" = local ]; then
-  tap_text "Menu" && tap_desc "Settings" && tap_text "This game" && for _ in 1 2 3 4 5; do
-    lbl=$(dump | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2)
-    [ "$lbl" = "Max" ] && break; [ -n "$lbl" ] && tap_text "$lbl"
-  done; tap_text "Hide"
 fi
 
 start=$(date +%s); moves=0; last=""; prev=""; same=0; tries=0; changed=$(date +%s)
