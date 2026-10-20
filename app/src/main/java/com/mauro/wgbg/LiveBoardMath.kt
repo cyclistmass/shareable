@@ -61,13 +61,21 @@ internal data class LiveProjection(val center: Offset, val scale: Float, val til
             ((s * p.x + c * p.y) * cos(tilt) - height * sin(tilt)) * scale)
     }
 
-    fun unproject(p: Offset): Offset {
+    /** The board point under screen point [p], on the plane [height] up (the inverse of [project]). */
+    fun unproject(p: Offset, height: Float = 0f): Offset {
         val q = (p - center) / scale
-        val z = q.y / cos(tilt)
+        val z = (q.y + height * sin(tilt)) / cos(tilt)
         val c = cos(rotation); val s = sin(rotation)
         return Offset(c * q.x + s * z, -s * q.x + c * z)
     }
 }
+
+/**
+ * Height of the board surface the player sees and taps: the Space board stands its tiles on a deck [SpaceArt.TILE_DECK_HEIGHT]
+ * up and lifts every piece with it, so rings, knight and merchant sprites, and taps on the board use this height. At
+ * height 0 they sat 0.22 * sin(tilt) tile units below the tiles: nothing when flat, plainly low at full tilt.
+ */
+internal fun liveBoardTop(choice: ArtChoice) = if (choice.space(ArtObject.BOARD)) SpaceArt.TILE_DECK_HEIGHT else 0f
 
 internal fun woodTint(materialName: String): Boolean = materialName == "WoodBody"
 

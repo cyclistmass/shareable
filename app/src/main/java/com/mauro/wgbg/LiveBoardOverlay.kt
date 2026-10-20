@@ -19,12 +19,12 @@ internal const val LIVE_KNIGHT_SHARE = 0.49f
 
 /** Knight sprites (where no model is loaded) remain screen overlays for this prototype. */
 internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights: List<ImageBitmap>, merchantModel: Boolean = false,
-                                       knightModel: (Int) -> Boolean = { false }) {
+                                       top: Float = 0f, knightModel: (Int) -> Boolean = { false }) {
     val ck = s.ck
     if (ck != null) for (v in 0 until s.board.vertexCount) {
         val owner = ck.knightOwner[v]
         if (owner < 0 || knightModel(v)) continue   // drawn as a 3D model instead
-        val at = p.project(liveVertex(s.board, v))
+        val at = p.project(liveVertex(s.board, v), top)
         val size = p.scale * KNIGHT_SCALE * LIVE_KNIGHT_SHARE
         val image = knights.getOrNull((ck.knightLevel[v].coerceIn(1, 3) - 1) * 2 + if (ck.isActive(v)) 1 else 0)
         drawCircle(PLAYER_COLORS[owner], size * .22f, at)
@@ -32,14 +32,15 @@ internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights:
             dstSize = IntSize(size.roundToInt(), size.roundToInt()))
     }
     if (ck != null && ck.merchantHex >= 0 && ck.merchantOwner >= 0 && !merchantModel)   // the Merchant (#112), on the tile, lower left
-        drawMerchantToken(p.project(liveHex(s.board, ck.merchantHex) + MERCHANT_SPOT), p.scale, cos(p.tilt), PLAYER_COLORS[ck.merchantOwner])
+        drawMerchantToken(p.project(liveHex(s.board, ck.merchantHex) + MERCHANT_SPOT, top), p.scale, cos(p.tilt), PLAYER_COLORS[ck.merchantOwner])
     // Harbours: the flat board's shallows, piers and buoys, projected (drawLivePorts in MainActivity.kt, #104).
 }
 
-internal fun DrawScope.drawLiveTargets(b: Board, targets: Targets, p: LiveProjection, color: Color, pulse: Float = 1f,
+/** [top] is the board surface's height ([liveBoardTop]): the rings sit on the tiles the player sees, where taps land. */
+internal fun DrawScope.drawLiveTargets(b: Board, targets: Targets, p: LiveProjection, color: Color, pulse: Float = 1f, top: Float = 0f,
                                        pieceOn: (Int) -> Boolean = { false }, knightOn: (Int) -> Boolean = { false }) {
     for (v in targets.vertices) {
-        val at = p.project(liveVertex(b, v))
+        val at = p.project(liveVertex(b, v), top)
         // A knight you can promote or supply: its base glows (#118).
         if (knightOn(v)) drawKnightBaseGlow(at, p.scale * KNIGHT_SCALE * LIVE_KNIGHT_SHARE, cos(p.tilt), color, 0.6f + 0.4f * pulse)
         else drawCircle(color, p.scale * .13f, at, style = Stroke(p.scale * .035f))
@@ -48,10 +49,10 @@ internal fun DrawScope.drawLiveTargets(b: Board, targets: Targets, p: LiveProjec
         // Clear of the pieces at its ends, like the flat board (the glow never covers a homestead).
         val v0 = liveVertex(b, b.edgeA[e]); val v1 = liveVertex(b, b.edgeB[e])
         val (f0, f1) = edgeGlowSpan(pieceOn(b.edgeA[e]), pieceOn(b.edgeB[e]))
-        drawLine(color, p.project(v0 + (v1 - v0) * f0), p.project(v0 + (v1 - v0) * f1), p.scale * .055f)
+        drawLine(color, p.project(v0 + (v1 - v0) * f0, top), p.project(v0 + (v1 - v0) * f1, top), p.scale * .055f)
     }
     for (h in targets.hexes) {
-        val at = p.project(liveHex(b, h)); val r = p.scale * .33f
+        val at = p.project(liveHex(b, h), top); val r = p.scale * .33f
         drawOval(color, at - Offset(r, r * cos(p.tilt)), androidx.compose.ui.geometry.Size(r * 2f, r * cos(p.tilt) * 2f),
             style = Stroke(p.scale * .04f))
     }

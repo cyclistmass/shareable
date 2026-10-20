@@ -988,7 +988,7 @@ fun WatchGameScreen(
             val l = if (sz.minDimension > 0f) Layout.fit(state.board, sz.width, sz.height, camera) else null
             AgentHooks.announce(online?.id ?: "local", state, legal, prompt(state, legal, names),
                 l?.let { lay -> { a: Action -> spotOf(state.board, a)?.let {
-                    (if (liveBoard) liveProjection(sz.width, sz.height).project(it) else lay.project(it.x, it.y)) + boardOrigin
+                    (if (liveBoard) liveProjection(sz.width, sz.height).project(it, liveBoardTop(env.art)) else lay.project(it.x, it.y)) + boardOrigin
                 } } })
         }
         androidx.compose.runtime.DisposableEffect(Unit) {
@@ -1190,7 +1190,7 @@ fun WatchGameScreen(
                         val l = Layout.fit(boardNow, size.width.toFloat(), size.height.toFloat(), camera)
                         // The 3D collection lays its rows out on its own projection, not the board's.
                         val p = if (liveBoardNow && inventory) liveProjection(size.width.toFloat(), size.height.toFloat()).unproject(at)
-                            else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at) else l.unproject(at)
+                            else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at, liveBoardTop(env.art)) else l.unproject(at)
                         val picking = cardPickNow.isNotEmpty()
                         val tapped = if (inventory) emptyList() else if (picking) movesAt(boardNow, cardPickNow, p, cardSecondNow) else tapMoves(stateNow, boardLegalNow, legalNow, p, me, buildModeNow != null)
                         // The Tinkerer swaps two tiles: the first tap narrows to that tile's swaps, the second picks the other tile.
@@ -1242,10 +1242,11 @@ fun WatchGameScreen(
                 bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art, space = space) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
                 if (!env.art.space(ArtObject.BOARD)) drawLivePorts(state.board, projection, measurer, wood, buildings)
-                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels) { v ->
+                drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels,
+                    liveBoardTop(env.art)) { v ->
                     env.art.space(ArtObject.KNIGHTS) || liveKnightModel(state, v, env.art.pirate(ArtObject.KNIGHTS)) in liveModels }
-                if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
-                if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (!targets.isEmpty) drawLiveTargets(state.board, targets, projection, targetGlow(me), targetPulse(sea.time), liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
+                if (chosen.isNotEmpty()) drawLiveTargets(state.board, Targets.of(chosen), projection, Color.White, top = liveBoardTop(env.art), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             } else {
                 val knights = if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal
                 val layerDensity = androidx.compose.ui.unit.Density(density, fontScale)
