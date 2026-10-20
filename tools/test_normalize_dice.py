@@ -53,6 +53,23 @@ class NormalizeDice(unittest.TestCase):
             nd.normalize(face(170, 160), 180).save(folder / "dice_pr_3.webp", lossless=True)
             self.assertEqual(1, nd.check(folder))
 
+    def test_check_fails_when_one_face_changes_colour(self):
+        """#31: a whole die must not change colour between numbers; a small shade difference is fine."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            for sets, target in ((nd.PRODUCTION, 189), (nd.EVENT, 187)):
+                for s in sets:
+                    for f in range(1, 7):
+                        nd.normalize(face(170, 160), target).save(folder / f"dice_{s}_{f}.webp", lossless=True)
+            shade = nd.normalize(face(170, 160), 189)
+            shade.putdata([(r - 8, g - 8, b - 8, a) if a > 200 else (r, g, b, a) for r, g, b, a in shade.getdata()])
+            shade.save(folder / "dice_nr_2.webp", lossless=True)
+            self.assertEqual(0, nd.check(folder), "a shade of 8 is within one die's natural variation")
+            off = nd.normalize(face(170, 160), 189)
+            off.putdata([(r, g - 40, b - 40, a) if a > 200 else (r, g, b, a) for r, g, b, a in off.getdata()])
+            off.save(folder / "dice_ni_5.webp", lossless=True)
+            self.assertEqual(1, nd.check(folder))
+
     def test_the_app_dice_are_pick_b(self):
         """Mauro's pick (#31, 2026-10-20): number dice 189 px wide, the event die 187 px, every face."""
         for sets, target in ((nd.PRODUCTION, 189), (nd.EVENT, 187)):

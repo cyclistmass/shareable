@@ -9,11 +9,13 @@ Usage: py -3.12 tools/normalize_dice.py OUT_DIR [--production PX] [--event PX] [
   OUT_DIR is where the faces are written (the res folder itself once Mauro has picked); --backup copies the
   originals there first.
        py -3.12 tools/normalize_dice.py --check [DIR]
-  Fails unless every number die face in DIR (default: res) has one body width, and every event die face one.
+  Fails unless every number die face in DIR (default: res) has one body width, and every event die face one, and
+  the faces of each number die share one body colour.
 """
 import argparse
 import shutil
 from pathlib import Path
+import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,10 +23,19 @@ RES = ROOT / "app/src/main/res/drawable-nodpi"
 PRODUCTION = ("nr", "ni", "pr", "pb")
 EVENT = ("ae", "pe", "pe1", "pe2", "pe3")
 SIZE = 192
+COLOUR_SPREAD = 14  # #31 (Mauro): one die may vary a little across its sides, but must not change colour by number
 
 
 def body(img: Image.Image):
     return img.getchannel("A").point(lambda a: 255 if a > 160 else 0).getbbox()
+
+
+def body_colour(img: Image.Image):
+    """The die's own colour: the median of the opaque pixels near the overall median, so pips and edges drop out."""
+    a = np.asarray(img.convert("RGBA"), dtype=float)
+    px = a[a[..., 3] > 200][:, :3]
+    near = px[np.linalg.norm(px - np.median(px, axis=0), axis=1) < 60]
+    return np.median(near, axis=0)
 
 
 def normalize(img: Image.Image, target: int) -> Image.Image:
@@ -56,6 +67,11 @@ def check(folder: Path) -> int:
         sizes = sorted(widths)
         print(f"{name}: body widths {sizes}")
         if len(sizes) > 1: bad += 1
+    for s in PRODUCTION:
+        cs = np.array([body_colour(Image.open(folder / f"dice_{s}_{f}.webp")) for f in range(1, 7)])
+        spread = int((cs.max(axis=0) - cs.min(axis=0)).max())
+        print(f"dice_{s}: body colour spread {spread} across its faces")
+        if spread > COLOUR_SPREAD: bad += 1
     return 1 if bad else 0
 
 
