@@ -3,6 +3,7 @@ package com.mauro.wgbg
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -81,7 +82,8 @@ fun CardGuide(chivalry: Boolean, pirate: Boolean, onClose: () -> Unit, modifier:
         }
         heading("Cards")
         val kinds = if (chivalry) ALL_CARD_ART.size else CARD_ART.size
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Wraps on a narrow screen: at 640 dp wide (CI's screen) the eighth card was squeezed to a column of letters.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (i in 0 until kinds) Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(74.dp)) {
                 card(i, 56)
                 Text(ALL_CARD_NAMES[i], color = GUIDE_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold)

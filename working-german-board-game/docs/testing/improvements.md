@@ -46,3 +46,14 @@ move it to **Done** with the commit when it lands.
   triangles. Keep the new batch-budget test and profile its eventual consumer on a mid-range device.
 - 2026-10-18, Codex (#88): preconfigure a writable Gradle cache, signing-key copy and in-process Kotlin
   compiler for restricted Windows sessions; avoids wrapper/signing lock failures and repeated daemon fallbacks.
+- 2026-10-19, bugs (#111): profile the Space and sea sprite decodes that still happen inside draw (SpaceSprites.image,
+  SeaSprites3d.frame cache misses on a tilt-step change or a new boat or critter frame) with a frame trace on a lane. If
+  they cost frames, decode them in the background with a redraw trigger and a board-layer key, so pieces don't blink in.
+- 2026-10-19, bugs: worktrees with a Gradle build tree can't be removed by `git worktree remove` on Windows (Filename
+  too long). Use `cmd /c rmdir /s /q "\?\C:\path"`, then `git worktree prune`.
+- 2026-10-19, bugs: every cold start skips about 43 frames (~0.7 s) on the main thread while the start screen first
+  draws, before any game opens (Pixel6 API34, `Choreographer: Skipped 43 frames`). Profile it with a frame or method trace
+  (Splash, fonts, wood textures, Firebase setup) and move what it finds off the main thread; saves a visible stall on launch.
+- 2026-10-20, bugs: `tools/ci_reach.sh` takes about 8 min on lane 2, nearly all of it `uiautomator dump` (~2 s each, it
+  waits for the animated board to idle). Read the screen from a cheaper source (one dump per screen and computed scroll
+  offsets, or a debug-only semantics dump) to bring it under 2 min; CI's slower emulator will feel it most.

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -177,8 +178,9 @@ fun Choice(
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
+        // Shrinks to fit rather than cut off: three seat cards side by side at 320 dp tall (CI's screen) read "Gree".
         Text(
-            label, maxLines = 1,
+            label, maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = size),
             style = Wood.sans(size, if (selected) FontWeight.Bold else FontWeight.SemiBold, if (selected) Wood.WOOD_DARK else Wood.INK)
                 .let { if (enabled) it else it.copy(color = it.color.copy(alpha = 0.4f)) },
         )

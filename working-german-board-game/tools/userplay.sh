@@ -11,6 +11,7 @@
 # Each run drives only its own device (ANDROID_SERIAL is required) and keeps its own folder, so two runs at
 # once never share files or taps.
 # Usage: ANDROID_SERIAL=emulator-5554 tools/userplay.sh <base|chivalry> <local|online|host|join> [players=3] [minutes=40]
+#   RESUME=1 finishes the saved game instead (the splash's Resume game); ruleset and players are then the save's.
 #   host/join meet through ROOM_FILE (default $TEMP/wgbg-userplay/room-code); start the host first.
 set -uo pipefail
 RULESET="$1"; MODE="$2"; PLAYERS="${3:-3}"; MINUTES="${4:-40}"
@@ -76,7 +77,9 @@ type_into() { [ -n "$3" ] || fail "no text box to type \"$1\" into"; tap $1 $2; 
 
 # A fresh install state, then in through the start screen like a player.
 "$ADB" shell am force-stop $PKG
-"$ADB" shell pm clear $PKG >/dev/null
+# RESUME=1 keeps the saved game (an update over the last release, or a relaunch mid-game) and goes in through the
+# splash's Resume game instead of a new game.
+[ -n "${RESUME:-}" ] || "$ADB" shell pm clear $PKG >/dev/null
 "$ADB" logcat -c; "$ADB" logcat -b crash -c 2>/dev/null || true
 # Tap the launcher icon. Android may still be tidying up after the clear and close the new window right away, so
 # make sure the app is really running (relaunch if not).
@@ -95,6 +98,9 @@ if echo "$d" | grep -q 'text="Tap to skip"'; then tap 1200 540; sleep 2
   for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="New game"' && break; sleep 1; done; fi
 echo "$d" | grep -q 'text="New game"' || fail "the splash never appeared"
 shot splash
+if [ -n "${RESUME:-}" ]; then
+  tap_text "Resume game" "$d" || fail "no Resume game button"
+else
 # The splash's New game opens the game-start screen (players, ruleset, Play, Host and Join).
 tap_text "New game" "$d" || fail "no New game button"
 for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="Play"' && break; sleep 1; done
@@ -152,6 +158,7 @@ else
   else
     tap_text "Play" || fail "no Play button"
   fi
+fi
 fi
 sleep 6
 shot start
