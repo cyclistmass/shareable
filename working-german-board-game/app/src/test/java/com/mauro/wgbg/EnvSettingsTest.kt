@@ -152,6 +152,7 @@ class EnvSettingsTest {
         assertEquals(1000L, botPauseAfter(end, 2, 1f), "1 s between turns by default")
         assertEquals(5000L, botPauseAfter(end, 2, 5f), "up to 5 s")
         assertEquals(2500L, botPauseAfter(road, 2, 5f), "a move inside the turn takes half")
+        assertEquals(5000L, botPauseAfter(roll, 2, 5f), "a roll gets the full beat, so its results can be read")
         org.junit.jupiter.api.Assertions.assertTrue(botPauseAfter(road, 4, 4f) < botPauseAfter(road, 2, 4f))
         for (speed in listOf(1, 2, 4, 8)) for (pace in listOf(1f, 3f, 5f)) for (type in listOf(road, roll))
             org.junit.jupiter.api.Assertions.assertTrue(botPauseAfter(type, speed, pace) >= pauseAfter(type, speed), "$type $pace s at $speed")

@@ -105,7 +105,7 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PL
         val scroll = androidx.compose.foundation.rememberScrollState()
         Box(Modifier.weight(1f).fillMaxWidth()) {
         Column(Modifier.fillMaxSize().padding(end = 22.dp).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        for (line in report.production) Text(line, color = HUD_TEXT, fontSize = 12.sp, maxLines = 1)
+        for (line in report.production) Text(line, color = HUD_TEXT, fontSize = 12.sp, maxLines = 2)
         for (line in report.events) Text(line, color = HUD_TEXT.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 2)
         val earlier = history.filter { it !== report }
         if (earlier.isNotEmpty()) {
@@ -113,8 +113,8 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PL
             for (t in earlier) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    (if (t.player == me) "Your turn" else "${names[t.player]}'s turn") +
-                        (if (t.rolled) " · rolled ${t.die1 + t.die2}" else "") + " · turn ${t.turn + 1}",
+                    // "Turn 3 · Blue rolled 9", not "Blue's turn · rolled 9 · turn 3" (Fable review T8).
+                    "Turn ${t.turn + 1} · " + (if (t.player == me) "You" else names[t.player]) + (if (t.rolled) " rolled ${t.die1 + t.die2}" else ""),
                     color = PLAYER_COLORS[t.player].copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp,
                 )
                 for (line in t.production) Text(line, color = HUD_TEXT.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 2)
@@ -199,6 +199,8 @@ private fun MiniCard(edge: Color, label: String, count: Int, face: Color) {
             .border(2.dp, edge, RoundedCornerShape(4.dp)),
         contentAlignment = Alignment.Center,
     ) {
+        if (LocalArtChoice.current.space(ArtObject.CARDS) && label in listOf("F", "?"))
+            androidx.compose.foundation.Image(artPainter(SpaceArt.cardBack), null, Modifier.fillMaxSize())
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, color = edge, fontSize = 8.sp, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
             Text("$count", color = Color(0xFF2B2118), fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 12.sp)
@@ -209,7 +211,7 @@ private fun MiniCard(edge: Color, label: String, count: Int, face: Color) {
 /** A resting 3D die (the same sprites the throw uses) at the panel's dice size, showing [value] on top. */
 @Composable
 private fun Die3d(value: Int, red: Boolean, pirate: Boolean, pad: Color, visible: Boolean, modifier: Modifier = Modifier) {
-    val face = if (visible) rememberDiceBitmap(diceFace(red, pirate, value), DIE_DP) else null
+    val face = if (visible) rememberDiceBitmap(ThemeArt.dice(LocalArtChoice.current, red, value), DIE_DP) else null
     val outline = androidx.compose.runtime.remember { androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f) }
     Canvas(modifier.size(DIE_DP.dp)) {
         // The die is centred in its slot (where the thrown die lands) at DIE_FACE_SHARE of it; the pad in the
@@ -232,7 +234,7 @@ private fun Die3d(value: Int, red: Boolean, pirate: Boolean, pad: Color, visible
 /** The Age of Chivalry event die resting on its pad: the Raiders' ship or a gate (Guilds, Academy, Crown). */
 @Composable
 private fun EventDie3d(face: Int, pirate: Boolean, style: Int, pad: Color, visible: Boolean, modifier: Modifier = Modifier) {
-    val img = if (visible) rememberDiceBitmap(DiceArt.eventFace(pirate, face.coerceAtLeast(0), style), DIE_DP) else null
+    val img = if (visible) rememberDiceBitmap(ThemeArt.event(LocalArtChoice.current, face.coerceAtLeast(0), style), DIE_DP) else null
     Canvas(modifier.size(DIE_DP.dp)) {
         val side = size.width * DIE_FACE_SHARE
         val halo = DIE_HALO_DP.dp.toPx()

@@ -18,7 +18,8 @@ import kotlin.math.roundToInt
 internal const val LIVE_KNIGHT_SHARE = 0.49f
 
 /** Knight sprites (where no model is loaded) remain screen overlays for this prototype. */
-internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights: List<ImageBitmap>, knightModel: (Int) -> Boolean = { false }) {
+internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights: List<ImageBitmap>, merchantModel: Boolean = false,
+                                       knightModel: (Int) -> Boolean = { false }) {
     val ck = s.ck
     if (ck != null) for (v in 0 until s.board.vertexCount) {
         val owner = ck.knightOwner[v]
@@ -30,7 +31,7 @@ internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights:
         if (image != null) drawImage(image, dstOffset = IntOffset((at.x - size / 2).roundToInt(), (at.y - size * .92f).roundToInt()),
             dstSize = IntSize(size.roundToInt(), size.roundToInt()))
     }
-    if (ck != null && ck.merchantHex >= 0 && ck.merchantOwner >= 0)   // the Merchant (#112), on the tile, lower left
+    if (ck != null && ck.merchantHex >= 0 && ck.merchantOwner >= 0 && !merchantModel)   // the Merchant (#112), on the tile, lower left
         drawMerchantToken(p.project(liveHex(s.board, ck.merchantHex) + MERCHANT_SPOT), p.scale, cos(p.tilt), PLAYER_COLORS[ck.merchantOwner])
     // Harbours: the flat board's shallows, piers and buoys, projected (drawLivePorts in MainActivity.kt, #104).
 }

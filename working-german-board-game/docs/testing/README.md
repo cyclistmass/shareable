@@ -49,6 +49,7 @@ requests, and skips changes that only touch Markdown or `docs/`.
 | play-to-end: `tools/play_to_end.sh chivalry 4 900` | a whole 4-player Age of Chivalry game to the end screen | stuck for 60 s, no end in 900 s |
 | trade: `tools/ci_trade.sh` | bank and player trades by touch | a trade not taken |
 | withdraw: `tools/ci_withdraw.sh` | withdrawing an open offer by touch, both rulesets | the offer stays open |
+| trade: `tools/ci_keyboard.sh` (after the trade script) | Back and the keyboard on the game-start name, Join name and room code, and Report note: keyboard up + Back, typed + Enter + Back | Back leaves with the keyboard up, Enter or Back leaves the keyboard up, Back doesn't leave (one extra allowed on the note, #146) |
 | online: `tools/ci_online.sh`: `OnlineTwoClientTest` | two clients host and join a room on the Firebase emulators; bots play a whole game | the two end states differ |
 | online: `tools/ci_online.sh`: `LiveBoardDeviceTest` | real touch on the 3D board: twist, pinch, tilt, pan, place a homestead and a road | gesture or placement not taken |
 | `firebase/rules-test` | Firestore security rules and push delivery | a rule lets the wrong player write |
@@ -61,7 +62,8 @@ requests, and skips changes that only touch Markdown or `docs/`.
 | `tools/online_sim.sh` | Two emulators play one online game (autoplay) and compare end states |
 | `tools/test_perf_framestats.sh` | Checks the frame-stats parser |
 | `tools/record_showcase.sh`, `tools/record_screenshots.sh` | README media; they assert nothing, but they break when buttons move, so they double as a UI smoke check |
-| `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green) |
+| `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green; then closes the issues it shipped) |
+| `tools/close_shipped.sh` | Run by the release: closes each issue a commit since the last release marks `Fixes #N` / `Closes #N`, with a "Shipped in X" note. A bare `#N` is progress and stays open (listed for review). `DRY_RUN=1` lists only. |
 
 ## Gaps
 

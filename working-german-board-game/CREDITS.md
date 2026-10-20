@@ -99,3 +99,23 @@ unless another path is given.
   code is copied into this project.
 - Game rules are compatible with the classic German settlement-building game and its knights expansion.
   Not affiliated with or endorsed by Catan GmbH; all names, card text and art here are our own.
+
+## Space art set (#88, imported 2026-10-18)
+
+Original procedural artwork created for Mauro's Working German Board Game, supplied in the
+`space-theme` delivery. Provenance: that delivery's `CREDITS.md`, `models3d/CREDITS.md`, `manifest.json`,
+`flat/catalog.json` and `cards/catalog.json`. Geometry and renders were produced with Blender 4.5.1,
+Python/NumPy and Pillow by `build_space.py`, `full_theme.py`, `critters_full.py`, `flat_full.py`,
+`finish_flat.py`, `finish_cards.py` and `finish_critters.py`. Owner direction is recorded in `notes.md`.
+No stock models, downloaded textures or franchise artwork are embedded in the production assets.
+Earlier original concept sheets used OpenAI image generation; their pixels and the supplied reference
+images are not copied into the imported geometry. The owner's existing licensing position is retained.
+
+Imported: 164 original GLBs, 75 sets of 18-view sprites, 42 unlettered card scene images, three neutral
+knight previews, and five animated critter modules. `tools/import_space.py` records source-relative paths
+and GLB hashes in `app/src/main/assets/space_catalog.json`; it uses Pillow/Lanczos/WebP conversion and
+splits existing critter strips into the app's individual frame format. No new art was generated.
+Runtime cards use unlettered scene renders so existing game labels remain unchanged. The preserved
+physical card GLBs contain source rasterized Segoe UI titles; no font software is redistributed and
+these models are not selected as runtime card art. The original source references retain their own
+provenance; this import does not claim a new CC0 dedication for them.

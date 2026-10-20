@@ -183,25 +183,39 @@ fun HumanControls(
     tradeButton: (@Composable () -> Unit)? = null,
     /** Why you must discard, when it isn't a rolled 7 (Wrecker played against you); null for a 7. */
     discardCause: String? = null,
+    /** A Fortune card tapped in the hand row ([HandRow]), to play now; [onFortuneDone] clears it. */
+    fortuneAsk: Int? = null,
+    onFortuneDone: () -> Unit = {},
 ) {
     var sheet by remember { mutableStateOf<String?>(null) } // which picker is open
+    // A Fortune card tapped in the hand: Sentinel and Trailblazers play at once, Windfall and Corner the Market open
+    // their picker here.
+    androidx.compose.runtime.LaunchedEffect(fortuneAsk) {
+        when (fortuneAsk) {
+            null -> return@LaunchedEffect
+            DevCard.KNIGHT -> legal.firstOrNull { it.type == ActionType.PLAY_KNIGHT_CARD }?.let(onMove)
+            DevCard.ROAD_BUILDING -> legal.firstOrNull { it.type == ActionType.PLAY_ROAD_BUILDING }?.let(onMove)
+            DevCard.YEAR_OF_PLENTY -> if (legal.any { it.type == ActionType.PLAY_YEAR_OF_PLENTY }) sheet = "yop"
+            DevCard.MONOPOLY -> if (legal.any { it.type == ActionType.PLAY_MONOPOLY }) sheet = "mono"
+        }
+        onFortuneDone()
+    }
     var ckChoices by remember { mutableStateOf<Pair<String, List<Action>>?>(null) }
     val types = legal.map { it.type }.toSet()
+    // A picker left open after its moves stopped being legal (a new turn, a bot's move, a resumed game) hid the
+    // Roll button under a prompt that said roll (#105). Drop any sheet that has nothing left to pick.
+    if (sheet != null && !sheetStillLegal(sheet, ckChoices?.second, legal)) sheet = null
     // The buttons in a column hugging the right edge with the main one (Roll / End turn) at the very bottom, within
     // reach of a right thumb. Every card sheet (pick, give, discard, name a card) sits in one place: bottom centre,
     // the lower third of the screen, like the trade chest (Mauro: "same card puller/giver ... for thumb reach").
     Box(modifier) {
         // Board A: the prompt, points and hand live elsewhere (TurnPrompt, PlayerStrip, HandRow); this
         // panel only appears for Fortune cards and the pickers.
-        val fortune = (0 until DevCard.COUNT).filter { s.devHand[me * DevCard.COUNT + it] > 0 }
-        if (fortune.isNotEmpty() || sheet != null) Column(
-            (if (sheet != null) Modifier.align(Alignment.BottomCenter).widthIn(max = 560.dp).chest()
-            else Modifier.align(Alignment.BottomEnd).padding(end = 184.dp).widthIn(max = 300.dp).brassEdgedWood().padding(12.dp)).testTag("card-sheet"),
+        // Fortune cards sit in the hand row now (tap to play, hold to read); this panel is only for the pickers.
+        if (sheet != null) Column(
+            Modifier.align(Alignment.BottomCenter).widthIn(max = 560.dp).chest().testTag("card-sheet"),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // Each Fortune card you hold, with what it does (Mauro: "add some hints on what a card does").
-            if (fortune.isNotEmpty() && sheet == null) for (c in fortune) Text("${s.devHand[me * DevCard.COUNT + c]} ${FORTUNE[c]}: ${FORTUNE_HINTS[c]}",
-                color = INK_LIGHT, fontSize = 12.sp, modifier = Modifier.testTag("fortune-hint-$c"))
             when (sheet) {
                 "yop" -> Picker("Windfall: ${FORTUNE_HINTS[DevCard.YEAR_OF_PLENTY]}", legal.filter { it.type == ActionType.PLAY_YEAR_OF_PLENTY }
                     .map { a -> (RES[a.yopFirst] + if (a.yopSecond >= 0) " + ${RES[a.yopSecond]}" else "") to a }, onMove) { sheet = null }
@@ -222,8 +236,7 @@ fun HumanControls(
         if (wgbg.engine.CkActionType.CHOOSE_CARD in types) {
             CardChoiceSheet(s, me, legal.filter { it.type == wgbg.engine.CkActionType.CHOOSE_CARD }, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box
         }
-        val buttonTypes = setOf(ActionType.ROLL, ActionType.END_TURN, ActionType.BUY_DEVELOPMENT_CARD,
-            ActionType.PLAY_KNIGHT_CARD, ActionType.PLAY_ROAD_BUILDING, ActionType.PLAY_YEAR_OF_PLENTY, ActionType.PLAY_MONOPOLY)
+        val buttonTypes = setOf(ActionType.ROLL, ActionType.END_TURN, ActionType.BUY_DEVELOPMENT_CARD)
         if (sheet == null && (types.any { it in buttonTypes } || ckButtonGroups(s, legal, names).isNotEmpty() || tradeButton != null)) Column(
             Modifier.align(Alignment.BottomEnd).width(176.dp).testTag("thumb-buttons"),
             horizontalAlignment = Alignment.End,
@@ -233,10 +246,7 @@ fun HumanControls(
                 legal.firstOrNull { it.type == t }?.let { a -> MoveButton(label, primary) { onMove(a) } }
             }
             // Buying a Fortune card lives in the build menu on the right edge now.
-            single(ActionType.PLAY_KNIGHT_CARD, "Play Sentinel")
-            single(ActionType.PLAY_ROAD_BUILDING, "Play Trailblazers")
-            if (ActionType.PLAY_YEAR_OF_PLENTY in types) MoveButton("Play Windfall…") { sheet = "yop" }
-            if (ActionType.PLAY_MONOPOLY in types) MoveButton("Play Corner the Market…") { sheet = "mono" }
+            // Fortune cards are played from the hand row (tap the card).
             // Age of Chivalry moves that aren't board taps: one button per kind (or card), a picker if it has choices.
             for ((label, acts) in ckButtonGroups(s, legal, names)) {
                 if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
@@ -247,7 +257,7 @@ fun HumanControls(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
                 legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp) { onMove(a) } }
-                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn") { onMove(a) } }
+                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn") { onMove(a) } }
             }
         }
     }
@@ -291,7 +301,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                                 }.testTag("discard-card-$r"),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
+                            Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
                             if (pile[r] > 0) Text("−${pile[r]}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
                         }
@@ -328,7 +338,7 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
     Text("$label: choose what the two number dice show", color = INK_LIGHT, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     @Composable fun row(isRed: Boolean, picked: Int, pick: (Int) -> Unit) = Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(if (isRed) "Red die" else "Ivory die", color = INK_LIGHT, fontSize = 13.sp, modifier = Modifier.width(76.dp))
-        for (v in 1..6) Image(painterResource(DiceArt.face(isRed, false, v)), "$v",
+        for (v in 1..6) Image(artPainter(DiceArt.face(isRed, false, v)), "$v",
             Modifier.size(44.dp).background(if (picked == v) Color(0xFFD9B865) else Color.Transparent, RoundedCornerShape(8.dp)).padding(3.dp)
                 .clickable { pick(v) }.testTag("die-${if (isRed) "red" else "ivory"}-$v"))
     }
@@ -353,7 +363,7 @@ private fun Picker(title: String, options: List<Pair<String, Action>>, onMove: (
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { close(); onMove(a) }.testTag("pick-$label")) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-                    for (c in cards) Image(painterResource(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
+                    for (c in cards) Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
                 }
                 Text(label, color = INK_LIGHT, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             } else MoveButton(label) { close(); onMove(a) }
@@ -422,7 +432,7 @@ internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<St
                     wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK ->
                         ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], ALL_CARD_ART[wgbg.engine.Track.commodity(a.a)],
                             "${ck.deckSize[a.a]} left", w = 64, h = 90)
-                    else -> Image(painterResource(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+                    else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
                 }
                 val under = when (a.type) {
                     wgbg.engine.CkActionType.DISCARD_PROGRESS -> "have ${ck.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
@@ -545,9 +555,29 @@ internal fun SpotPicker(choices: List<SpotChoice>, onPick: (Action) -> Unit) {
             if (cost == null) Text("free", color = Color(0xFF2A1A0C), fontSize = 14.sp)
             else Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (r in cost.indices) repeat(cost[r]) {
-                    Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.size(width = 20.dp, height = 28.dp))
+                    Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.size(width = 20.dp, height = 28.dp))
                 }
             }
         }
     }
+}
+
+/** The Fortune cards (DevCard ids) [legal] lets the player play right now, for the hand row. */
+internal fun fortunePlayable(legal: List<Action>): Set<Int> = buildSet {
+    for (a in legal) when (a.type) {
+        ActionType.PLAY_KNIGHT_CARD -> add(DevCard.KNIGHT)
+        ActionType.PLAY_ROAD_BUILDING -> add(DevCard.ROAD_BUILDING)
+        ActionType.PLAY_YEAR_OF_PLENTY -> add(DevCard.YEAR_OF_PLENTY)
+        ActionType.PLAY_MONOPOLY -> add(DevCard.MONOPOLY)
+        else -> {}
+    }
+}
+
+/** Whether an open picker still has a legal move to offer (#105: a stale one hid the Roll button). */
+internal fun sheetStillLegal(sheet: String?, ckActs: List<Action>?, legal: List<Action>): Boolean = when (sheet) {
+    null -> false
+    "yop" -> legal.any { it.type == ActionType.PLAY_YEAR_OF_PLENTY }
+    "mono" -> legal.any { it.type == ActionType.PLAY_MONOPOLY }
+    "ck" -> ckActs != null && ckActs.any { it in legal }
+    else -> true
 }

@@ -27,6 +27,10 @@ if [ -f "$OUT/run.pid" ] && kill -0 "$(cat "$OUT/run.pid")" 2>/dev/null; then
   echo "USERPLAY: another run (pid $(cat "$OUT/run.pid")) is already driving $ANDROID_SERIAL; stop it first"; exit 1
 fi
 echo $$ > "$OUT/run.pid"; trap 'rm -f "$OUT/run.pid"' EXIT
+# Stopping the shell that started a run (a background task stopped) leaves this script tapping on, holding the device:
+# quit once that shell is gone.
+PARENT=$PPID
+orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (the shell that started it is gone)"; exit 1; }; }
 
 # The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
 dump() {
@@ -55,15 +59,19 @@ declare -A POS
 tap_at() { [ -n "${POS[$1]:-}" ] || POS[$1]=$(find_text "$1"); [ -n "${POS[$1]}" ] || { unset "POS[$1]"; return 1; }; "$ADB" shell input tap ${POS[$1]} </dev/null; sleep 0.5; }
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
-fail() { echo "USERPLAY $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
+fail() { echo "USERPLAY $TAG FAILED: $1"; [ "$MODE" = join ] && touch "$ROOM_FILE.failed"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
 # Centres of every element with text $1, left to right.
 all_text() { echo "$2" | grep -o "\(text\|content-desc\)=\"$1\"[^/]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]" | grep -o 'bounds=.*' | tr -c '0-9\n' ' ' |
   awk '{print int(($1+$3)/2), int(($2+$4)/2)}' | sort -n -k1,1; }
 # Close the on-screen keyboard with its Enter/Done key, as a player would. Not Back: on Android 14 (lane 2) one Back
 # closes the keyboard AND the app (0.2.9 test, 2026-10-13).
-hide_keyboard() { sleep 0.5; "$ADB" shell dumpsys input_method | grep -q "mInputShown=true" && "$ADB" shell input keyevent KEYCODE_ENTER; sleep 1; }
+# Enter first (a player's Done key); if it only moved to the next box, Back closes the keyboard. Back only while
+# it's still up, or it would close the screen. Check it's really gone: a box hidden under it gets the wrong text.
+kb_up() { "$ADB" shell dumpsys input_method | grep -q "mInputShown=true"; }
+hide_keyboard() { sleep 0.5; for k in ENTER BACK; do kb_up || return 0; "$ADB" shell input keyevent KEYCODE_$k; sleep 1; done
+  kb_up && fail "the keyboard won't close"; return 0; }
 # Type into a text box (tap it, clear it, type).
-type_into() { tap $1 $2; sleep 0.5; "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in $(seq 1 14); do "$ADB" shell input keyevent KEYCODE_DEL; done
+type_into() { [ -n "$3" ] || fail "no text box to type \"$1\" into"; tap $1 $2; sleep 0.5; "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in $(seq 1 14); do "$ADB" shell input keyevent KEYCODE_DEL; done
   "$ADB" shell input text "$3"; sleep 0.5; }
 
 # A fresh install state, then in through the start screen like a player.
@@ -127,13 +135,17 @@ else
       # Read the room code off the lobby and hand it to the friend; Start game once they're in and ready.
       code=$(dump | grep -o 'text="[^"]*"' | grep -o '[A-Z]\{3,\}-[1-9][0-9]\{1,2\}' | head -1)
       [ -n "$code" ] || fail "no room code on the lobby screen"
-      mkdir -p "$(dirname "$ROOM_FILE")"; echo "$code" > "$ROOM_FILE"; echo "USERPLAY $TAG: hosting $code"
+      mkdir -p "$(dirname "$ROOM_FILE")"; rm -f "$ROOM_FILE.failed"; echo "$code" > "$ROOM_FILE"; echo "USERPLAY $TAG: hosting $code"
       shot lobby
       for _ in $(seq 1 90); do
+        orphaned
         "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break
+        [ -e "$ROOM_FILE.failed" ] && break
         d=$(dump); echo "$d" | grep -q 'text="Duo"' && tap_text "Start game" "$d"; sleep 3
       done
       rm -f "$ROOM_FILE"
+      # A friend who never made it in would leave the host sitting in the lobby until its time limit.
+      "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || { rm -f "$ROOM_FILE.failed"; fail "the friend never joined (see the join log)"; }
     else
       tap_text "Start game" || fail "no Start game (lobby: $(dump | grep -o 'text="[^"]*ready[^"]*"' | head -2))"
     fi
@@ -147,14 +159,15 @@ shot start
 for _ in $(seq 1 120); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
 "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started (still on the start screen?)"
 # Animations off from the menu, like a player can (Mauro: test games skip the animation; it also makes reading the
-# screen fast, since a still screen needs no waiting): Menu, Settings, Animations Off, Hide (it saves as you tap).
+# screen fast, since a still screen needs no waiting): Menu, Settings, Play, Animations Off, Hide (it saves as you tap).
+# Settings opens with its groups shut (Fable review T4), so open Play first; only its Off is then on screen.
 if tap_text "Menu"; then
-  tap_desc "Settings" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
+  tap_desc "Settings" && tap_text "Play" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
   tap_text "Hide"
 fi
-# Local games: speed the bots up like a player can (Menu, the gear, tap the speed button up to Max, Hide).
+# Local games: speed the bots up like a player can (Menu, the gear, This game, tap the speed button up to Max, Hide).
 if [ "$MODE" = local ]; then
-  tap_text "Menu" && tap_desc "Settings" && for _ in 1 2 3 4 5; do
+  tap_text "Menu" && tap_desc "Settings" && tap_text "This game" && for _ in 1 2 3 4 5; do
     lbl=$(dump | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2)
     [ "$lbl" = "Max" ] && break; [ -n "$lbl" ] && tap_text "$lbl"
   done; tap_text "Hide"
@@ -162,6 +175,7 @@ fi
 
 start=$(date +%s); moves=0; last=""; prev=""; same=0; tries=0; changed=$(date +%s)
 while true; do
+  orphaned
   [ $(( $(date +%s) - start )) -gt $((MINUTES * 60)) ] && fail "game not over after $MINUTES minutes ($moves moves)"
   crashed && fail "crash after $moves moves"
   if "$ADB" logcat -d -s WGBG-GAME:I WGBG-ONLINE:I | grep -q -E "over|game over"; then

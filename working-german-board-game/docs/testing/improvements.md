@@ -41,3 +41,8 @@ move it to **Done** with the commit when it lands.
 - Local `--ez autoplay true` (a bot plays your seat offline too): a full base game in ~2.5 min. 7254728.
 - `tap()` helpers no longer let `adb shell` eat stdin inside `while read` loops (only the first tap happened).
   7254728, found by Crest.
+- 2026-10-18, Codex (#88): measure model primitive counts as well as triangles, including two road instances
+  per edge and animated critter materials; Space's unbatched bound was 797 draws despite only 199,090
+  triangles. Keep the new batch-budget test and profile its eventual consumer on a mid-range device.
+- 2026-10-18, Codex (#88): preconfigure a writable Gradle cache, signing-key copy and in-process Kotlin
+  compiler for restricted Windows sessions; avoids wrapper/signing lock failures and repeated daemon fallbacks.

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -31,6 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
@@ -195,9 +198,14 @@ fun cardNameSp(name: String, w: Int): Float {
  */
 @Composable
 fun ProgressCardFace(name: String, edge: Color, art: Int?, small: String? = null, w: Int = 56, h: Int = 78, modifier: Modifier = Modifier) {
-    Box(modifier.size(width = w.dp, height = h.dp).background(Color(0xFFEFE3C8), RoundedCornerShape(5.dp))
+    // Space renders are bare objects: they sit inset on a night-blue face instead of filling a cream one (as the hand's resource cards).
+    val space = LocalArtChoice.current.space(ArtObject.CARDS)
+    Box(modifier.size(width = w.dp, height = h.dp).then(if (space) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF34405F), Color(0xFF151B2C))), RoundedCornerShape(5.dp))
+            else Modifier.background(Color(0xFFEFE3C8), RoundedCornerShape(5.dp)))
         .clip(RoundedCornerShape(5.dp)).border(2.dp, edge, RoundedCornerShape(5.dp))) {
-        if (art != null) Image(painterResource(art), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        val selectedArt = ThemeArt.namedCard(LocalArtChoice.current, name, art)
+        if (selectedArt != null) Image(artPainter(selectedArt), null, if (space) Modifier.fillMaxWidth().fillMaxHeight(.72f).padding(4.dp) else Modifier.fillMaxSize(),
+            contentScale = if (space) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(3.dp)
             .background(Color(0xE6EFE3C8), RoundedCornerShape(3.dp)).padding(2.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -216,7 +224,9 @@ fun ProgressCardFace(name: String, edge: Color, art: Int?, small: String? = null
  * Chivalry also your commodities and your progress cards (named, edged in their deck's colour) (#4).
  */
 @Composable
-fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, pace: Float = 1f) {
+fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, pace: Float = 1f,
+            /** Fortune cards [me] may play now ([fortunePlayable]): a tap plays one (Fable review: cards, not worded buttons). */
+            fortunePlayable: Set<Int> = emptySet(), onFortune: ((Int) -> Unit)? = null, fortuneArt: (Int) -> Int = { GuideArt.fortuneArt(it, false) }) {
     version // see PlayerStrip
     @Composable
     fun count(n: Int) = Text("$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
@@ -248,7 +258,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     detail?.let { d ->
         Row(Modifier.padding(bottom = 6.dp).brassEdgedWood().padding(12.dp).widthIn(max = 520.dp).pointerInput(d) { detectTapGestures { detail = null } }.testTag("card-detail"),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(d.art), d.title, Modifier.size(width = 100.dp, height = 140.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            Image(artPainter(ThemeArt.namedCard(LocalArtChoice.current, d.title, d.art)!!), d.title, Modifier.size(width = 100.dp, height = 140.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(d.title, color = Color(0xFFF1D58A), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 d.kind?.let { Text(it, color = Color(0xFFCDBFA6), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
@@ -266,8 +276,26 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             val n = s.hand(me, r)
             if (n == 0) continue
             Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.ck != null))) {
-                Image(painterResource(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
+                Image(artPainter(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
+            }
+        }
+        // Fortune cards (base game) as cards in the hand, dimmed when they can't be played; a tap plays one, a long press
+        // shows it large. They were worded buttons beside the move buttons before (Fable review 2.5).
+        if (s.ck == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
+            val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
+            if (n == 0) continue
+            val now = c in fortunePlayable && onFortune != null
+            Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now && c != wgbg.engine.DevCard.VICTORY_POINT)) {
+                namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70, art = fortuneArt(c),
+                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c]))) {
+                    if (now) { hint = null; onFortune?.invoke(c) }
+                    else hint = "${FORTUNE[c]}: " + when {
+                        c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]
+                        s.currentPlayer != me -> "only on your turn."
+                        else -> "not now (one Fortune card a turn, never one you bought this turn)."
+                    }
+                }
             }
         }
         val ck = s.ck ?: return@Row
@@ -275,7 +303,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         for (c in 0 until wgbg.engine.Commodity.COUNT) {
             val n = s.card(me, CARD_TYPES + c)
             if (n > 0) Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).testTag("hand-commodity-$c").longPressFor(cardDetail(CARD_TYPES + c, true))) {
-                Image(painterResource(COMMODITY_ART[c]), ALL_CARD_NAMES[CARD_TYPES + c], Modifier.size(width = 50.dp, height = 70.dp))
+                Image(artPainter(COMMODITY_ART[c]), ALL_CARD_NAMES[CARD_TYPES + c], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
             }
         }
@@ -284,7 +312,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         for (c in 0 until wgbg.engine.Progress.COUNT) {
             val n = ck.progressHand[me * wgbg.engine.Progress.COUNT + c]
             val now = c in playable
-            if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).alpha(if (now) 1f else 0.45f)) {
+            if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now)) {
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
                     small = null,
                     art = progressArt(c), long = progressDetail(c)) {
@@ -295,6 +323,16 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     }
     }
 }
+
+/**
+ * A card that can't be played now, darkened but solid: at 45% alpha the board (a harbour, a road) showed through the
+ * card. SrcAtop in its own layer darkens only the card's pixels, so its rounded corners stay clear.
+ */
+private fun Modifier.dimmed(dim: Boolean): Modifier = if (!dim) this else
+    graphicsLayer(compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen).drawWithContent {
+        drawContent()
+        drawRect(Color(0xA6140E08), blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop)
+    }
 
 /** Progress cards [me] may play right now: the engine's legal plays (none when it isn't their move). */
 fun playableProgress(s: GameState, me: Int): Set<Int> =
@@ -412,7 +450,7 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
 @Composable
 private fun MiniRollCard(m: RollMini) {
     Box(Modifier.size(width = 21.dp, height = 30.dp), contentAlignment = Alignment.Center) {
-        if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(ALL_CARD_ART[m.card]),
+        if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(artPainter(ALL_CARD_ART[m.card]),
             ALL_CARD_NAMES[m.card], Modifier.fillMaxSize())
         else Box(Modifier.fillMaxSize().background(Color(0xFF5A4030), RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(2.dp)),
             contentAlignment = Alignment.Center) { Text("?", color = Color(0xFFEFE3C8), fontSize = 10.sp, fontWeight = FontWeight.Bold) }

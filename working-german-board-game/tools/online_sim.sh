@@ -33,6 +33,9 @@ fill() {
   "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.6
   "$A" -s "$1" shell input keycombination 113 29; "$A" -s "$1" shell input keyevent KEYCODE_DEL
   "$A" -s "$1" shell input text "$text"; "$A" -s "$1" shell input keyevent KEYCODE_ENTER; sleep 0.6  # Enter (IME Done) hides the keyboard; Back would leave the screen when it is already hidden
+  # On a box with a Next key, Enter only moves on and the keyboard stays up over the next box: then Back closes it.
+  "$A" -s "$1" shell dumpsys input_method | grep -q "mInputShown=true" && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
+  return 0
 }
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
 # Waits up to $3 s for text matching $2 on device $1.

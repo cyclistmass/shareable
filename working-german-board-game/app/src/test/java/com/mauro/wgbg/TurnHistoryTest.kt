@@ -70,12 +70,19 @@ class TurnHistoryTest {
                 val who = s.actingPlayer
                 val a = bots[who].choose(s, buf)
                 val had = s.cardCount(who)
+                val before = tracker.current?.rollOut?.getOrNull(who)?.sum()
                 tracker.apply(s, who, a) { Rules.apply(s, a) }
                 if (a.type == wgbg.engine.ActionType.DISCARD) {
                     discards++
-                    val line = tracker.current!!.events.last { it.startsWith("You discarded") || it.contains(" discarded ") }
+                    val names = listOf("You", "Blue", "Orange")
+                    // One line per player for the whole discard, listing every card put back so far (Fable review T8).
+                    val out = tracker.current!!.rollOut.getOrNull(who)
+                    if (before != null && out != null) assertEquals(had - s.cardCount(who), out.sum() - before, "the running total grows by what left")
+                    val mine = tracker.current!!.events.filter { it.startsWith("${names[who]} discarded ") && it.substringAfter("discarded ").first().isDigit() }
+                    if (out != null) assertEquals(1, mine.size, "one line each: $mine")
+                    val line = mine.last()
                     val listed = Regex("""(\d+) (\w+)""").findAll(line.substringAfter("discarded ")).sumOf { it.groupValues[1].toInt() }
-                    assertEquals(had - s.cardCount(who), listed, "every card that left the hand is listed: $line")
+                    assertEquals(out?.sum() ?: (had - s.cardCount(who)), listed, "every card that left the hand is listed: $line")
                     if (listOf("Parchment", "Fabric", "Silver").any { it in line }) commodityDiscards++
                 }
                 tracker.current?.steal?.let { st ->

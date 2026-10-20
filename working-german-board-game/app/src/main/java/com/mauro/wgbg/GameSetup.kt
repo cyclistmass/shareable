@@ -12,7 +12,17 @@ import wgbg.engine.GameConfig
 enum class SeatKind(val label: String) { FRIEND("Friend"), BOT("Bot"), EMPTY("Empty") }
 
 /** Bot strength, weakest first. STRONG is the trained bot (#6); until it lands it plays as Greedy. */
-enum class BotLevel(val label: String) { EASY("Easy"), GREEDY("Greedy"), STRONG("Strong") }
+enum class BotLevel(val label: String) {
+    EASY("Easy"), GREEDY("Greedy"), STRONG("Strong");
+
+    /** How the level plays today, which is what a picker shows as chosen: Strong is Greedy until #6. */
+    val plays get() = if (this == STRONG) GREEDY else this
+
+    companion object {
+        /** The levels a picker offers: no "Strong" until it plays differently from Greedy (Fable review W4). */
+        val offered get() = entries.filter { it.plays == it }
+    }
+}
 
 data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY)
 
@@ -110,3 +120,6 @@ data class GameSetup(
         fun diceLabel(decks: Int) = if (decks == 0) "Random" else "${36 * decks}-card deck"
     }
 }
+
+/** The name as players see it in the log: "Mauro " read "Mauro  moved the bandit" (player report, 0.3.1). */
+internal fun GameSetup.trimmedName() = copy(name = name.trim())

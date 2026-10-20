@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.toArgb
 import kotlin.math.hypot
 
@@ -41,18 +42,21 @@ class WoodPieces(res: Resources, colors: List<Color>) {
     /** The stained-wood fill for color [i], for drawing other wooden things (tokens). */
     fun brush(i: Int): Brush = stains[i]
 
-    fun DrawScope.settlement(at: Offset, player: Int, scale: Float) {
+    /** [degrees] turns the house about [at] (a supply piece facing its owner); its shadow stays on the board's one sun (#129). */
+    fun DrawScope.settlement(at: Offset, player: Int, scale: Float, degrees: Float = 0f) {
         val u = 0.1955f * scale // 15% bigger than the first pass
         shadow(at, 2.6f * u, u)
-        house(at + Offset(-0.15f * u, 0.5f * u), 1.3f * u, 1.0f * u, 0.75f * u, u, player)
+        rotate(degrees, at) { house(at + Offset(-0.15f * u, 0.5f * u), 1.3f * u, 1.0f * u, 0.75f * u, u, player) }
     }
 
-    fun DrawScope.city(at: Offset, player: Int, scale: Float) {
+    fun DrawScope.city(at: Offset, player: Int, scale: Float, degrees: Float = 0f) {
         val u = 0.1955f * scale // 15% bigger than the first pass
         shadow(at, 4.0f * u, 1.3f * u)
         // Low hall at the back right, tall tower in front on the left.
-        house(at + Offset(0.55f * u, 0.45f * u), 1.4f * u, 0.95f * u, 0.7f * u, u, player)
-        house(at + Offset(-0.6f * u, 0.75f * u), 0.95f * u, 1.9f * u, 0.6f * u, u, player)
+        rotate(degrees, at) {
+            house(at + Offset(0.55f * u, 0.45f * u), 1.4f * u, 0.95f * u, 0.7f * u, u, player)
+            house(at + Offset(-0.6f * u, 0.75f * u), 0.95f * u, 1.9f * u, 0.6f * u, u, player)
+        }
     }
 
     fun DrawScope.road(a: Offset, b: Offset, player: Int, scale: Float) {

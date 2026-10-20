@@ -123,10 +123,16 @@ object GoogleAccount {
 @androidx.compose.runtime.Composable
 fun AccountSection(compact: Boolean = false) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val transport = androidx.compose.runtime.remember { runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull() } ?: return
+    // Set up off the main thread: on the game-start screen this ran while the player typed a name, and a slow Firebase
+    // start (cold phone, disk busy) held the screen up. The rows appear once it's ready.
+    val transport = androidx.compose.runtime.produceState<FirestoreTransport?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()
+        }
+    }.value ?: return
     val clientId = androidx.compose.runtime.remember { GoogleAccount.webClientId(context) } ?: return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var status by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(GoogleAccount.status(transport.account)) }
+    var status by androidx.compose.runtime.remember(transport) { androidx.compose.runtime.mutableStateOf(GoogleAccount.status(transport.account)) }
     var note by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var busy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val gold = androidx.compose.ui.graphics.Color(0xFFD9B865)

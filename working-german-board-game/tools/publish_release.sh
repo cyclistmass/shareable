@@ -4,7 +4,7 @@
 #   https://github.com/cyclistmass/shareable/releases/latest/download/working-german-board-game.apk
 # always serves the newest version. Run from the project root after CI is green for the pushed commit.
 # The GitHub token comes from Git Credential Manager for one command at a time; it is never printed or saved.
-# Usage: tools/publish_release.sh [path to gameplay mp4]
+# Usage: [APK=<tested apk>] tools/publish_release.sh [path to gameplay mp4]
 set -euo pipefail
 VIDEO="${1:-$TEMP/wgbg-showcase/working-german-board-game-gameplay.mp4}"
 REPO="${REPO:-cyclistmass/shareable}"   # REPO=cyclistmass/sharable until the rename has run
@@ -31,6 +31,15 @@ import json,sys
 print([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'].endswith('debug-apk')][0])")
 curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://api.github.com/repos/$REPO/actions/artifacts/$ART/zip"
 (cd "$WORK" && unzip -q apk.zip && mv app-debug.apk working-german-board-game.apk)
+# APK=<file>: publish the exact APK that was user-tested (same commit), not CI's rebuild of it. CI must still be green.
+if [ -n "${APK:-}" ]; then
+  echo "CI's APK:    $(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)"
+  echo "Tested APK:  $(sha256sum < "$APK" | cut -c1-64) (publishing this one)"
+  # Players update over CI-signed releases: a different signing cert would make every update fail.
+  cert() { "$(ls -d "${ANDROID_HOME:-$LOCALAPPDATA/Android/Sdk}"/build-tools/*/ | tail -1)apksigner.bat" verify --print-certs "$1" | sed -n 's/.*SHA-256 digest: //p'; }
+  [ "$(cert "$APK")" = "$(cert "$WORK/working-german-board-game.apk")" ] || { echo "Tested APK is signed with a different cert than CI's; not publishing"; exit 1; }
+  cp "$APK" "$WORK/working-german-board-game.apk"
+fi
 
 py -c "
 import json,sys
@@ -50,3 +59,6 @@ up "$WORK/working-german-board-game.apk" application/vnd.android.package-archive
 if [ -f "$VIDEO" ]; then cp "$VIDEO" "$WORK/working-german-board-game-gameplay.mp4"; up "$WORK/working-german-board-game-gameplay.mp4" video/mp4; fi
 rm -rf "$WORK"
 echo "published wgbg-v$VERSION from ${SHA:0:7}"
+# Close the issues this release shipped (named in commit subjects since the previous release).
+REPO="$REPO" SHAREABLE="$SHAREABLE" "$(dirname "$0")/close_shipped.sh" "$VERSION" "$SHA"
+

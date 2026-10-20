@@ -262,4 +262,13 @@ class GameSetupTest {
         val b = qrMatrix(Lobby.sample().copy(code = "TIDE-17").link)
         assertFalse(a == b)
     }
+
+    @Test
+    fun `pickers offer no Strong until it plays differently, and a saved Strong shows as Greedy`() {
+        assertEquals(listOf(BotLevel.EASY, BotLevel.GREEDY), BotLevel.offered)
+        assertEquals(BotLevel.GREEDY, BotLevel.STRONG.plays)
+        BotLevel.offered.forEach { assertSame(it, it.plays) }
+        // Defaults: you, then three bots (a Friend seat is only ever chosen, never the default).
+        assertTrue(base.seats.drop(1).all { it.kind == SeatKind.BOT })
+    }
 }

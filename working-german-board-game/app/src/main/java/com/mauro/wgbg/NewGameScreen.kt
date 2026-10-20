@@ -27,7 +27,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,7 +103,7 @@ fun NewGameScreen(
     }
 
     Row(
-        modifier.fillMaxSize().background(Wood.NIGHT).padding(14.dp).testTag("new-game"),
+        modifier.fillMaxSize().tableTop().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Panel(Modifier.weight(1f)) {
@@ -219,11 +222,13 @@ private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, onKind: (SeatK
         when (seat.kind) {
             SeatKind.BOT -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    for (b in BotLevel.entries) Choice(b.label, seat.bot == b, "seat-$i-bot-${b.name}", Modifier.weight(1f).height(26.dp),
+                    for (b in BotLevel.offered) Choice(b.label, seat.bot.plays == b, "seat-$i-bot-${b.name}", Modifier.weight(1f).height(26.dp),
                         radius = 7.dp, size = 11.sp) { onBot(b) }
                 }
             }
-            SeatKind.FRIEND -> Text("Invite from the lobby, or pass this phone", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
+            // There is no pass-the-phone mode yet: on Play a bot sits here, so say so (Fable review W3).
+            SeatKind.FRIEND -> Text("Kept open for a friend when you Host a room. Play on this phone: a bot sits here.",
+                style = Wood.sans(12.sp, color = Wood.INK_SOFT))
             SeatKind.EMPTY -> Text("Nobody sits here", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
         }
     }
@@ -249,6 +254,22 @@ private fun DiceChoice(title: String, note: String, selected: Boolean, tag: Stri
 @Composable
 private fun NameField(name: String, onChange: (String) -> Unit) = ParchmentField(name, onChange, "name")
 
+/**
+ * For a text box: Back with the keyboard up only puts the keyboard away (#121). On Android 14 one Back did that AND
+ * left the screen, closing the app from the start screen. Only while the keyboard is up does Back let go of the box;
+ * once it's down (Done, or Android 16's keyboard eating the Back itself) the next Back leaves as usual. Focus is never
+ * dropped just because the keyboard hid: a hardware Enter then put it straight back on the first box, reopening the
+ * keyboard, and Back stopped working on the Join screen.
+ */
+@Composable
+internal fun Modifier.backPutsKeyboardAway(): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    val ime = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+    androidx.activity.compose.BackHandler(enabled = focused && ime) { focus.clearFocus() }
+    return onFocusChanged { focused = it.isFocused }
+}
+
 /** A one-line parchment text box with a brass edge (name, room code). */
 @Composable
 internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: String,
@@ -260,7 +281,8 @@ internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: Stri
         textStyle = Wood.sans(15.sp, FontWeight.SemiBold, Wood.PARCHMENT_INK),
         cursorBrush = SolidColor(Wood.PARCHMENT_INK),
         keyboardOptions = KeyboardOptions(capitalization = caps, imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth().height(32.dp).testTag(tag),
+        modifier = Modifier.fillMaxWidth().height(32.dp).testTag(tag)
+            .backPutsKeyboardAway(),
         decorationBox = { inner ->
             Box(
                 Modifier.fillMaxSize().background(Wood.PARCHMENT, RoundedCornerShape(8.dp))

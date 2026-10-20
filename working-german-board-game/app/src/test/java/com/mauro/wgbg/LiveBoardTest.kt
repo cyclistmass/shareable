@@ -89,6 +89,14 @@ class LiveBoardTest {
         for (name in listOf("BrassTrim", "FixedDetails", "RuntimeDigits", "WoodBodyTrim", "woodbody", "")) assertFalse(woodTint(name))
     }
 
+    @Test fun `Space town and Capital glass takes the owner colour, other Space details stay their own`() {
+        for (m in listOf("space_town", "space_capital_crown", "space_capital_guilds", "space_capital_academy")) {
+            assertEquals(PLAYER_COLORS[1], liveTint(m, "FixedDetails", 1))
+            assertEquals(null, liveTint(m, "FixedDetails", -1))
+        }
+        for (m in listOf("space_homestead", "space_ramparts_h2", "space_knight_l1_active", "default_town")) assertEquals(null, liveTint(m, "FixedDetails", 1))
+    }
+
     @Test fun `both themes and LODs use real terrain numbers roads and expansion pieces without state changes`() {
         val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
         // A rendering fixture isolates all piece forms from rule progression.
@@ -103,6 +111,15 @@ class LiveBoardTest {
             assertEquals(18, list.count { it.model == "number_plate" })
             assertEquals(2, list.count { it.model == "${theme}_road_v" && it.owner == 2 })
             assertTrue(list.filter { it.model.endsWith("_road_v") }.all { it.height == LIVE_ROAD_LIFT }, "roads stand proud of the tile edges")
+            assertTrue(list.filter { it.model.endsWith("_road_v") }.all { it.stretch == LIVE_ROAD_HEIGHT }, "roads stand taller than modelled")
+            // Each road half's outer end stops LIVE_ROAD_GAP short of its corner, so buildings there keep clear of it.
+            val a = liveVertex(s.board, s.board.edgeA[0]); val z = liveVertex(s.board, s.board.edgeB[0])
+            val dir = (z - a) / (z - a).getDistance()
+            for (half in list.filter { it.model == "${theme}_road_v" && it.owner == 2 }) {
+                val ends = listOf(half.position - dir * LIVE_ROAD_HALF, half.position + dir * LIVE_ROAD_HALF)
+                val gap = minOf(ends.minOf { (it - a).getDistance() }, ends.minOf { (it - z).getDistance() })
+                assertEquals(LIVE_ROAD_GAP, gap, 1e-4f, "road end to corner")
+            }
             assertEquals(1, list.count { it.model == "${theme}_homestead" && it.owner == 0 })
             assertEquals(1, list.count { it.model == "${theme}_ramparts" && it.owner == 1 })
             assertEquals(1, list.count { it.model == "${theme}_capital_guilds" && it.owner == 2 })
@@ -111,6 +128,17 @@ class LiveBoardTest {
                 assertTrue(list.any { it.model == "digit_${s.board.hexNumber[h]}" && it.position == liveHex(s.board, h) + LIVE_PLATE })
             }
         }
+    }
+
+    @Test fun `the merchant stands as a tinted model on its tile when the model is there`() {
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        assertTrue(livePlacements(s, false, 0) { true }.none { it.model == LIVE_MERCHANT }, "nobody holds it yet")
+        s.ck!!.merchantHex = 7; s.ck!!.merchantOwner = 2
+        assertTrue(livePlacements(s, false, 0).none { it.model == LIVE_MERCHANT }, "no model file: the overlay draws it")
+        val m = livePlacements(s, true, 0) { true }.single { it.model == LIVE_MERCHANT }
+        assertEquals(2, m.owner)
+        assertEquals(liveHex(s.board, 7) + MERCHANT_SPOT, m.position)
+        assertTrue(liveStanding(m.model), "it tips toward the camera like the Bandit")
     }
 
     @Test fun `knights become tinted standing models by theme, level and active, and stay sprites without a model`() {
@@ -128,6 +156,10 @@ class LiveBoardTest {
         assertEquals(listOf("pirate_knight_l2" to 1, "pirate_knight_l3_inactive" to 3), knights.map { it.model to it.owner })
         assertEquals(liveVertex(s.board, 4), knights[0].position)
         assertTrue(knights.all { liveStanding(it.model) }, "knights tip toward the camera like the buildings")
+        // Knights swapped on their own (the Inventory): Pirate buildings, Default knights.
+        val mixed = livePlacements(s, true, 0, knightsPirate = false) { true }
+        assertEquals(listOf("default_knight_l2", "default_knight_l3_inactive"), mixed.filter { "_knight_" in it.model }.map { it.model })
+        assertTrue(mixed.none { it.model.startsWith("default_") && "_knight_" !in it.model }, "the buildings stay Pirate")
     }
 
     @Test fun `legal placement taps pick the same move after a full orbit at every tilt`() {

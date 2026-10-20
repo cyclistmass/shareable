@@ -27,7 +27,7 @@ class SpotChoiceTest {
         val wall = Action.buildCityWall(3)
         val knight = Action.buildKnight(3)
         val rows = spotChoices(s, listOf(town, wall, knight), names)
-        assertEquals(listOf("Town", "Ramparts", "Raise a knight"), rows.map { it.name })
+        assertEquals(listOf("Town", "Ramparts", "New knight"), rows.map { it.name })
         assertEquals(listOf(MoveIcon.TOWN, MoveIcon.RAMPARTS, MoveIcon.KNIGHT), rows.map { it.icon })
         assertArrayEquals(Cost.CITY, rows[0].cost)
         assertArrayEquals(CkCost.WALL, rows[1].cost)

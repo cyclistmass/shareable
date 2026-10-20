@@ -24,9 +24,9 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
     HOMESTEAD(ActionType.BUILD_SETTLEMENT, MoveIcon.HOMESTEAD, "Homestead"),
     TOWN(ActionType.BUILD_CITY, MoveIcon.TOWN, "Town"),
     FORTUNE(ActionType.BUY_DEVELOPMENT_CARD, MoveIcon.CARD, "Fortune card", onBoard = false, chivalry = false),
-    KNIGHT(CkActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "Raise a knight", chivalry = true),
-    ROUSE(CkActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply a knight", chivalry = true),
-    PROMOTE(CkActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote a knight", chivalry = true),
+    KNIGHT(CkActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "New knight", chivalry = true),
+    ROUSE(CkActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply knight", chivalry = true),
+    PROMOTE(CkActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote knight", chivalry = true),
     RAMPARTS(CkActionType.BUILD_CITY_WALL, MoveIcon.RAMPARTS, "Ramparts", chivalry = true);
 
     companion object {

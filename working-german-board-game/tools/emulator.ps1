@@ -1,8 +1,8 @@
 # Starts (if needed) the test emulator, puts it in landscape, and fits its window on screen.
-# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\emulator.ps1 [-Lane 1|2] [-Launch]
+# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\emulator.ps1 [-Lane 1|2] [-Launch] [-Cold]
 # Two lanes can run side by side: lane 1 = Pixel8_API36 on emulator-5554, lane 2 = Pixel6_API34 on
 # emulator-5556. Each lane only ever checks, restarts and moves its OWN emulator.
-param([int]$Lane = 1, [string]$Avd = "", [int]$Port = 0, [switch]$Launch, [string]$Gpu = "")
+param([int]$Lane = 1, [string]$Avd = "", [int]$Port = 0, [switch]$Launch, [switch]$Cold, [string]$Gpu = "")
 $ErrorActionPreference = "Stop"
 if (-not $Avd) { $Avd = @("Pixel8_API36", "Pixel6_API34")[$Lane - 1] }
 if (-not $Port) { $Port = 5552 + 2 * $Lane }
@@ -76,7 +76,11 @@ function Wait-EmuReady([int]$sec) {
 }
 
 $t0 = Get-Date
-if (-not (Get-EmuWindow)) {
+# -Cold: a long-running emulator leaks host RAM and slows the app enough to fake ANRs; start this lane fresh.
+if ($Cold) {
+    if (Get-EmuWindow) { Restart-Emulator } else { Start-Emu @("-no-snapshot-load", "-no-snapshot-save") }
+    if (-not (Wait-EmuReady 180)) { throw "Emulator did not cold-boot in 3 minutes" }
+} elseif (-not (Get-EmuWindow)) {
     Start-Emu @("-no-snapshot-save")
     if (-not (Wait-EmuReady 90)) { Restart-Emulator; if (-not (Wait-EmuReady 90)) { throw "Emulator did not boot in 3 minutes" } }
 } elseif (-not (Wait-EmuReady 15)) {

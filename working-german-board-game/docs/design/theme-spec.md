@@ -38,7 +38,7 @@ applied); the art spec gives the base frames and file sizes they come from.
 | Capital (Age of Chivalry) | a town plus a central keep, about **0.85** across, dome top highest | Replaces a town |
 | Knight (Age of Chivalry) | frame **1.30** on the flat board, **0.64** on the 3D board (0.49 of flat) | Stands on a corner, base at the lower centre |
 | Bandit | frame **2.65** | Feet on the number plate; its base hides the plate |
-| Merchant (Age of Chivalry) | radius **0.20**, ring in the holder's colour | Lies flat on its tile at (−0.36, +0.30), lower LEFT, mirroring the number plate, so it never covers the number |
+| Merchant (Age of Chivalry) | a standing pawn about **0.5** tall, in the holder's colour | Stands on its tile at (−0.36, +0.30), lower LEFT, mirroring the number plate, so it never covers the number and shows on a tilted board. Each theme may replace the pawn |
 | Port buoy | radius about **0.39** | 0.80 out to sea from the middle of its coast edge |
 | Cliff strip | **1.16** along a coast edge × **0.55** deep | Along each coast edge |
 | Boat (sloop) | frame **1.08**, hull about 0.76 long | On the sea |
@@ -65,23 +65,42 @@ everything on the table at once. For 5 to 6 players (30 tiles) the ceiling is 42
 - **no baked shadows**, and transparent surfaces kept small: glass domes, spouts and mist cost more per pixel
   than any triangle.
 
-| Object | Default LOD0 | LOD1 | Most on the worst board | Worst subtotal |
-|---|---:|---:|---:|---:|
-| Terrain tile (with its props) | 7,500 | 1,900 | 19 | 142,500 |
-| Number plate | 150 | — | 18 | 2,700 |
-| Road | 400 | — | 60 (15 × 4) | 24,000 |
-| Homestead | 500 | — | 20 (5 × 4) | 10,000 |
-| Town | 1,000 | — | 16 (4 × 4) | 16,000 |
-| Ramparts | 800 | — | 12 (3 × 4) | 9,600 |
-| Capital | 1,500 | — | 3 | 4,500 |
-| Knight L1 / L2 / L3 | 2,000 / 2,500 / 3,000 | — | 24 (2 of each level × 4) | 60,000 |
-| Bandit | 4,000 | — | 1 | 4,000 |
-| Raiders' ship | 3,000 | — | 1 | 3,000 |
-| Merchant | 600 | — | 1 | 600 |
-| Port (buoy and dock) | 800 | — | 9 | 7,200 |
-| Boat | 600 | — | 6 | 3,600 |
-| Critter (whale, space whale, …) | 4,000 | 1,000 | 3 | 12,000 |
-| **Board** | | | | **299,700** |
+| Object | Default LOD0 | LOD1 | Most on the worst board | Worst subtotal | Space LOD0/1 per instance | Space worst subtotal |
+|---|---:|---:|---:|---:|---:|---:|
+| Terrain tile (with its props) | 7,500 | 1,900 | 19 | 142,500 | 2,348 | 44,612 |
+| Number plate | 150 | — | 18 | 2,700 | 680 including digit | 12,240 |
+| Road | 400 | — | 60 (15 × 4) | 24,000 | 384 × 2 models per road | 46,080 |
+| Homestead | 500 | — | 20 (5 × 4) | 10,000 | 194 | 3,880 |
+| Town | 1,000 | — | 16 (4 × 4) | 16,000 | 492 | 7,872 |
+| Ramparts | 800 | — | 12 (3 × 4) | 9,600 | 1,200 (highest) | 14,400 |
+| Capital | 1,500 | — | 3 | 4,500 | 736 (largest) | 2,208 |
+| Knight L1 / L2 / L3 | 2,000 / 2,500 / 3,000 | — | 24 (2 of each level × 4) | 60,000 | 526 / 1,100 / 1,722 | 26,784 |
+| Bandit | 4,000 | — | 1 | 4,000 | 1,636 | 1,636 |
+| Raiders' ship | 3,000 | — | 1 | 3,000 | 86 | 86 |
+| Merchant | 600 | — | 1 | 600 | 1,332 | 1,332 |
+| Port (buoy and dock) | 800 | — | 9 | 7,200 | 1,968 (largest) | 17,712 |
+| Boat | 600 | — | 6 | 3,600 | 494 | 2,964 |
+| Critter (whale, space whale, …) | 4,000 | 1,000 | 3 | 12,000 | 2,280 (largest) | 6,840 |
+| Starfield | — | — | 1 | — | 652 | 652 |
+| Extra cliff strips | — | — | 30 | — | 144 | 4,320 |
+| Mycelium lanes | — | — | 72 | — | 76 | 5,472 |
+| **Board** | | | | **299,700** | | **199,090** |
+
+**Space import ledger (#88, 2026-10-18):** measured from the imported GLB index accessors by
+`SpaceArtTest`. Counts deliberately overestimate legal occupancy: all buildings and knights, the
+largest terrain on every hex, largest port at every harbour, extra Capitals and highest Ramparts.
+Roads count the current renderer's two models per logical edge. Number meshes already include their
+plate; do not add a duplicate plate or the legacy knight pedestal discs. LOD1 reuses these lean assets.
+The 6-player bound uses 30 tiles, 28 numbered plates, 180 road models, 30 Homesteads, 24 Towns,
+18 Ramparts, 36 knights, 11 ports, 38 cliffs and 109 lanes: **289,126 triangles**, below 420,000.
+
+Use `SpaceBoardBatch` for static Space geometry, keeping up to `SpaceArt.MAX_CRITTERS` (3) animated
+critters separate. The tested 4-player batch has **7 static material draws + at most 18 critter draws = 25**;
+the 6-player batch has **9 + 18 = 27**. Raw individual instances would cost **797** primitives on the
+4-player bound and are **not within budget**. These are verified GLB primitive counts, not phone GPU
+measurements; the future renderer hook must consume the batch output. Board meshes have no textures;
+the archived physical card GLBs contain their source portrait textures and are excluded from the board
+and runtime card lookup. See [theme-wiring.md](theme-wiring.md) for remaining consumer hooks.
 
 The LOD1 column is the player's low-detail setting (Detail: LOD1): with LOD1 tiles the worst board drops to about
 193,000.
@@ -90,7 +109,7 @@ The LOD1 column is the player's low-detail setting (Detail: LOD1): with LOD1 til
 
 - The shipped tiles peak at 7,253 triangles. The buildings reach 1,422, which is over the homestead and town shares.
 - The measured full board is 121k triangles (default) and 140k (pirate) without knights, in 83 to 85 draws.
-- The space pieces come in well under (knights 2,440 to 2,682).
+- The imported Space knights come in at 526 / 1,100 / 1,722 triangles per level, in both banner states.
 - The knight exporter's current ceilings (5,000 / 6,500 / 8,000) are over the table. Knight exports move to
   2,000 / 2,500 / 3,000 with the v4 knights (Crest), and the default theme's ledger is written then.
 

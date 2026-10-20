@@ -108,13 +108,14 @@ fun RollingDice(die1: Int, die2: Int, rollKey: Any?, rest: Offset?, modifier: Mo
     val restDp = maxOf(DiceSprites.SIDE_DP.toFloat(), (slots?.first?.width ?: 0f) / density,
         (slots?.second?.width ?: 0f) / density, (eventSlot?.width ?: 0f) / density)
     val artDp = kotlin.math.ceil(restDp * DIE_FACE_SHARE * 1.5f / DiceSprites.TUMBLE_SHARE).toInt()
-    val redTumble = rememberDiceFrames(diceTumble(red = true, pirate), artDp)
-    val ivoryTumble = rememberDiceFrames(diceTumble(red = false, pirate), artDp)
-    val redFace = rememberDiceBitmap(diceFace(red = true, pirate, die1), artDp)
-    val ivoryFace = rememberDiceBitmap(diceFace(red = false, pirate, die2), artDp)
+    val choice = LocalArtChoice.current
+    val redTumble = rememberDiceFrames(if (choice.space(ArtObject.DICE)) listOf(SpaceArt.diceFace(true, die1)) else diceTumble(red = true, pirate), artDp)
+    val ivoryTumble = rememberDiceFrames(if (choice.space(ArtObject.DICE)) listOf(SpaceArt.diceFace(false, die2)) else diceTumble(red = false, pirate), artDp)
+    val redFace = rememberDiceBitmap(ThemeArt.dice(choice, true, die1), artDp)
+    val ivoryFace = rememberDiceBitmap(ThemeArt.dice(choice, false, die2), artDp)
     val showEvent = event >= 0 && eventSlot != null
-    val eventTumble = if (showEvent) rememberDiceFrames(DiceArt.eventTumble(pirate, eventStyle), artDp) else emptyList()
-    val eventFace = if (showEvent) rememberDiceBitmap(DiceArt.eventFace(pirate, event, eventStyle), artDp) else null
+    val eventTumble = if (showEvent) rememberDiceFrames(if (choice.space(ArtObject.DICE)) listOf(SpaceArt.eventFace(event)) else DiceArt.eventTumble(pirate, eventStyle), artDp) else emptyList()
+    val eventFace = if (showEvent) rememberDiceBitmap(ThemeArt.event(choice, event, eventStyle), artDp) else null
 
     // Where this roll is thrown from: a direction and distance picked from the roll itself (same roll, same throw).
     val rnd = remember(rollKey) { java.util.Random(rollKey.hashCode().toLong() * 7919L + 17) }

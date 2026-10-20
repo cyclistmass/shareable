@@ -218,12 +218,15 @@ fun TradePanel(
     autoNoSeconds: Int? = null,
     /** Width the chest may fill; the cards grow to use it (Mauro: "the trade panel could be a little bigger"). */
     room: Dp = 480.dp,
+    /** Harbour tab chosen, kept by the caller: the chest leaves the screen for a moment after each bank trade, and
+     *  a tab held here went back to Players every time (player report, 0.3.1). */
+    harbour: androidx.compose.runtime.MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     version
     val mode = tradeMode(s, me)
     // Fresh selections whenever the trade situation changes.
     val key = listOf(s.turn, s.phase, s.actingPlayer, s.counters.contentHashCode(), s.hands.sum())
-    var maritime by remember { mutableStateOf(false) }
+    var maritime by harbour
     var countering by remember(key) { mutableStateOf(false) }
     var get by remember(key) { mutableStateOf(IntArray(tradeCards(s))) }
     var give by remember(key) { mutableStateOf(IntArray(tradeCards(s))) }
@@ -433,7 +436,7 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
                 contentAlignment = Alignment.Center,
             ) {
                 // The illustrated card; dimmed until it is part of the trade.
-                if (r < ALL_CARD_ART.size) Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())   // bright: no reason to dim them (Mauro)
+                if (r < ALL_CARD_ART.size) Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())   // bright: no reason to dim them (Mauro)
                 else Box(Modifier.fillMaxSize().background(Color(0xFFEFE3C8).copy(alpha = if (lit) 1f else 0.5f), RoundedCornerShape(5.dp))
                     .border(2.dp, COMMODITY_COLORS[r - CARD_ART.size], RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
                     // Commodities (Age of Chivalry) until their card art lands.
@@ -479,7 +482,7 @@ fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<St
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (a in choices.sortedBy { it.a }) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { onMove(a) }.testTag("choose-card-${a.a}")) {
-                Image(painterResource(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
+                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
                 Text("${if (owner == me) "have" else "has"} ${s.card(owner, a.a)}", color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
         }
@@ -500,7 +503,7 @@ private fun CardRow(counts: IntArray, editable: Boolean, single: Boolean, badge:
                 contentAlignment = Alignment.Center,
             ) {
                 // The illustrated card; dimmed until it is part of the trade.
-                if (r < ALL_CARD_ART.size) Image(painterResource(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
+                if (r < ALL_CARD_ART.size) Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(Color(0xFFEFE3C8).copy(alpha = if (lit) 1f else 0.45f), RoundedCornerShape(5.dp))
                     .border(2.dp, COMMODITY_COLORS[r - CARD_ART.size], RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
                     // Commodities (Age of Chivalry) until their card art lands.
@@ -512,7 +515,7 @@ private fun CardRow(counts: IntArray, editable: Boolean, single: Boolean, badge:
             Box(Modifier.height(15.dp), contentAlignment = Alignment.Center) {
                 if (editable && lit && !single) Text("−", color = INK, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { change(r, -1) }.padding(horizontal = 10.dp))
-                else badge(r)?.let { Text(it, color = INK.copy(alpha = 0.6f), fontSize = 9.sp) }
+                else badge(r)?.let { Text(it, color = INK.copy(alpha = 0.7f), fontSize = 10.sp) }
             }
         }
     }
@@ -530,14 +533,15 @@ internal fun ChestButton(label: String, color: Color, tag: String, width: androi
 
 @Composable
 private fun BigButton(label: String, color: Color, tag: String, onClick: (() -> Unit)?, width: androidx.compose.ui.unit.Dp = 78.dp) {
+    // The same 9-slice brass plates as every other button (green go, red stop, gold counter), not a flat rounded box
+    // (Fable review T3: the chest buttons looked like another app); dimmed by the plate when there is nothing to do.
     val on = onClick != null
-    Box(
-        Modifier.size(width = width, height = 38.dp)
-            .background(if (on) color else color.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-            .border(2.dp, if (on) BRASS_LIGHT else BRASS_DARK, RoundedCornerShape(10.dp))
-            .then(if (on) Modifier.clickable { onClick!!() } else Modifier).testTag(tag),
-        contentAlignment = Alignment.Center,
-    ) { Text(label, color = if (on) Color.White else INK.copy(alpha = 0.4f), fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+    val plate = when { color.green > color.red -> Plate.GO; color.red > 0.6f && color.green < 0.4f -> Plate.STOP
+        color.red > 0.8f && color.green > 0.6f -> Plate.GOLD; else -> Plate.BRASS }
+    PlateBox(plate, enabled = on, onClick = { onClick?.invoke() }, modifier = Modifier.size(width = width, height = 38.dp).testTag(tag)) {
+        Text(label, style = Wood.sans(14.sp, FontWeight.Bold, when { !on -> INK.copy(alpha = 0.45f); plate == Plate.GOLD -> Color(0xFF3A2410); else -> Color.White }),
+            maxLines = 1, softWrap = false)
+    }
 }
 
 @Composable

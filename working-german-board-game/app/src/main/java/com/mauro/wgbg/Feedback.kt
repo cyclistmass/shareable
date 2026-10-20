@@ -127,6 +127,8 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
     var note by remember { mutableStateOf("") }
     var withGame by remember { mutableStateOf(game != null) }
     var status by remember { mutableStateOf("") }
+    // One report per tap: Send stays off while one uploads (a second tap sent an empty copy a second later).
+    var sending by remember { mutableStateOf(false) }
     val canSpeak = remember { RecognizerIntent.ACTION_RECOGNIZE_SPEECH.let { Intent(it).resolveActivity(context.packageManager) != null } }
     val listen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val said = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
@@ -155,7 +157,8 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
                 textStyle = Wood.sans(15.sp, FontWeight.Medium, Wood.PARCHMENT_INK),
                 cursorBrush = SolidColor(Wood.PARCHMENT_INK),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth().height(110.dp).testTag("feedback-note"),
+                // Back with the keyboard up must not close the sheet and lose the note (#121).
+                modifier = Modifier.fillMaxWidth().height(110.dp).testTag("feedback-note").backPutsKeyboardAway(),
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxSize().background(Wood.PARCHMENT, RoundedCornerShape(8.dp))
                         .border(2.dp, Wood.BRASS, RoundedCornerShape(8.dp)).padding(10.dp)) {
@@ -186,13 +189,14 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
                             .putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what happened"))
                     }.onFailure { status = "Voice input isn't available" }
                 }
-                GoButton("Send", "feedback-send", enabled = note.isNotBlank() || withGame, Modifier.height(44.dp)) {
-                    status = "Sending…"
+                GoButton("Send", "feedback-send", enabled = !sending && (note.isNotBlank() || withGame), Modifier.height(44.dp)) {
+                    sending = true; status = "Sending…"
                     val text = report(Feedback.UPLOAD_MAX) + if (shots.isEmpty()) "" else "\nScreenshots: ${shots.size}"
                     val pics = shots.toList()
                     scope.launch {
                         val encoded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { pics.mapNotNull { Screenshot.jpegBase64(it) } }
                         sendCrashReport(context, text, encoded) { ok, n ->
+                            sending = false
                             status = when {
                                 !ok -> "Couldn't send (offline?); try Share"
                                 n < encoded.size -> "Sent, thank you (the picture didn't go)"
