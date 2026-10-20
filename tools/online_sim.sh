@@ -6,7 +6,10 @@
 # Needs: both emulator lanes up (tools/emulator.ps1 -Lane 1 / -Lane 2), the debug APK installed on both, and
 #   firebase emulators:start --only firestore,auth --project demo-wgbg   (Java 21+ on PATH; the debug build needs no
 #   google-services.json for this: --es firebase emu sets up the demo project in code)
-# Usage (Git Bash, project root): [FIREBASE=live] tools/online_sim.sh [ruleset: base|chivalry] [timeout seconds]
+# Usage (Git Bash, project root): [FIREBASE=live] [REOPEN_AT=moves] tools/online_sim.sh [ruleset: base|chivalry] [timeout seconds]
+#   REOPEN_AT=150: once the joiner has seen that many moves, close its app for good and open it again; it must rejoin,
+#   catch up and end on the same fingerprint (the 0.3.4 check).
+# Under pipefail a grep that finds nothing fails its whole pipeline: every one here is guarded (|| true, if, &&).
 set -eEuo pipefail
 trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR
 RULESET="${1:-base}"
@@ -22,13 +25,13 @@ dump() { "$A" -s "$1" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; "$A
 centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' '; }
 # Taps the Nth node whose text is exactly $2 on device $1.
 tap_text() {
-  local b; b=$(dump "$1" | grep "\(text\|content-desc\)=\"$2\"" | sed -n "${3:-1}p" | centre)
+  local b; b=$(dump "$1" | grep "\(text\|content-desc\)=\"$2\"" | sed -n "${3:-1}p" | centre) || true
   [ -n "$b" ] || { echo "[$1] '$2' not on screen"; return 1; }
   set -- "$1" $b; "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.8
 }
 # Replaces the text of the Nth text box on device $1 with $3.
 fill() {
-  local b; b=$(dump "$1" | grep 'class="android.widget.EditText"' | sed -n "$2p" | centre)
+  local b; b=$(dump "$1" | grep 'class="android.widget.EditText"' | sed -n "$2p" | centre) || true
   [ -n "$b" ] || { echo "[$1] no text box $2"; return 1; }
   local text="$3"; set -- "$1" $b
   "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.6
@@ -64,7 +67,8 @@ tap_text $HOST "Friend" 1
 [ "$RULESET" = chivalry ] && tap_text $HOST "Age of Chivalry"
 tap_text $HOST "Host a room"
 wait_for $HOST "Room [A-Z]*-[0-9]*" 20
-CODE=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 | cut -d' ' -f2)
+CODE=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 | cut -d' ' -f2) || true
+[ -n "$CODE" ] || { echo "no room code on the host"; exit 1; }
 echo "Room $CODE"
 
 # Guest: join by code (typed the way people do: lower case, no dash).
@@ -87,6 +91,16 @@ tap_text $HOST "Start game"
 # Play out: wait for both fingerprints.
 echo "Playing (up to ${LIMIT}s)..."
 t0=$(date +%s)
+moves() { "$A" -s "$1" logcat -d -s WGBG-MOVES:I | grep -c ' #' || true; }
+if [ -n "${REOPEN_AT:-}" ]; then
+  for _ in $(seq 1 200); do n=$(moves $GUEST); [ "$n" -ge "$REOPEN_AT" ] && break; sleep 3; done
+  echo "joiner saw $n moves; closing its app at $(date +%T)"
+  "$A" -s $GUEST shell am force-stop com.mauro.wgbg; sleep 5
+  "$A" -s $GUEST shell am start -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true >/dev/null
+  for _ in $(seq 1 60); do m=$(moves $GUEST); [ "$m" -gt "$n" ] && break; sleep 2; done
+  [ "$m" -gt "$n" ] || { echo "FAIL: the joiner didn't catch up after reopening ($m move lines)"; exit 1; }
+  echo "joiner back at $(date +%T): $m move lines, pid $("$A" -s $GUEST shell pidof com.mauro.wgbg || true)"
+fi
 while :; do
   H=$("$A" -s $HOST logcat -d -s WGBG-ONLINE:I | grep -o 'game over.*' | tail -1 || true)
   G=$("$A" -s $GUEST logcat -d -s WGBG-ONLINE:I | grep -o 'game over.*' | tail -1 || true)

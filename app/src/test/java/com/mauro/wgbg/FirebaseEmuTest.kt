@@ -39,6 +39,28 @@ class FirebaseEmuTest {
     }
 
     @Test
+    fun `a release build never uses the demo project or the emulators, and keeps its own google-services config`() {
+        // The emulators are only ever chosen from a debuggable build launched with `--es firebase emu`...
+        assertTrue("val debug = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0" in main)
+        assertEquals(1, Regex("""LobbyRepository\.emulatorHost = """).findAll(main).count(), "one place picks the emulators")
+        assertTrue("@Volatile var emulatorHost: String? = null" in repo, "no emulators unless asked")
+        // ...and release builds are not debuggable.
+        val gradle = File("build.gradle.kts").readText().replace("\r\n", "\n")
+        val release = gradle.substringAfter("release {").substringBefore("\n        }\n")
+        assertFalse(Regex("""isDebuggable\s*=\s*true""").containsMatchIn(release), release)
+        // A build's own config (google-services.json) always comes first: the demo options are only the fallback when
+        // there is none AND the emulators were asked for, and only then are the emulators used.
+        val create = repo.substringAfter("@Synchronized fun create(context: Context): GameTransport {").substringBefore("\n    }\n")
+        val own = create.indexOf("FirebaseApp.initializeApp(context)\n")
+        val demo = create.indexOf("emulatorHost?.let { FirebaseApp.initializeApp(context, emulatorOptions) }")
+        assertTrue(own in 0 until demo, create)
+        assertEquals(1, Regex("""emulatorOptions\b""").findAll(repo).count() - 1, "the demo options are built once and used once")
+        val emu = create.substringAfter("if (emulatorHost != null) {").substringBefore("} else")
+        assertTrue("db.useEmulator(emulatorHost, 8080)" in emu && "auth.useEmulator(emulatorHost, 9099)" in emu)
+        assertEquals(2, Regex("""useEmulator\(""").findAll(repo).count(), "useEmulator only behind the emulatorHost check")
+    }
+
+    @Test
     fun `the scripts and docs start the emulators on the same demo project`() {
         assertTrue("PROJECT=\"\${2:-demo-wgbg}\"" in File("../tools/ci_online.sh").readText())
         assertTrue("--project demo-wgbg" in File("../tools/online_sim.sh").readText())
