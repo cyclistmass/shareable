@@ -1089,7 +1089,8 @@ fun WatchGameScreen(
                 if (inventory) themedInventoryPlacements(env.art) else themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
-            LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating) { reason ->
+            LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating,
+                projectionNow = { if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null }) { reason ->
                 liveFailure = reason; env.liveBoard = false
                 android.widget.Toast.makeText(appContext, "3D board unavailable; using the sprite board", android.widget.Toast.LENGTH_LONG).show()
             }

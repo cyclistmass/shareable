@@ -25,30 +25,48 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
     facing: Boolean = true,
     critters: List<SeaCritter> = emptyList(),
     animate: Boolean = true,
+    /**
+     * The camera as it is right now, read when each 3D frame is drawn. The renderer's frame callback runs before
+     * Compose recomposes, so [projection] alone is a frame old there: the 3D roads and pieces trailed the overlays drawn
+     * over them (harbours, highlights) when the board was panned or tilted, then caught up (Mauro, 0.3.4).
+     */
+    projectionNow: (() -> LiveProjection?)? = null,
     onFailure: (String) -> Unit) {
     val latestFailure by rememberUpdatedState(onFailure)
     val context = androidx.compose.ui.platform.LocalContext.current
     val space = remember(placements) { placements.filter { it.model.startsWith("space_") } }
     val ordinary = remember(placements) { placements.filterNot { it.model.startsWith("space_") } }
-    var batch by remember { mutableStateOf<SpaceBoardBatch.Result?>(null) }
-    LaunchedEffect(space, projection?.rotation, projection?.tilt, facing) {
-        try {
-        batch = if (space.isEmpty()) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            SpaceBoardBatch.build(space.map { p ->
-                val color = PLAYER_COLORS.getOrNull(p.owner)
-                fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
-                val rotation = projection?.rotation ?: 0f
-                // Standing pieces lie back toward the camera like the per-model path (updateCamera): upright under the
-                // near top-down camera, a Space knight showed only its thin top edge (Space playtest).
-                val matrix = when {
-                    liveStanding(p.model) -> liveStandingMatrix(p, liveLift(projection?.tilt ?: 0f), rotation, facing)
-                    p.model.startsWith("space_number_") -> liveModelMatrix(p.copy(heading = p.heading + rotation))
-                    else -> liveModelMatrix(p)
-                }.let { liveDepthBias(p.model).let { d -> if (d > 0f) liveTowardCamera(it, projection?.tilt ?: 0f, rotation, d) else it } }
-                SpaceBoardBatch.Instance(p.model.removePrefix("space_"), matrix, color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
-            }) { path -> context.assets.open(path).use { it.readBytes() } }
+    // The Space board is batched in one model per depth layer (liveDepthBias), and the renderer slides each layer toward
+    // the camera every frame. The bias used to be baked in, so on a tilt or twist the roads and pieces sat off their
+    // places until the rebuild landed (Mauro, 0.3.4: "roads lag behind the board"). Only the layers that turn with the
+    // camera (numbers kept upright, standing pieces facing you) are rebuilt as it moves; the board and roads on a move.
+    var still by remember { mutableStateOf(emptyList<SpaceLayer>()) }
+    var turning by remember { mutableStateOf(emptyList<SpaceLayer>()) }
+    suspend fun layers(of: List<LivePlacement>, rotation: Float, tilt: Float): List<SpaceLayer> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            of.groupBy { liveDepthBias(it.model) }.map { (bias, group) ->
+                SpaceLayer(bias, SpaceBoardBatch.build(group.map { p ->
+                    val color = PLAYER_COLORS.getOrNull(p.owner)
+                    fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
+                    // Standing pieces lie back toward the camera like the per-model path (updateCamera): upright under the
+                    // near top-down camera, a Space knight showed only its thin top edge (Space playtest).
+                    val matrix = when {
+                        liveStanding(p.model) -> liveStandingMatrix(p, liveLift(tilt), rotation, facing)
+                        p.model.startsWith("space_number_") -> liveModelMatrix(p.copy(heading = p.heading + rotation))
+                        else -> liveModelMatrix(p)
+                    }
+                    SpaceBoardBatch.Instance(p.model.removePrefix("space_"), matrix, color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
+                }) { path -> context.assets.open(path).use { it.readBytes() } })
+            }
         }
-        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+    LaunchedEffect(space) {
+        try { still = layers(space.filterNot { liveTurnsWithCamera(it.model) }, 0f, 0f) }
+        catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (error: Exception) { latestFailure(error.message ?: "Space batch failed") }
+    }
+    LaunchedEffect(space, projection?.rotation, projection?.tilt, facing) {
+        try { turning = layers(space.filter { liveTurnsWithCamera(it.model) }, projection?.rotation ?: 0f, projection?.tilt ?: 0f) }
+        catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
         catch (error: Exception) { latestFailure(error.message ?: "Space batch failed") }
     }
     val holder = remember { arrayOfNulls<LiveBoardRenderer>(1) }
@@ -61,10 +79,11 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
     }, update = {
         holder[0]?.let { renderer ->
             renderer.placements = ordinary
-            renderer.batch = batch
+            renderer.batch = still + turning
             renderer.critters = critters.take(SpaceArt.MAX_CRITTERS)
             renderer.animate = animate
             renderer.projection = projection
+            renderer.projectionNow = projectionNow
             renderer.facing = facing
             renderer.running = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         }
@@ -77,6 +96,12 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
         onDispose { lifecycle.removeObserver(observer); holder[0]?.close(); holder[0] = null }
     }
 }
+
+/** One depth layer of the Space batch: the renderer moves it [bias] toward the camera ([liveTowardCamera]) each frame. */
+internal class SpaceLayer(val bias: Float, val result: SpaceBoardBatch.Result)
+
+/** True for models posed by the camera itself: digits kept upright and standing pieces facing it, rebuilt as it turns. */
+internal fun liveTurnsWithCamera(model: String): Boolean = liveStanding(model) || model.startsWith("space_number_")
 
 /** All engine access is on the main thread, as required by Filament's Android API. */
 internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private val context: Context, private val fail: (String) -> Unit) :
@@ -100,15 +125,15 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private var closed = false
     private var scheduled = false
     var placements = emptyList<LivePlacement>()
-    var batch: SpaceBoardBatch.Result? = null
-    private var shownBatch: SpaceBoardBatch.Result? = null
-    private var batchAsset: FilamentAsset? = null
+    var batch = emptyList<SpaceLayer>()
+    private val batchAssets = mutableMapOf<SpaceLayer, FilamentAsset>()
     var critters = emptyList<SeaCritter>()
     var animate = true
     private var shownCritters = emptyList<SeaCritter>()
     private val critterInstances = mutableListOf<FilamentInstance>()
     private var critterTime = 0L
     var projection: LiveProjection? = null
+    var projectionNow: (() -> LiveProjection?)? = null
     var facing = true
     private var shown = emptyList<LivePlacement>()
     private var active = mutableListOf<FilamentInstance>()
@@ -228,15 +253,14 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     }
 
     private fun updateScene() {
-        if (batch !== shownBatch) {
-            batchAsset?.let { scene.removeEntities(it.entities); loader.destroyAsset(it) }
-            batchAsset = batch?.let { result ->
-                val buffer = ByteBuffer.allocateDirect(result.glb.size).apply { put(result.glb); flip() }
+        if (batch.toSet() != batchAssets.keys) {
+            for ((layer, asset) in batchAssets.filterKeys { it !in batch }) { scene.removeEntities(asset.entities); loader.destroyAsset(asset); batchAssets.remove(layer) }
+            for (layer in batch) if (layer !in batchAssets) {
+                val buffer = ByteBuffer.allocateDirect(layer.result.glb.size).apply { put(layer.result.glb); flip() }
                 val instances = arrayOfNulls<FilamentInstance>(1)
-                requireNotNull(loader.createInstancedAsset(buffer, instances)).also { resources.loadResources(it); scene.addEntities(it.entities) }
+                batchAssets[layer] = requireNotNull(loader.createInstancedAsset(buffer, instances)).also { resources.loadResources(it); scene.addEntities(it.entities) }
+                Log.i("WGBG-3D", "Space batch bias=${layer.bias} triangles=${layer.result.triangles} draws=${layer.result.draws}")
             }
-            shownBatch = batch
-            batch?.let { Log.i("WGBG-3D", "Space batch triangles=${it.triangles} draws=${it.draws}") }
         }
         if (critters != shownCritters) {
             for (i in critterInstances) scene.removeEntities(i.entities)
@@ -274,6 +298,8 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             -(height - p.center.y).toDouble() / p.scale, p.center.y.toDouble() / p.scale, 0.1, 100.0)
         // Keep digits upright under twist, while retaining their horizontal plane and real depth; standing pieces
         // tip toward the camera so they read as clearly as the flat board's.
+        for ((layer, asset) in batchAssets) engine.transformManager.setTransform(engine.transformManager.getInstance(asset.root),
+            liveTowardCamera(floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f), p.tilt, p.rotation, layer.bias))
         val lift = liveLift(p.tilt)
         for ((index, placement) in shown.withIndex()) {
             val m = when {
@@ -292,7 +318,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         scheduled = false
         if (!running || closed) return
         scheduled = true; Choreographer.getInstance().postFrameCallback(this)
-        val p = projection ?: return
+        val p = projectionNow?.invoke() ?: projection ?: return
         if (liveStalled(System.nanoTime(), runningSince, lastFrameAt)) {
             // Nothing on screen for a while (no surface, or every frame skipped): the flat board rather than a blank one.
             running = false
@@ -380,7 +406,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         scene.removeEntities(lights.toIntArray())
         for (i in active) scene.removeEntities(i.entities)
         for (i in critterInstances) scene.removeEntities(i.entities)
-        batchAsset?.let { scene.removeEntities(it.entities); loader.destroyAsset(it) }
+        for (asset in batchAssets.values) { scene.removeEntities(asset.entities); loader.destroyAsset(asset) }
         for (m in models.values) loader.destroyAsset(m.asset)
         for (m in tints.values) engine.destroyMaterialInstance(m)
         resources.destroy(); loader.destroy(); provider.destroyMaterials(); provider.destroy()
