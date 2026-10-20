@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,7 +146,9 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
     // A dim backdrop that swallows taps, so the board under it isn't played by accident.
     Box(Modifier.fillMaxSize().background(Color(0xA0000000)).clickable(MutableInteractionSource(), null) {}.testTag("feedback"),
         contentAlignment = Alignment.Center) {
-        Column(Modifier.width(520.dp).brassEdgedWood().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Scrolls when it can't fit: at 320 dp tall (CI's screen) with a screenshot attached, Send and Close were squashed.
+        Column(Modifier.width(520.dp).padding(vertical = 6.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Report a bug or an idea", style = Wood.title(20.sp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 for (k in Feedback.Kind.entries) Choice(k.label, kind == k, "feedback-${k.name.lowercase()}",

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -106,7 +107,8 @@ fun NewGameScreen(
         modifier.fillMaxSize().tableTop().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Panel(Modifier.weight(1f)) {
+        // Scrolls too: at 320 dp tall (CI's screen) Points, Report and Intro were cut off the bottom.
+        Panel(Modifier.weight(1f), scroll = true) {
             Text("Players", style = Wood.title(22.sp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PhotoToken(setup.photo, setup.name, PLAYER_COLORS[0]) {
@@ -135,15 +137,13 @@ fun NewGameScreen(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Choice("+", false, "points-up", Modifier.size(34.dp), size = 18.sp,
                     enabled = setup.points < GameSetup.POINTS_RANGE.last) { setup = setup.withPoints(setup.points + 1) }
-                Spacer(Modifier.weight(1f))
-                if (onFeedback != null) WoodButton("Report", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
-                if (onFeedback != null) Spacer(Modifier.width(8.dp))
-                if (onPlayIntro != null) WoodButton("Intro", "play-intro", Modifier.height(40.dp)) { onPlayIntro() }
-                if (onPlayIntro != null) Spacer(Modifier.width(8.dp))
-                if (onLookAndArt != null) BrassButton("Look & art", "look-and-art", Modifier.height(40.dp)) { onLookAndArt(setup) }
             }
-            if (onCardTester != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                WoodButton("Card tester", "card-tester", Modifier.height(40.dp)) { onCardTester() }
+            // Their own row that wraps: beside Points they ran off the right edge of a narrow panel (CI's 640x320 screen).
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onFeedback != null) WoodButton("Report", "start-feedback", Modifier.height(40.dp)) { onFeedback() }
+                if (onPlayIntro != null) WoodButton("Intro", "play-intro", Modifier.height(40.dp)) { onPlayIntro() }
+                if (onLookAndArt != null) BrassButton("Look & art", "look-and-art", Modifier.height(40.dp)) { onLookAndArt(setup) }
+                if (onCardTester != null) WoodButton("Card tester", "card-tester", Modifier.height(40.dp)) { onCardTester() }
             }
         }
         // Scrolls when it can't fit: a saved game's Resume used to push Host and Join off the bottom (2026-10-12).

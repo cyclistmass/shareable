@@ -1537,13 +1537,16 @@ fun WatchGameScreen(
         // The Trade button is always there in Play mode; it lights up when a trade waits on you.
         // The build menu down the right edge, on your turn: an icon per thing you can build or do to a knight; also while
         // placing your first pieces (Mauro: "add the build menu during setup"), showing the homestead, town or road due.
-        if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && tick.let {
+        // Both are drawn after the sheets above, so they hide while one is open: on a narrow screen (CI's 640x320) the
+        // build menu sat over the card guide and the Leave dialog, and could still be tapped through them.
+        val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen
+        if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && !sheetOpen && tick.let {
                 (state.phase == Phase.PLAY_TURN && state.currentPlayer == me || inSetup(state)) && state.actingPlayer == me })
             BuildMenu(state.ck != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
                 Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
         // Zoom, Tilt and Turn bars on the right edge, only when switched on under the gear (#137, Mauro: gestures by
         // default). Pinch zooms, two-finger drag tilts and a two-finger twist turns the 3D board without them.
-        if (env.viewBars && !inventory && !panelOpen && !settingsOpen && boardSize.minDimension > 0f) ViewBarsPanel(camera,
+        if (env.viewBars && !inventory && !panelOpen && !settingsOpen && !sheetOpen && boardSize.minDimension > 0f) ViewBarsPanel(camera,
             onZoom = { z -> camera = camera.transform(Offset(boardSize.width / 2f, boardSize.height / 2f), Offset.Zero, z / camera.zoom, boardSize) },
             onTilt = { t -> camera = camera.copy(tilt = t) },
             // The 3D board also turns (Mauro: "a rotate slider - start it in the middle"); the flat board doesn't.

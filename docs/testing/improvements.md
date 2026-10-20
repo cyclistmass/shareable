@@ -54,3 +54,6 @@ move it to **Done** with the commit when it lands.
 - 2026-10-19, bugs: every cold start skips about 43 frames (~0.7 s) on the main thread while the start screen first
   draws, before any game opens (Pixel6 API34, `Choreographer: Skipped 43 frames`). Profile it with a frame or method trace
   (Splash, fonts, wood textures, Firebase setup) and move what it finds off the main thread; saves a visible stall on launch.
+- 2026-10-20, bugs: `tools/ci_reach.sh` takes about 5 min on lane 2, nearly all of it `uiautomator dump` (~2 s each, it
+  waits for the animated board to idle). Read the screen from a cheaper source (one dump per screen and computed scroll
+  offsets, or a debug-only semantics dump) to bring it under 2 min; CI's slower emulator will feel it most.

@@ -133,7 +133,10 @@ fun SplashScreen(
         Column(Modifier.fillMaxSize().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
             Text("Working German Board Game", style = Wood.title(34.sp, Color(0xFFFFF6DE)).copy(shadow = Shadow(Color(0xB3000000), Offset(0f, 4f), 12f)),
                 textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
-            Column(Modifier.width(300.dp).brassEdgedWood().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Takes what the title and the bottom row leave and scrolls in it: at 320 dp tall (CI's screen) a saved game's
+            // Resume and End pushed Settings off the bottom.
+            Column(Modifier.weight(1f, fill = false).width(300.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(14.dp).testTag("start-menu"),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (b in Splash.buttons(resumeGame, resumeRoom, account != null, signedIn)) {
                     val tap = {
                         when (b.action) {
@@ -180,7 +183,9 @@ fun SplashScreen(
                     modifier = Modifier.fillMaxHeight().padding(vertical = 10.dp).clickable(remember { MutableInteractionSource() }, null) { }) {
                     WoodButton("Close", "splash-panel-close") { close() }
                     if (open == Splash.Action.SETTINGS) SettingsPanel(env, sound, Modifier.weight(1f, fill = false))
-                    else Column(Modifier.width(360.dp).brassEdgedWood().padding(16.dp).testTag("log-in-panel"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Scrolls like Settings when it can't fit (320 dp tall).
+                    else Column(Modifier.weight(1f, fill = false).width(360.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp).testTag("log-in-panel"),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Log in", style = Wood.title(20.sp))
                         Text("Sign in to keep your online name and rooms on any phone. Playing as a guest works too.",
                             style = Wood.sans(13.sp, color = Wood.INK_SOFT))

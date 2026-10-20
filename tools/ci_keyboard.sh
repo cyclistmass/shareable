@@ -58,7 +58,9 @@ for _ in $(seq 1 10); do on "New game" && break; sleep 1; done
 
 # Opens a screen by its button and checks it really opened (marked by $2): otherwise every check after it is moot.
 # A button below the fold (CI's 640x320 screen) is scrolled to, as a player would: each half of the screen scrolls on its own.
+# wm size gives the portrait size; the app is landscape, so the long side is the width.
 scroll_to() { on "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
+  [ "$w" -lt "$h" ] && read -r w h <<< "$h $w"
   for x in $((w * 3 / 4)) $((w / 4)); do for _ in 1 2 3; do "$ADB" shell input swipe $x $((h * 3 / 4)) $x $((h / 4)) 400; sleep 1; on "$1" && return 0; done; done; return 1; }
 go() { scroll_to "$1"; tap_text "$1" && on "$2" || { bad "\"$1\" didn't open its screen"; [ $fail = 0 ] || { echo "keyboard: FAILED"; exit 1; }; }; }
 go "New game" "Base game"
@@ -79,14 +81,12 @@ go "Join a room" "Room code"
 enter_back 2 "Room code" "join code" "ROVER-42" line
 go "Join a room" "Room code"
 enter_back 1 "Room code" "join name" "Duo" line
-# Report (marked by Add a picture): the note has several lines.
-# On CI's 640x320 screen the left panel (Points, Report, Intro) is cut off and doesn't scroll (as in 0.3.1): say so, don't fail.
-if scroll_to "Report"; then
-  go "Report" "Add a picture"
-  up_back 1 "Add a picture" "report note"
-  go "Report" "Add a picture"
-  enter_back 1 "Add a picture" "report note" "Test" note
-else echo "keyboard: report note: SKIPPED, the Report button is off screen at $("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*')"; fi
+# Report (marked by Add a picture): the note has several lines. On CI's 640x320 screen it's below the fold of the
+# left panel, which scrolls (0.3.1 and 0.3.2 cut it off, so this was skipped there).
+go "Report" "Add a picture"
+up_back 1 "Add a picture" "report note"
+go "Report" "Add a picture"
+enter_back 1 "Add a picture" "report note" "Test" note
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || bad "the app crashed"
 [ $fail = 0 ] && echo "keyboard: PASSED"
