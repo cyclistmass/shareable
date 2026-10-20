@@ -717,7 +717,8 @@ fun WatchGameScreen(
         var last = 0L
         while (true) {
             // Animations off (or Density 0): the scenery code doesn't run at all, so it can't take a game down.
-            if (!env.animating || env.liveBoard) { last = 0L; delay(300); continue }
+            // The 3D board's water, boats and gulls run on this too (#63); a Space board's critters run in its renderer.
+            if (!env.animating || (env.liveBoard && env.art.space(ArtObject.BOARD))) { last = 0L; delay(300); continue }
             withFrameNanos { now ->
             sea.clouds01 = env.clouds; sea.birds01 = env.birds; sea.boats01 = env.boats; sea.waves01 = env.waves; sea.density01 = env.density
             // Clamp both ends: on some phones (Pixel 9/10, Android 17) the frame clock can step back a little,
@@ -918,8 +919,11 @@ fun WatchGameScreen(
     fun liveProjection(width: Float, height: Float): LiveProjection {
         if (inventory) {
             val available = (height - with(liveDensity) { INVENTORY_CARDS_DP.dp.toPx() }).coerceAtLeast(height * .4f)
-            val scale = minOf(width / 18f, available / 12f) * camera.zoom
-            return LiveProjection(Offset(width / 2, available / 2) + camera.pan, scale, camera.tilt, boardRotation)
+            // The painted collection runs on to the sea's models (rows down to z 10), so it is centred 2.5 further down.
+            val painted = ArtObject.entries.none { env.art.space(it) }
+            val scale = minOf(width / 18f, available / (if (painted) 17f else 12f)) * camera.zoom
+            val down = if (painted) 2.5f * scale * kotlin.math.cos(camera.tilt) else 0f
+            return LiveProjection(Offset(width / 2, available / 2 - down) + camera.pan, scale, camera.tilt, boardRotation)
         }
         val fitted = Layout.fit(state.board, width, height, camera)
         return LiveProjection(fitted.center, fitted.scale, camera.tilt, boardRotation)
@@ -1111,8 +1115,10 @@ fun WatchGameScreen(
                 if (inventory) themedInventoryPlacements(env.art) else themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
+            // Codex's animated 3D water, boats, gulls and Raiders' ship (#63) ride the 2D sea's simulation; a Space board has its own.
             LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating,
-                projectionNow = { if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null }) { reason ->
+                projectionNow = { if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null },
+                sea = sea.takeIf { !inventory && !env.art.space(ArtObject.BOARD) }, raiders = state.ck != null) { reason ->
                 liveFailure = reason; env.liveBoard = false
                 android.widget.Toast.makeText(appContext, "3D board unavailable; using the sprite board", android.widget.Toast.LENGTH_LONG).show()
             }
@@ -1139,12 +1145,14 @@ fun WatchGameScreen(
                     boardGestures(
                         grab = { p ->
                             val seat = pileAt(p)
-                            if (liveBoardNow) false else if (seat >= 0) {
+                            if (!liveBoardNow && seat >= 0) {
                                 pile = seat
                                 pileGrip = lattice(p) - supplyCenter(stateNow, seat, viewerNow, pileOffsetsNow)
                                 hostView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                                 true
-                            } else env.animating && seaNow.cloudAt(lattice(p))?.also { dragged = it } != null
+                            } else env.animating && seaNow.cloudAt(lattice(p))?.also {
+                                dragged = it; seaNow.grab(it, lattice(p))
+                            } != null
                         },
                         onGrabMove = { p ->
                             if (pile >= 0) {
@@ -1236,7 +1244,8 @@ fun WatchGameScreen(
                             pending.isNotEmpty() -> pending = emptyList() // tapping elsewhere cancels
                             knightPickNow != null -> knightPick = null      // and lets go of a picked knight
                             !inventory && boardTapHint(boardNow, legalNow, stateNow.robberHex, p) != null -> tapHint = boardTapHint(boardNow, legalNow, stateNow.robberHex, p)
-                            !inventory && seaNow.isWater(p) -> seaNow.splash(p)
+                            !inventory && seaNow.isWater(p) -> seaNow.splash(if (liveBoardNow)
+                                LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at, LIVE_WATER_HEIGHT) else p)
                             // The 3D collection: tap a piece set to play with it (#119: "useless if I can't pick").
                             inventory && liveBoardNow && ArtObject.entries.none { env.art.space(it) } -> liveInventoryThemeAt(p)?.let { env.art = env.art.with(ArtObject.BUILDINGS, if (it) ArtSet.PIRATE else ArtSet.DEFAULT) }
                             // The flat Inventory: tap a piece to swap its set (Mauro: "tap in inventory").
@@ -1244,6 +1253,11 @@ fun WatchGameScreen(
                         }
                     }, onDoubleTap = { at ->
                         val sz = Size(size.width.toFloat(), size.height.toFloat())
+                        val lay = Layout.fit(boardNow, sz.width, sz.height, camera)
+                        val seaAt = if (liveBoardNow) LiveProjection(lay.center, lay.scale, camera.tilt, boardRotation).unproject(at)
+                            else lay.unproject(at)
+                        // Repeated pokes belong to the cloud, including the poke that poofs it.
+                        if (env.animating && seaNow.cloudAt(seaAt) != null) return@detectTapGestures
                         // A double-tap on a supply resets that pile (handled with its drag); the view stays.
                         if (!liveBoardNow && supplyAt(stateNow, viewerNow, pileOffsetsNow, Layout.fit(boardNow, sz.width, sz.height, camera), at, 48.dp.toPx()) >= 0) return@detectTapGestures
                         camera = if (camera.zoom > 1.05f || kotlin.math.abs(camera.tilt - Camera.START_TILT) > 0.01f || camera.pan.getDistance() > 1f || kotlin.math.abs(boardRotation) > .01f) Camera.FIT.also { boardRotation = 0f }
@@ -1261,7 +1275,7 @@ fun WatchGameScreen(
                 }
                 fun set(name: String, pirate: Boolean) = if (env.art.pirate(ArtObject.BUILDINGS) == pirate) "$name pieces: in use" else "$name pieces: tap to use"
                 for ((text, z) in (if (ArtObject.entries.any { env.art.space(it) }) listOf("Selected terrain and harbours" to -5.2f, "Buildings, Ramparts and Capitals" to .45f, "Knights, Merchant and Bandit" to 2.8f) else listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
-                        "Bandit and runtime plate" to 6.1f))) {
+                        "Sloop, Bandit, Raiders, plate and coast" to 6.1f, "Gull wingbeat and water marks" to 10.3f))) {
                     val at = projection.project(Offset(0f, z))
                     drawContext.canvas.nativeCanvas.drawText(text, at.x, at.y, paint)
                 }
@@ -1269,6 +1283,13 @@ fun WatchGameScreen(
                 InventoryArt(if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, raiders, cliff, art.boatSprites, art.gullGlide, buildings, sea.sprites3d),
                 bottomInset = INVENTORY_CARDS_DP.dp.toPx(), chosen = env.art, space = space) else if (liveBoard) {
                 val projection = liveProjection(size.width, size.height)
+                if (env.animating && !env.art.space(ArtObject.BOARD)) {
+                    // Over the 3D water (#63): splash rings, the whale (it keeps clear of the coast), clouds; gulls are models.
+                    noteSeaView(sea, state.board)
+                    sea.drawLiveSplashes(this, { x, y -> projection.project(Offset(x, y), LIVE_WATER_HEIGHT) }, projection.scale)
+                    sea.drawLiveCritters(this, { x, y -> projection.project(Offset(x, y), LIVE_WATER_HEIGHT) }, projection.scale, projection.tilt)
+                    sea.drawSky(this, { x, y -> projection.project(Offset(x, y)) }, projection.scale, includeBirds = false)
+                }
                 if (!env.art.space(ArtObject.BOARD)) drawLivePorts(state.board, projection, measurer, wood, buildings)
                 drawLiveOverlay(state, projection, if (env.art.pirate(ArtObject.KNIGHTS)) knightsPirate else knightsNormal, env.art.space(ArtObject.MERCHANT) || LIVE_MERCHANT in liveModels,
                     liveBoardTop(env.art)) { v ->
@@ -1699,6 +1720,7 @@ private suspend fun PointerInputScope.boardGestures(
     val first = awaitFirstDown(requireUnconsumed = false)
     // A single finger landing on a cloud drags that cloud (a tap without moving poofs it).
     if (grab(first.position)) {
+        first.consume()
         var moved = false
         var travel = 0f
         var last = first.position
@@ -2001,6 +2023,14 @@ data class Camera(val zoom: Float = 1f, val pan: Offset = Offset.Zero, val tilt:
  */
 internal enum class BoardPart { WATER, UNDER, STILL, OVER, ALL }
 
+/** The open water a critter may use: the sea in view at fit zoom, between the side panel and the zoom bars (set once). */
+private fun DrawScope.noteSeaView(sea: Sea, board: Board) {
+    if (sea.viewArea != null || Layout.leftInset <= 0f) return
+    val fit = Layout.fit(board, size.width, size.height, Camera.FIT)
+    val a = fit.unproject(Offset(Layout.leftInset + 8.dp.toPx(), 0f)); val b = fit.unproject(Offset(size.width - 100.dp.toPx(), size.height))
+    sea.viewArea = androidx.compose.ui.geometry.Rect(minOf(a.x, b.x), minOf(a.y, b.y), maxOf(a.x, b.x), maxOf(a.y, b.y))
+}
+
 /** What the cached [BoardPart.WATER] layer depends on: the camera, the size, and the sea's clock in 1/6 s steps. */
 private data class WaterLayerKey(val camera: Camera, val size: Size, val step: Int)
 
@@ -2025,12 +2055,7 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
     val lift = 1f + 1.2f * kotlin.math.sin(l.tilt)
     val stand = 1f + 0.15f * kotlin.math.sin(l.tilt)
     val toScreen = { x: Float, y: Float -> l.project(x, y) }
-    // The open water a critter may use: the sea in view at fit zoom, between the side panel and the zoom bars.
-    if (sea != null && sea.viewArea == null && Layout.leftInset > 0f) {
-        val fit = Layout.fit(board, size.width, size.height, Camera.FIT)
-        val a = fit.unproject(Offset(Layout.leftInset + 8.dp.toPx(), 0f)); val b = fit.unproject(Offset(size.width - 100.dp.toPx(), size.height))
-        sea.viewArea = androidx.compose.ui.geometry.Rect(minOf(a.x, b.x), minOf(a.y, b.y), maxOf(a.x, b.x), maxOf(a.y, b.y))
-    }
+    if (sea != null) noteSeaView(sea, board)
     val spaceBoard = space?.choice?.space(ArtObject.BOARD) == true
     if (spaceBoard && part == BoardPart.WATER) {
         space!!.fillSea(this, scale)

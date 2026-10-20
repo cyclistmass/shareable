@@ -98,7 +98,7 @@ internal fun themedLivePlacements(s: GameState, choice: ArtChoice, lod: Int, has
     return buildList {
         for (p in original) {
             val m = p.model
-            if (board && (m == "sea" || m.startsWith("tile_") || m == "number_plate" || m.startsWith("digit_"))) continue
+            if (board && (m == "sea" || m == "live_water_mesh" || m == "coast_a" || m.startsWith("tile_") || m == "number_plate" || m.startsWith("digit_"))) continue
             if (choice.space(ArtObject.KNIGHTS) && m in listOf(KNIGHT_RING, KNIGHT_BAND)) continue
             var sprite: SpaceArt.Sprite? = null
             var position = p.position

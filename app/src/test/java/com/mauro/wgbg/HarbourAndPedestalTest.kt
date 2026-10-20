@@ -45,8 +45,9 @@ class HarbourAndPedestalTest {
                 assertEquals(p.project((a + c) / 2f + n * PORT_BUOY_OUT).y + drop, h.token.y, 1e-3f)
             }
         }
-        assertEquals(LIVE_SEA, livePlacements(Rules.newGame(GameConfig(), 7L), false, 0).first { it.model == "sea" }.height,
-            "the harbours and the sea model agree on the water's height")
+        // The 3D water (#63) is built at the harbours' sea height and placed unraised.
+        assertEquals(LIVE_SEA, LIVE_WATER_HEIGHT, "the harbours and the water agree on the water's height")
+        assertEquals(0f, livePlacements(Rules.newGame(GameConfig(), 7L), false, 0).single { it.model == "live_water_mesh" }.height)
     }
 
     @Test

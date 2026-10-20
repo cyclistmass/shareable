@@ -31,6 +31,8 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
      * over them (harbours, highlights) when the board was panned or tilted, then caught up (Mauro, 0.3.4).
      */
     projectionNow: (() -> LiveProjection?)? = null,
+    sea: Sea? = null, raiders: Boolean = false,
+    scenery: Boolean = true,
     onFailure: (String) -> Unit) {
     val latestFailure by rememberUpdatedState(onFailure)
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -85,6 +87,9 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
             renderer.projection = projection
             renderer.projectionNow = projectionNow
             renderer.facing = facing
+            renderer.sea = sea
+            renderer.raiders = raiders
+            renderer.scenery = scenery
             renderer.running = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         }
     })
@@ -135,17 +140,25 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     var projection: LiveProjection? = null
     var projectionNow: (() -> LiveProjection?)? = null
     var facing = true
+    var sea: Sea? = null
+    var raiders = false
+    var scenery = true
     private var shown = emptyList<LivePlacement>()
     private var active = mutableListOf<FilamentInstance>()
+    private var moving = emptySet<FilamentInstance>()
+    private val fades = mutableMapOf<FilamentInstance, List<MaterialInstance>>()
+    private val shownAlpha = mutableMapOf<FilamentInstance, Float>()
+    private var water: LiveWaterMaterial? = null
     private data class Model(val asset: FilamentAsset, val first: FilamentInstance)
     private val models = mutableMapOf<String, Model>()
     private val pools = mutableMapOf<Pair<String, Int>, MutableList<FilamentInstance>>()
     private val tints = mutableMapOf<Pair<String, Int>, MaterialInstance>()
     private val lights = mutableListOf<Int>()
     private val fill = IndirectLight.Builder().irradiance(1, floatArrayOf(0.7f, 0.76f, 0.85f)).intensity(25_000f).build(engine)
-    private val sky = Skybox.Builder().color(0.055f, 0.12f, 0.17f, 1f).build(engine)
+    private val sky = Skybox.Builder().color(.035f, .13f, .22f, 1f).build(engine)
     private val intervals = mutableListOf<Double>()
     private val submit = mutableListOf<Double>()
+    private val prepare = mutableListOf<Double>()
     private var lastRendered = 0L
     private var windowStart = 0L
     private var skipped = 0
@@ -172,8 +185,6 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         addLight(0.5f, -0.8f, 0.6f, 80_000f, 1f, 0.91f, 0.78f)
         addLight(-0.5f, -0.4f, -0.4f, 12_000f, 0.75f, 0.85f, 1f)
         surfaceView.holder.addCallback(this)
-        // Compose can reuse an already-sized native surface after the sprite fallback. Adding a
-        // callback alone doesn't replay surfaceChanged; adopt its current frame explicitly.
         if (surfaceView.holder.surface.isValid) {
             surfaceCreated(surfaceView.holder)
             val frame = surfaceView.holder.surfaceFrame
@@ -238,7 +249,16 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             for (primitive in 0 until rm.getPrimitiveCount(renderable)) {
                 val material = rm.getMaterialInstanceAt(renderable, primitive)
                 val color = liveTint(p.model, material.name, p.owner)
-                if (color != null) {
+                if (p.model == "live_water_mesh") {
+                    val waterMaterial = water ?: LiveWaterMaterial(engine, context).also { water = it }
+                    rm.setMaterialInstanceAt(renderable, primitive, waterMaterial.instance)
+                    // Wave displacement is bounded; avoid culling this single expansive surface by its flat box.
+                    rm.setCulling(renderable, false)
+                } else if (p.model.startsWith("sea_")) {
+                    val fade = MaterialInstance.duplicate(material, "${p.model}-fade-${result.root}")
+                    rm.setMaterialInstanceAt(renderable, primitive, fade)
+                    fades[result] = fades.getOrDefault(result, emptyList()) + fade
+                } else if (color != null) {
                     val tint = tints.getOrPut(key) {
                         MaterialInstance.duplicate(material, "${p.model}-player-${p.owner}").apply {
                             setParameter("baseColorFactor", Colors.RgbaType.SRGB, color.red, color.green, color.blue, 1f)
@@ -250,6 +270,36 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         }
         pool.add(result)
         return result
+    }
+
+    /** Moving poses reuse model instances and update transforms; static scenery stays in place. */
+    private fun updateSea() {
+        val simulation = sea
+        water?.update(simulation?.liveCoastEdges ?: emptyList(), simulation)
+        val poses = simulation?.takeIf { scenery }?.let { liveSeaPlacements(it, raiders) } ?: emptyList()
+        val counts = mutableMapOf<Pair<String, Int>, Int>()
+        val next = HashSet<FilamentInstance>()
+        val transforms = engine.transformManager
+        transforms.openLocalTransformTransaction()
+        try {
+        for (p in poses) {
+            val key = p.model to p.owner
+            val index = counts.getOrDefault(key, 0); counts[key] = index + 1
+            val instance = instance(p, index)
+            next.add(instance)
+            transforms.setTransform(transforms.getInstance(instance.root), liveModelMatrix(p))
+            val alpha = (p.alpha.coerceIn(0f, 1f) * 64).roundToInt() / 64f
+            if (shownAlpha[instance] != alpha) for (material in fades[instance].orEmpty()) {
+                val shade = p.model == "sea_shadow"
+                material.setParameter("baseColorFactor", if (shade) .02f else .8f,
+                    if (shade) .05f else .94f, if (shade) .08f else 1f, alpha)
+            }
+            shownAlpha[instance] = alpha
+            if (instance !in moving) scene.addEntities(instance.entities)
+        }
+        } finally { transforms.commitLocalTransformTransaction() }
+        for (instance in moving) if (instance !in next) scene.removeEntities(instance.entities)
+        moving = next
     }
 
     private fun updateScene() {
@@ -335,7 +385,9 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
             return
         }
         try {
-            updateScene(); updateCamera(p); updateCritters(frameTimeNanos, p)
+            val prepareStart = System.nanoTime()
+            updateScene(); updateSea(); updateCamera(p); updateCritters(frameTimeNanos, p)
+            prepare.add((System.nanoTime() - prepareStart) / 1e6)
             val start = System.nanoTime()
             if (renderer.beginFrame(requireNotNull(swapChain), frameTimeNanos)) {
                 renderer.render(view); renderer.endFrame()
@@ -378,24 +430,26 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         fun percentile(values: List<Double>, q: Double): Double = values.sorted()[(q * (values.size - 1)).roundToInt()]
         if (intervals.isNotEmpty()) Log.i("WGBG-3D-PERF", "frames=${intervals.size} elapsedMs=${(now - windowStart) / 1e6} " +
             "fps=${intervals.size * 1e9 / (now - windowStart)} p50Ms=${percentile(intervals, .50)} p95Ms=${percentile(intervals, .95)} " +
-            "submitP95Ms=${percentile(submit, .95)} skipped=$skipped tilt=${p.tilt} rotation=${p.rotation} " +
+            "submitP95Ms=${percentile(submit, .95)} prepareP95Ms=${percentile(prepare, .95)} skipped=$skipped tilt=${p.tilt} rotation=${p.rotation} " +
             "lod=${shown.firstOrNull { it.model.startsWith("tile_") }?.model?.takeLast(1)} pirate=${shown.any { it.model.startsWith("pirate_") }} " +
-            "placements=${shown.size} renderables=${scene.renderableCount}")
+            "placements=${shown.size} moving=${moving.size} renderables=${scene.renderableCount}")
         if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && intervals.isNotEmpty()) {
             val sample = org.json.JSONObject().apply {
                 put("elapsedMs", (now - windowStart) / 1e6); put("intervalMs", org.json.JSONArray(intervals))
                 put("submitMs", org.json.JSONArray(submit)); put("skipped", skipped)
+                put("prepareMs", org.json.JSONArray(prepare))
                 put("tilt", p.tilt); put("rotation", p.rotation)
                 put("lod", shown.firstOrNull { it.model.startsWith("tile_") }?.model?.takeLast(1)?.toIntOrNull() ?: 0)
                 put("pirate", shown.any { it.model.startsWith("pirate_") })
                 put("placements", shown.size); put("renderables", scene.renderableCount)
+                put("moving", moving.size)
             }
             context.cacheDir.resolve("live-board-frames.jsonl").appendText(sample.toString() + "\n")
         }
         resetTiming()
     }
 
-    private fun resetTiming() { intervals.clear(); submit.clear(); windowStart = 0; lastRendered = 0; skipped = 0 }
+    private fun resetTiming() { intervals.clear(); submit.clear(); prepare.clear(); windowStart = 0; lastRendered = 0; skipped = 0 }
 
     override fun close() {
         if (closed) return
@@ -407,8 +461,11 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         for (i in active) scene.removeEntities(i.entities)
         for (i in critterInstances) scene.removeEntities(i.entities)
         for (asset in batchAssets.values) { scene.removeEntities(asset.entities); loader.destroyAsset(asset) }
+        for (i in moving) scene.removeEntities(i.entities)
         for (m in models.values) loader.destroyAsset(m.asset)
         for (m in tints.values) engine.destroyMaterialInstance(m)
+        for (m in fades.values.flatten()) engine.destroyMaterialInstance(m)
+        water?.close()
         resources.destroy(); loader.destroy(); provider.destroyMaterials(); provider.destroy()
         for (l in lights) { engine.destroyEntity(l); EntityManager.get().destroy(l) }
         engine.destroyIndirectLight(fill); engine.destroySkybox(sky)

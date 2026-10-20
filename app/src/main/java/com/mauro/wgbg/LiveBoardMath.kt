@@ -103,7 +103,7 @@ internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || 
 internal fun liveTint(model: String, material: String, owner: Int): androidx.compose.ui.graphics.Color? = when {
     model == KNIGHT_BAND -> KNIGHT_BAND_COLOR
     model == KNIGHT_RING -> PLAYER_COLORS.getOrNull(owner)
-    owner >= 0 && (woodTint(material) || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
+    owner >= 0 && (woodTint(material) || material == "SailCloth" || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
     else -> null
 }
 
@@ -112,7 +112,14 @@ internal val LIVE_PLATE = Offset(0.36f, 0.45f)
 
 /** [stretch] scales the model's height only, on top of [scale] (roads stand taller than they're modelled). */
 internal data class LivePlacement(val model: String, val position: Offset, val height: Float = 0f,
-    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1, val stretch: Float = 1f)
+    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1, val stretch: Float = 1f, val alpha: Float = 1f) {
+    init {
+        require(position.x.isFinite() && position.y.isFinite() && height.isFinite() && heading.isFinite())
+        require(scale.isFinite() && scale > 0f && stretch.isFinite() && stretch > 0f)
+        require(alpha.isFinite() && alpha in 0f..1f)
+        require(owner in -1 until PLAYER_COLORS.size)
+    }
+}
 
 /**
  * Column-major glTF Y-axis transform; positive heading cancels the camera's screen orbit. A [lift] (radians) then tips
@@ -246,7 +253,9 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     val b = s.board
     val theme = if (pirate) "pirate" else "default"
     val terrain = listOf("timber", "clay", "fleece", "grain", "stone", "desert")
-    add(LivePlacement("sea", Offset.Zero, LIVE_SEA))
+    // Codex's animated water (#63) and the surf along the coast; the harbours stay the projected ones (#104).
+    add(LivePlacement("live_water_mesh", Offset.Zero))
+    addAll(liveCoastPlacements(b))
     for (h in 0 until b.hexCount) {
         val at = liveHex(b, h)
         add(LivePlacement("tile_${terrain.getOrElse(b.hexResource[h]) { "desert" }}_lod$lod", at))
@@ -314,7 +323,7 @@ internal fun liveCapital(track: Int) = "capital_" + DECK_NAMES[track].lowercase(
 
 /** Side-by-side imported models for maintainer review; never mixed into a game state. */
 internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {
-    add(LivePlacement("sea", Offset.Zero, LIVE_SEA, 2f))
+    add(LivePlacement("live_water_mesh", Offset.Zero))
     val terrains = listOf("timber", "clay", "fleece", "grain", "stone", "desert")
     for (lod in 0..1) for ((i, terrain) in terrains.withIndex()) {
         val at = Offset(-6.5f + i * 2.6f, -4f + lod * 2.7f)
@@ -328,4 +337,10 @@ internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {
     add(LivePlacement("bandit", Offset(-4f, 5.4f)))
     add(LivePlacement("number_plate", Offset(0f, 5.4f), .012f))
     add(LivePlacement("digit_6", Offset(0f, 5.4f), .039f))
+    add(LivePlacement("coast_a", Offset(3f, 5.4f)))
+    add(LivePlacement("live_sloop", Offset(-7f, 5.4f), owner = 1))
+    add(LivePlacement("live_raiders", Offset(-2f, 5.4f)))
+    for (i in 0 until 16) add(LivePlacement("live_gull_$i", Offset(-7.5f + i, 9f)))
+    for ((i, name) in listOf("sea_wavelet", "sea_wake", "sea_shadow").withIndex())
+        add(LivePlacement(name, Offset(5f + i, 10f), scale = 2f))
 }

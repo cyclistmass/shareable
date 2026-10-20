@@ -68,7 +68,7 @@ class LiveBoardTest {
 
     @Test fun `collection includes every imported model in both themes and LODs`() {
         val models = liveInventoryPlacements().map { it.model }.filter { !it.startsWith("digit_") }.toSet()
-        assertEquals(33, models.size)
+        assertEquals(55, models.size)   // 33, then the 3D sea's 22: coast, sloop, Raiders, 16 gull frames, 3 water marks
         assertEquals(12, models.count { it.startsWith("tile_") })
         assertEquals(9, models.count { it.startsWith("default_") })
         assertEquals(9, models.count { it.startsWith("pirate_") })

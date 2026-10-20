@@ -94,6 +94,25 @@ unless another path is given.
 
 ## References
 
+- 3D sea (#63, made by **OpenAI Codex** on its 3D-sea branch, 2026-10-12; brought into the game in 0.3.4): the animated
+  water mesh and shader, our own coast surf, wake, wavelet and shadow meshes (`tools/blender/realtime/export_sea.py`).
+  The 3D sloops, Raiders' ship and the sixteen gull wingbeat poses reuse our already credited authored
+  `sea_props.py` model sources, exported with the bounded vertex-colour exporter (`tools/blender/realtime/export_assets.py`).
+  No third-party models or textures. The shared `Sea` simulation supplies all movement.
+- Live water shader (`tools/filament/live_water.mat`, `live_water_math.glsl`): Filament adaptation
+  of **Stylized Water for Godot 4.x** by MinhCreatorVN / MinhCreator (2024, MIT), originally
+  combining kmitt91 and StayAtHomeDev's work:
+  https://godotshaders.com/shader/stylized-water-for-godot-4-x/
+  https://github.com/MinhCreator/Stylized-Water-Shader-Demo
+  and **Boujie Water Shader** by Zach Bernal / Chrisknyfe and contributors (2023-present, MIT),
+  with original water work credited upstream to Tom Langwaldt / MrMinimal:
+  https://github.com/Chrisknyfe/boujie_water_shader
+  Licence notices are retained in `docs/licenses/MIT-water-stylized.txt` and
+  `docs/licenses/MIT-water-boujie.txt`, and ship in the app (`app/src/main/assets/licenses/`). Only code formulas were adapted: no reference images,
+  videos, demo textures or models were copied. The ocean texture is our existing authored art.
+  Shore foam uses our own coastline-distance texture instead of reading scene depth; refraction
+  distorts the underwater colour texture. Fresnel and depth fog use the credited formulas.
+
 - Live-board spike models (`app/src/main/assets/filament/*.glb`): our own Blender geometry and vertex-colour
   materials, from the 2026-10-11 `wgbg-art/realtime/glb` export. Default and Pirate pieces, the Bandit,
   number plate, sea, and both terrain LODs; the knights (levels 1–3, active and inactive, both themes) from the
