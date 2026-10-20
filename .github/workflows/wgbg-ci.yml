@@ -249,6 +249,7 @@ jobs:
             [ "$SHARD" != play-to-end ] || STALL=60 bash tools/play_to_end.sh chivalry 4 900
             # Trades by touch (#122, #135, #114): bank trades, several lots, open offers, withdrawing an offer, in both rulesets.
             [ "$SHARD" != trade ] || bash tools/ci_trade.sh
+            [ "$SHARD" != trade ] || bash tools/ci_keyboard.sh
             [ "$SHARD" != withdraw ] || bash tools/ci_withdraw.sh 300 "base chivalry"
             # Online play end to end (#35): two clients, one room, a whole game on the Firebase emulators.
             [ "$SHARD" != online ] || bash tools/ci_online.sh apk/app-debug-androidTest.apk demo-wgbg
