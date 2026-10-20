@@ -51,3 +51,6 @@ move it to **Done** with the commit when it lands.
   they cost frames, decode them in the background with a redraw trigger and a board-layer key, so pieces don't blink in.
 - 2026-10-19, bugs: worktrees with a Gradle build tree can't be removed by `git worktree remove` on Windows (Filename
   too long). Use `cmd /c rmdir /s /q "\?\C:\path"`, then `git worktree prune`.
+- 2026-10-19, bugs: every cold start skips about 43 frames (~0.7 s) on the main thread while the start screen first
+  draws, before any game opens (Pixel6 API34, `Choreographer: Skipped 43 frames`). Profile it with a frame or method trace
+  (Splash, fonts, wood textures, Firebase setup) and move what it finds off the main thread; saves a visible stall on launch.
