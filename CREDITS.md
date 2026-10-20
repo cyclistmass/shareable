@@ -58,6 +58,14 @@ unless another path is given.
 
 - Trade chime (`app/src/main/res/raw/trade_chime.wav`): our own, synthesised in Python (two decaying bell
   tones, E6 and B6), 2026-10-09.
+- Event-die clunk (`app/src/main/res/raw/event_clunk.ogg`): Kenney, "Impact Sounds" (`impactWood_heavy_002`
+  with `impactWood_light_001` as its bounce), CC0, https://kenney.nl/assets/impact-sounds. Mixed and levelled by
+  `tools/import_sounds.sh`, 2026-10-20.
+- Turn bell (`app/src/main/res/raw/turn_bell.ogg`): Kenney, "Impact Sounds" (`impactBell_heavy_000`), CC0,
+  https://kenney.nl/assets/impact-sounds. Levelled by `tools/import_sounds.sh`, 2026-10-20.
+- Raiders horn (`app/src/main/res/raw/raiders_horn.ogg`): "Hunting horn tone" by Alon-De-Lon, CC0,
+  https://commons.wikimedia.org/wiki/File:Hunting_horn_tone.ogg. The first blast, cut and faded by
+  `tools/import_sounds.sh`, 2026-10-20.
 - Carnival of Venice (`app/src/main/res/raw/tune_carnival_of_venice.ogg`): public-domain melody (the
   traditional 3/4 theme); our own arrangement and synthesis via `tools/make_sounds.py`.
 

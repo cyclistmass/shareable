@@ -45,6 +45,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 
 /** Where settings are kept: SharedPreferences on device, a map in tests. */
+/** A saved list index, or -1 when the saved value is broken (roundToInt throws on NaN, which crashed the art getter). */
+internal fun Float.savedIndex(): Int = if (isFinite()) roundToInt() else -1
+
 interface FloatStore {
     fun get(key: String, default: Float): Float
     fun put(key: String, value: Float)
@@ -159,8 +162,8 @@ class EnvSettings(private val store: FloatStore) {
 
     /** The chosen theme and any pieces swapped to another set on the Inventory screen. Saved. */
     var art: ArtChoice
-        get() = ArtChoice(ArtSet.entries.getOrElse(themeState.floatValue.roundToInt()) { ArtSet.DEFAULT },
-            swapStates.mapNotNull { (o, v) -> ArtSet.entries.getOrNull(v.floatValue.roundToInt())?.let { o to it } }.toMap()).tidy()
+        get() = ArtChoice(ArtSet.entries.getOrElse(themeState.floatValue.savedIndex()) { ArtSet.DEFAULT },
+            swapStates.mapNotNull { (o, v) -> ArtSet.entries.getOrNull(v.floatValue.savedIndex())?.let { o to it } }.toMap()).tidy()
         set(v) {
             val tidy = v.tidy()
             themeState.floatValue = tidy.theme.ordinal.toFloat(); store.put(THEME, themeState.floatValue)
@@ -477,8 +480,27 @@ class SoundSettings(private val store: FloatStore) {
     fun songOn(i: Int): Boolean = songOn.getOrNull(i)?.floatValue?.let { it > 0.5f } ?: false
     fun setSongOn(i: Int, on: Boolean) { val v = if (on) 1f else 0f; songOn[i].floatValue = v; store.put(songKey(SONGS[i]), v) }
 
+    private val turn = mutableFloatStateOf(store.get(TURN_ALERT, 1f))
+    /** A bell and a buzz when it becomes your turn. */
+    var turnAlert: Boolean
+        get() = turn.floatValue > 0.5f
+        set(v) { turn.floatValue = if (v) 1f else 0f; store.put(TURN_ALERT, turn.floatValue) }
+    private val raiders = mutableFloatStateOf(store.get(RAIDERS_ALERT, 1f))
+    /** A horn when the Raiders' ship moves to within [raidersSteps] steps of the island (Age of Chivalry). */
+    var raidersAlert: Boolean
+        get() = raiders.floatValue > 0.5f
+        set(v) { raiders.floatValue = if (v) 1f else 0f; store.put(RAIDERS_ALERT, raiders.floatValue) }
+    private val steps = mutableFloatStateOf(store.get(RAIDERS_STEPS, DEFAULT_RAIDERS_STEPS.toFloat()))
+    /** How close (steps left on the Raiders' track, [RAIDERS_STEPS_RANGE]) the ship comes before the horn sounds. */
+    var raidersSteps: Int
+        get() = steps.floatValue.takeIf { it.isFinite() }?.roundToInt()?.coerceIn(RAIDERS_STEPS_RANGE) ?: DEFAULT_RAIDERS_STEPS
+        set(v) { steps.floatValue = v.coerceIn(RAIDERS_STEPS_RANGE).toFloat(); store.put(RAIDERS_STEPS, steps.floatValue) }
+
     /** Back to the defaults (saved); every song ticked again. */
-    fun reset() { musicVolume = DEFAULT_MUSIC; soundVolume = DEFAULT_SOUNDS; SONGS.indices.forEach { setSongOn(it, true) } }
+    fun reset() {
+        musicVolume = DEFAULT_MUSIC; soundVolume = DEFAULT_SOUNDS; SONGS.indices.forEach { setSongOn(it, true) }
+        turnAlert = true; raidersAlert = true; raidersSteps = DEFAULT_RAIDERS_STEPS
+    }
 
     companion object {
         const val DEFAULT_MUSIC = 0.6f
@@ -486,6 +508,11 @@ class SoundSettings(private val store: FloatStore) {
         const val MUSIC = "vol-music"
         const val SOUNDS = "vol-sounds"
         const val MUSIC_PAUSED = "music-paused"
+        const val TURN_ALERT = "alert-turn"
+        const val RAIDERS_ALERT = "alert-raiders"
+        const val RAIDERS_STEPS = "alert-raiders-steps"
+        const val DEFAULT_RAIDERS_STEPS = 3
+        val RAIDERS_STEPS_RANGE = 1..10
         fun songKey(song: Song) = "song-on:" + song.title
         /** The set list (#17, #58), our own recordings; more shanties to come. */
         val SONGS: List<Song> = listOf(
@@ -516,6 +543,23 @@ fun SoundBody(sound: SoundSettings) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Sounds ${(sound.soundVolume * 100).roundToInt()}%", style = Wood.sans(12.sp), modifier = Modifier.width(96.dp))
                 VolumeSlider(sound.soundVolume, "vol-sounds", 200.dp) { sound.soundVolume = it }
+            }
+            // Alerts (0.3.4): each its own sound, so you know which it is without looking.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Your turn: bell and buzz", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp))
+                Choice("On", selected = sound.turnAlert, tag = "alert-turn-on", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.turnAlert = true }
+                Choice("Off", selected = !sound.turnAlert, tag = "alert-turn-off", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.turnAlert = false }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Raiders close: horn", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp))
+                Choice("On", selected = sound.raidersAlert, tag = "alert-raiders-on", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.raidersAlert = true }
+                Choice("Off", selected = !sound.raidersAlert, tag = "alert-raiders-off", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.raidersAlert = false }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val n = sound.raidersSteps
+                Text("Horn at $n step${if (n == 1) "" else "s"} away", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp).testTag("alert-raiders-steps"))
+                Choice("−", selected = false, tag = "alert-raiders-fewer", modifier = Modifier.height(36.dp).width(70.dp), size = 15.sp) { sound.raidersSteps = n - 1 }
+                Choice("+", selected = false, tag = "alert-raiders-more", modifier = Modifier.height(36.dp).width(70.dp), size = 15.sp) { sound.raidersSteps = n + 1 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Choice(if (sound.musicPaused) "▶ Play" else "⏸ Pause", selected = sound.musicPaused, tag = "music-pause",

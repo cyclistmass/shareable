@@ -12,6 +12,17 @@ class EnvSettingsTest {
     }
 
     @Test
+    fun `a broken saved art choice falls back instead of crashing`() {
+        // roundToInt throws on NaN; a damaged settings file read NaN for the theme and the art getter threw on start.
+        for (bad in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            val store = MapStore().apply { map[EnvSettings.THEME] = bad }
+            for (o in ArtObject.entries) store.map[EnvSettings.artKey(o)] = bad
+            assertEquals(ArtSet.DEFAULT, EnvSettings(store).art.theme)
+        }
+        assertEquals(-1, Float.NaN.savedIndex()); assertEquals(2, 1.6f.savedIndex())
+    }
+
+    @Test
     fun `every scenery slider starts at half`() {
         val env = EnvSettings(MapStore())
         for (i in Item.entries) assertEquals(0.5f, env[i])

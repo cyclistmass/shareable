@@ -1055,8 +1055,24 @@ fun WatchGameScreen(
         if (lastRoll.player == me) Haptics.diceRattle(appContext)
         // Age of Chivalry: the Raiders' ship on the event die gets a wooden clonk as the dice settle, for everyone.
         if (lastRoll.event in 0 until wgbg.engine.EventDie.SHIP_FACES) {
-            delay(650); sounds.raidersClonk(sound.soundVolume); Haptics.raidersClonk(appContext)
+            delay(650); sounds.eventClunk(sound.soundVolume); Haptics.raidersClonk(appContext)
         }
+    }
+    // Your turn (0.3.4): a bell and a buzz, each time it comes round (Settings > Sound). Not for the turn already showing
+    // when the screen opens.
+    val turnKey = tick.let { myTurnKey(state, me) }
+    val firstTurnKey = remember { turnKey }
+    LaunchedEffect(turnKey) {
+        if (turnKey == null || turnKey == firstTurnKey || !sound.turnAlert) return@LaunchedEffect
+        sounds.turnBell(sound.soundVolume); Haptics.turnBuzz(appContext)
+    }
+    // The Raiders close in (0.3.4): a horn when their ship moves to within the set number of steps, after the dice and clunk.
+    val raidersLeft = tick.let { raidersStepsLeft(state) }
+    var raidersBefore by remember { mutableStateOf(raidersLeft) }
+    LaunchedEffect(raidersLeft) {
+        val before = raidersBefore; raidersBefore = raidersLeft
+        if (!sound.raidersAlert || !raidersWarn(before, raidersLeft, sound.raidersSteps)) return@LaunchedEffect
+        delay(1300); sounds.raidersHorn(sound.soundVolume)
     }
     val myMoveKey = tick.let { if (me >= 0 && !state.isOver && state.actingPlayer == me) listOf(state.turn, state.phase) else null }
     LaunchedEffect(myMoveKey) { if (myMoveKey != null) hostView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY) }

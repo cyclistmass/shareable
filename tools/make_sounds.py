@@ -91,30 +91,6 @@ def dice_roll():
     return out[:length]
 
 
-def raiders_clonk():
-    """The Raiders' ship lands face up on the event die (Mauro: "a cannon hitting its mount on deck", then "the sound
-    of a boat creaking"): a heavy iron-on-oak thud with a short metallic clank, then the hull's timbers creaking."""
-    n = int(1.6 * SR); out = np.zeros(n); t = np.arange(n) / SR
-    # The cannon: a low body thump (falling pitch), a dull wood knock, a few inharmonic iron partials.
-    thump = np.sin(2 * np.pi * (72 * t - 18 * t * t)) * np.exp(-t / 0.16)
-    m = int(0.5 * SR); burst = rng.standard_normal(m) * np.exp(-np.arange(m) / (0.004 * SR))
-    knock = resonator(burst, 160, 0.12) + 0.6 * resonator(burst, 340, 0.07)
-    clank = sum(g * np.sin(2 * np.pi * f * t[:m]) * np.exp(-t[:m] / d)
-                for f, d, g in ((830, 0.09, 0.25), (1330, 0.06, 0.18), (2210, 0.04, 0.12), (3170, 0.025, 0.08)))
-    out[:n] += 1.0 * thump; out[:m] += 0.7 * knock + clank
-    # The creak: stick-slip friction, a stutter of tiny clicks whose rate glides up then down, through hull resonances.
-    start = int(0.22 * SR); dur = 1.05; k = start; tt = 0.0
-    while tt < dur:
-        rate = 55 + 110 * np.sin(np.pi * tt / dur) ** 1.5 + rng.uniform(-6, 6)   # clicks per second
-        amp = 0.35 * np.sin(np.pi * tt / dur) ** 0.8 * rng.uniform(0.7, 1.0)
-        if k < n: out[k] += amp * (1 if rng.random() < 0.5 else -1)
-        step = 1.0 / rate; tt += step; k = start + int(tt * SR)
-    creak = out.copy(); creak[:start] = 0; out[start:] = 0
-    body = resonator(creak, 420, 0.03) + 0.8 * resonator(creak, 760, 0.025) + 0.5 * resonator(creak, 1250, 0.015)
-    out += 2.2 * body
-    return one_pole_lowpass(out, 4200)
-
-
 # ------------------------------------------------------------------ instruments
 
 def guitar12(note, dur, vel=1.0):
@@ -532,7 +508,6 @@ def main(what):
     RAW.mkdir(parents=True, exist_ok=True)
     if what in ("dice", "all"):
         write_ogg("dice_roll", dice_roll(), quality=5)
-        write_ogg("raiders_clonk", raiders_clonk(), quality=5)
     if what in ("tunes", "all"):
         write_ogg("tune_drunken_sailor", drunken_sailor())
         write_ogg("tune_carnival_of_venice", carnival_of_venice())
