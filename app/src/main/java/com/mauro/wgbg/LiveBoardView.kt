@@ -36,38 +36,26 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
     onFailure: (String) -> Unit) {
     val latestFailure by rememberUpdatedState(onFailure)
     val context = androidx.compose.ui.platform.LocalContext.current
-    val space = remember(placements) { placements.filter { it.model.startsWith("space_") } }
-    val ordinary = remember(placements) { placements.filterNot { it.model.startsWith("space_") } }
     // The Space board is batched in one model per depth layer (liveDepthBias), and the renderer slides each layer toward
     // the camera every frame. The bias used to be baked in, so on a tilt or twist the roads and pieces sat off their
-    // places until the rebuild landed (Mauro, 0.3.4: "roads lag behind the board"). Only the layers that turn with the
-    // camera (numbers kept upright, standing pieces facing you) are rebuilt as it moves; the board and roads on a move.
+    // places until the rebuild landed (Mauro, 0.3.4: "roads lag behind the board"). Pieces posed by the camera (numbers
+    // kept upright, standing pieces facing you) aren't batched: rebuilt as it turned, they lay on their backs or showed
+    // their numbers upside down for most of a second after each turn. They take the per-model path, posed every frame.
+    val space = remember(placements) { placements.filter { liveBatched(it.model) } }
+    val ordinary = remember(placements) { placements.filterNot { liveBatched(it.model) } }
     var still by remember { mutableStateOf(emptyList<SpaceLayer>()) }
-    var turning by remember { mutableStateOf(emptyList<SpaceLayer>()) }
-    suspend fun layers(of: List<LivePlacement>, rotation: Float, tilt: Float): List<SpaceLayer> =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            of.groupBy { liveDepthBias(it.model) }.map { (bias, group) ->
-                SpaceLayer(bias, SpaceBoardBatch.build(group.map { p ->
-                    val color = PLAYER_COLORS.getOrNull(p.owner)
-                    fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
-                    // Standing pieces lie back toward the camera like the per-model path (updateCamera): upright under the
-                    // near top-down camera, a Space knight showed only its thin top edge (Space playtest).
-                    val matrix = when {
-                        liveStanding(p.model) -> liveStandingMatrix(p, liveLift(tilt), rotation, facing)
-                        p.model.startsWith("space_number_") -> liveModelMatrix(p.copy(heading = p.heading + rotation))
-                        else -> liveModelMatrix(p)
-                    }
-                    SpaceBoardBatch.Instance(p.model.removePrefix("space_"), matrix, color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
-                }) { path -> context.assets.open(path).use { it.readBytes() } })
+    LaunchedEffect(space) {
+        try {
+            still = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                space.groupBy { liveDepthBias(it.model) }.map { (bias, group) ->
+                    SpaceLayer(bias, SpaceBoardBatch.build(group.map { p ->
+                        val color = PLAYER_COLORS.getOrNull(p.owner)
+                        fun linear(v: Float) = if (v <= .04045f) v / 12.92f else ((v + .055f) / 1.055f).pow(2.4f)
+                        SpaceBoardBatch.Instance(p.model.removePrefix("space_"), liveModelMatrix(p), color?.let { listOf(linear(it.red), linear(it.green), linear(it.blue)) })
+                    }) { path -> context.assets.open(path).use { it.readBytes() } })
+                }
             }
         }
-    LaunchedEffect(space) {
-        try { still = layers(space.filterNot { liveTurnsWithCamera(it.model) }, 0f, 0f) }
-        catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-        catch (error: Exception) { latestFailure(error.message ?: "Space batch failed") }
-    }
-    LaunchedEffect(space, projection?.rotation, projection?.tilt, facing) {
-        try { turning = layers(space.filter { liveTurnsWithCamera(it.model) }, projection?.rotation ?: 0f, projection?.tilt ?: 0f) }
         catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
         catch (error: Exception) { latestFailure(error.message ?: "Space batch failed") }
     }
@@ -81,7 +69,7 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
     }, update = {
         holder[0]?.let { renderer ->
             renderer.placements = ordinary
-            renderer.batch = still + turning
+            renderer.batch = still
             renderer.critters = critters.take(SpaceArt.MAX_CRITTERS)
             renderer.animate = animate
             renderer.projection = projection
@@ -105,8 +93,11 @@ internal fun LiveBoardView(placements: List<LivePlacement>, projection: LiveProj
 /** One depth layer of the Space batch: the renderer moves it [bias] toward the camera ([liveTowardCamera]) each frame. */
 internal class SpaceLayer(val bias: Float, val result: SpaceBoardBatch.Result)
 
-/** True for models posed by the camera itself: digits kept upright and standing pieces facing it, rebuilt as it turns. */
+/** True for models posed by the camera itself: digits kept upright and standing pieces facing it, posed every frame. */
 internal fun liveTurnsWithCamera(model: String): Boolean = liveStanding(model) || model.startsWith("space_number_")
+
+/** True for the Space models drawn in the depth-layer batch: the board, roads and scenery, not the camera-posed pieces. */
+internal fun liveBatched(model: String): Boolean = model.startsWith("space_") && !liveTurnsWithCamera(model)
 
 /** All engine access is on the main thread, as required by Filament's Android API. */
 internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private val context: Context, private val fail: (String) -> Unit) :
@@ -354,6 +345,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         for ((index, placement) in shown.withIndex()) {
             val m = when {
                 placement.model.startsWith("digit_") -> liveModelMatrix(placement.copy(heading = p.rotation))
+                placement.model.startsWith("space_number_") -> liveModelMatrix(placement.copy(heading = placement.heading + p.rotation))
                 liveStanding(placement.model) -> liveStandingMatrix(placement, lift, p.rotation, facing)
                 liveDepthBias(placement.model) > 0f -> liveModelMatrix(placement)
                 else -> continue

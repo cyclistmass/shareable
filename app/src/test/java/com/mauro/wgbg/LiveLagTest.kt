@@ -44,14 +44,19 @@ class LiveLagTest {
     }
 
     @Test
-    fun `only pieces posed by the camera are rebuilt as it moves - the board and roads never wait on it`() {
-        for (m in listOf("space_homestead", "space_town", "space_bandit", "space_knight_l2", "space_number_8")) assertTrue(liveTurnsWithCamera(m), m)
-        for (m in listOf("space_road_v", "space_tile_grain", "space_deck", "space_sea")) assertFalse(liveTurnsWithCamera(m), m)
-        val still = view.substringAfter("LaunchedEffect(space) {").substringBefore("\n    }\n")
-        assertTrue("filterNot { liveTurnsWithCamera" in still, "the still layers are keyed on the pieces alone")
-        val turning = view.substringAfter("LaunchedEffect(space, projection?.rotation, projection?.tilt, facing) {").substringBefore("\n    }\n")
-        assertTrue("filter { liveTurnsWithCamera" in turning)
-        // No bias is baked into the batch any more: it's applied per layer each frame.
+    fun `pieces posed by the camera are posed every frame, never in a batch rebuilt after the turn`() {
+        // 0.3.3 rebuilt them in the background as the camera turned: for most of a second the Bandit lay on its back and
+        // the numbers stood upside down (device recording, 0.3.4).
+        for (m in listOf("space_homestead", "space_town", "space_bandit", "space_knight_l2_active", "space_number_8", "space_capital_crown")) {
+            assertTrue(liveTurnsWithCamera(m), m); assertFalse(liveBatched(m), m)
+        }
+        for (m in listOf("space_road_v", "space_tile_grain", "space_deck", "space_sea")) { assertFalse(liveTurnsWithCamera(m), m); assertTrue(liveBatched(m), m) }
+        for (m in listOf("homestead", "bandit", "live_sloop", "digit_8")) assertFalse(liveBatched(m), m)
+        assertFalse("projection?.rotation" in view.substringBefore("AndroidView("), "no batch keyed on the camera")
+        val frame = view.substringAfter("private fun updateCamera").substringBefore("\n    }\n")
+        assertTrue("startsWith(\"space_number_\") -> liveModelMatrix(placement.copy(heading = placement.heading + p.rotation))" in frame)
+        assertTrue("liveStanding(placement.model) -> liveStandingMatrix(placement, lift, p.rotation, facing)" in frame)
+        // No bias is baked into the batch: it's applied per layer each frame.
         assertFalse("liveTowardCamera(it, projection" in view)
         assertTrue("for ((layer, asset) in batchAssets) engine.transformManager.setTransform" in view)
     }
