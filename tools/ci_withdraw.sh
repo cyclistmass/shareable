@@ -18,6 +18,9 @@ dump() { for _ in 1 2 3; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiau
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 at() { dump | grep "\(text\|content-desc\)=\"$1\"" | centre; }
 tap_text() { local xy; xy=$(at "$1"); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
+# A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
+panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
+  for _ in 1 2 3 4; do "$ADB" shell input swipe $((w * 7 / 10)) $((h * 4 / 5)) $((w * 7 / 10)) $((h * 3 / 10)) 400; sleep 0.8; tap_text "$1" && return 0; done; return 1; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }
 move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "$1" >/dev/null; }
@@ -35,12 +38,13 @@ for ruleset in $RULESETS; do
   sleep 4
   # Bots say no at once; only a counter holds for the AI pace. Slider to 5 s (Menu › Settings › Play, by touch) so
   # there is time to tap Withdraw after a counter.
-  if tap_text "Menu" && tap_text "Settings" && tap_text "Play"; then
+  if tap_text "Menu" && tap_text "Settings" && panel_tap "Play"; then
     dpi=$("$ADB" shell wm density | grep -o '[0-9]*' | tail -1)
     xy=$(dump | grep 'text="[0-9.]* s"' | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | tr -c '0-9\n' ' ' | awk -v d="$dpi" '{print $3 + int(214 * d / 160), int(($2+$4)/2)}')
     [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 0.6
     say "AI pace now: $(dump | grep -o 'text="[0-9.]* s"' | head -1)"
     tap_text "Hide" || "$ADB" shell input keyevent BACK
+  else say "couldn't reach the AI pace slider"; tap_text "Hide" || true   # never leave the menu over the trade button
   fi
   # On CI the slider tap didn't stick (every answer came back within a second); set it through the debug receiver too.
   "$ADB" shell am broadcast -a $PKG.FILAMENT_VIEW -p $PKG --ef aiPace 5 >/dev/null
