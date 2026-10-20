@@ -45,7 +45,7 @@ class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boo
     val roadM30 = if (choice.space(ArtObject.BUILDINGS)) space(SpaceArt.road(2)) else load(res, BuildingArt.roadM30(pirate))
     /** Ramparts by wall height, low to high (Age of Chivalry only); see [rampartsHeight]. */
     val ramparts: List<Piece> = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) (1..3).map { space(SpaceArt.ramparts(it)) } else BuildingArt.ramparts(pirate).map { load(res, it) }) else emptyList()
-    private val capitals = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) listOf(0, 2, 1).map { glassDomes(space(SpaceArt.capital(it))) } else BuildingArt.capitals(pirate).map { load(res, it) }) else emptyList()
+    private val capitals = if (chivalry) (if (choice.space(ArtObject.BUILDINGS)) CAPITAL_ORDER.map { glassDomes(space(SpaceArt.capital(it))) } else BuildingArt.capitals(pirate).map { load(res, it) }) else emptyList()
     /** The bell-buoy ports (PortArt.index order), 8 tilt steps each. */
     val ports: List<List<ImageBitmap>> = PortArt.TYPES.map { t -> t.map { ImageBitmap.imageResource(res, it) } }
     /** The Merchant pawn (#112), rendered like the buildings so it stands at their (and the Bandit's) angle. */
@@ -80,8 +80,11 @@ class BuildingSprites(private val res: Resources, pirate: Boolean, chivalry: Boo
          */
         fun rampartsHeight(bestLevel: Int): Int = (bestLevel / 2).coerceIn(0, 2)
 
+        /** The tracks in BuildingArt.capitals' order: Guilds, Academy, Crown. */
+        val CAPITAL_ORDER = listOf(Track.TRADE, Track.SCIENCE, Track.POLITICS)
+
         /** Index into BuildingArt.capitals (Guilds, Academy, Crown) for a metropolis [track], or -1. */
-        fun capitalIndex(track: Int): Int = when (track) { Track.TRADE -> 0; Track.SCIENCE -> 1; Track.POLITICS -> 2; else -> -1 }
+        fun capitalIndex(track: Int): Int = CAPITAL_ORDER.indexOf(track)
 
         /** 0 = upright edge, 1 = rising to the right (screen 150 degrees), 2 = falling to the right (30 degrees). */
         fun roadKind(dx: Float, dy: Float): Int {

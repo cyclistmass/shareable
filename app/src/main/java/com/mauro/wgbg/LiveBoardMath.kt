@@ -271,7 +271,7 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         if (walled) add(LivePlacement("${theme}_ramparts", at, scale = BUILDING_SCALE, owner = owner))
         val metro = ck?.metroVertex?.indexOf(v) ?: -1
         val kind = when {
-            metro >= 0 -> "capital_${listOf("guilds", "academy", "crown")[metro]}"
+            metro >= 0 -> liveCapital(metro)
             s.vertexBuilding[v] == Piece.CITY -> "town"
             else -> "homestead"
         }
@@ -297,6 +297,12 @@ internal fun liveInventoryThemeAt(p: Offset): Boolean? = when {
 
 private const val LIVE_SET_ROW_Y = 1.3f
 private const val LIVE_SET_ROW_GAP = 2f
+
+/**
+ * The Capital model for engine track [track] (metroVertex is indexed by track: Guilds, Crown, Academy). It used to index
+ * a Guilds, Academy, Crown list, so the 3D board stood a Crown Capital on the Academy's town and the other way round.
+ */
+internal fun liveCapital(track: Int) = "capital_" + DECK_NAMES[track].lowercase()
 
 /** Side-by-side imported models for maintainer review; never mixed into a game state. */
 internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {

@@ -45,7 +45,7 @@ import wgbg.engine.CARD_TYPES
 import wgbg.engine.GameState
 import wgbg.engine.Track
 
-/** Town-improvement bars in the order and colours of the design: Guilds (gold), Academy (green), Crown (blue). */
+/** Town-improvement bars in the order of the design: Guilds, Academy, Crown, each in its deck colour ([TRACK_COLORS]). */
 internal val IMPROVEMENT_BARS get() = listOf(Track.TRADE to TRACK_COLORS[Track.TRADE], Track.SCIENCE to TRACK_COLORS[Track.SCIENCE], Track.POLITICS to TRACK_COLORS[Track.POLITICS])
 
 /** Segments filled on a 4-segment improvement bar for an engine level 0..5. */
