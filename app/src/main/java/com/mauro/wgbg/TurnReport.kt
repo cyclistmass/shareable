@@ -105,6 +105,8 @@ class TurnTracker(private val names: List<String>) {
             d1 = ((action.payload ushr 8) and 0xff).toInt(); d2 = ((action.payload ushr 16) and 0xff).toInt()
             ev = s.rng.copy().nextInt(6)
         }
+        // #26: a No from a player who couldn't pay says why in the turn's history (the offer is gone after the move).
+        val lacked = if (action.type == ActionType.REJECT_TRADE && wgbg.engine.Rules.cantPayOffer(s, who)) shortfallText(s, who) else null
         applyFn()
         val heldAfter = holdings(s)
         noteHits(s, owner, who, action, held, heldAfter, phaseBefore)
@@ -125,6 +127,9 @@ class TurnTracker(private val names: List<String>) {
                     .ifEmpty { listOf("Nobody produced anything.") },
             )
             action.type == ActionType.END_TURN -> r
+            // One line per offer for everyone who couldn't pay, so a big table doesn't push the turn's other lines out.
+            action.type == ActionType.REJECT_TRADE && lacked != null -> r.events.lastOrNull()?.takeIf { it.startsWith(CANT_PAY) }
+                ?.let { r.copy(events = r.events.dropLast(1) + "$it, $n ($lacked)") } ?: r.plus("$CANT_PAY$n ($lacked)")
             action.type == ActionType.REJECT_TRADE || action.type == ActionType.ACCEPT_TRADE ||
                 action.type == ActionType.COUNTER_TRADE || action.type == wgbg.engine.CkActionType.COUNTER_TRADE_CK -> r
             action.type == ActionType.MOVE_ROBBER -> {
@@ -214,6 +219,8 @@ class TurnTracker(private val names: List<String>) {
     companion object {
         /** How many finished turns the info box keeps. */
         const val HISTORY = 40
+        /** Starts the one line per offer that lists who said No because they couldn't pay (#26). */
+        private const val CANT_PAY = "Said No, couldn't pay: "
         init { check(Resource.COUNT == RESOURCE_NAMES.size) }
     }
 }
