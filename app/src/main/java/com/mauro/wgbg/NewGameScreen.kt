@@ -137,12 +137,11 @@ fun NewGameScreen(
                 }
             }
             // What the bots are called (Mauro, 0.3.4): their colours, or a theme; each seat then picks from its names.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Bot names", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
-                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (t in NameTheme.entries) Choice(t.label, setup.theme == t, "theme-${t.name}", Modifier.height(30.dp),
-                        radius = 8.dp, size = 12.sp) { setup = setup.withTheme(t) }
-                }
+            // The label goes above the chips: beside them it floated loose once they wrapped on a narrow screen.
+            Text("Bot names", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (t in NameTheme.entries) Choice(t.label, setup.theme == t, "theme-${t.name}", Modifier.height(30.dp),
+                    radius = 8.dp, size = 12.sp) { setup = setup.withTheme(t) }
             }
             naming?.let { i ->
                 SeatNamePicker(i, setup, onPick = { setup = setup.withSeatName(i, it); naming = null }, onDismiss = { naming = null })

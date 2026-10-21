@@ -49,15 +49,28 @@ reach() {
 }
 re() { printf '%s' "$1" | sed 's/[][\.*^$]/\\&/g'; }   # a name as a literal in a regex
 
+# A slow emulator (a busy host) can stall a system app until Android asks to close it, and the dialog covers ours.
+# Another app's "isn't responding" gets Close app (Wait loops when it has hung for good); ours is a failure.
+system_anr() {
+  local d="$1" xy
+  if echo "$d" | grep -q 'text="Live Caption"'; then   # the system's own first-run popup, not ours
+    xy=$(find_re "Got it" "$d"); [ -n "$xy" ] && { echo "NAMES $TAG: closed the system's Live Caption popup"; tap $xy; return 0; }
+  fi
+  echo "$d" | grep -q 'text="[^"]* isn.t responding"' || return 1
+  echo "$d" | grep -q 'text="Working German Board Game isn.t responding"' && fail "the game isn't responding (ANR)"
+  echo "NAMES $TAG: closed a system app that wasn't responding: $(echo "$d" | grep -o 'text="[^"]* isn.t responding"' | head -1)"
+  xy=$(find_re "Close app" "$d"); [ -n "$xy" ] && tap $xy
+  return 0
+}
 launch() {
   for _ in 1 2 3; do
     "$ADB" shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 3
     [ -n "$("$ADB" shell pidof $PKG | tr -d '\r\n')" ] && break
   done
   local d
-  for _ in $(seq 1 15); do d=$(dump); echo "$d" | grep -q 'text="Tap to skip"\|text="New game"' && break; sleep 2; done
+  for _ in $(seq 1 20); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="Tap to skip"\|text="New game"' && break; sleep 2; done
   if echo "$d" | grep -q 'text="Tap to skip"'; then tap $((W / 2)) $((H / 2)); sleep 2; fi
-  for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="New game"' && return 0; sleep 1; done
+  for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="New game"' && return 0; sleep 1; done
   fail "the start screen never appeared"
 }
 new_game() { tap $(find_re "New game") || fail "no New game"; for _ in $(seq 1 10); do dump | grep -q 'text="Play"' && return 0; sleep 1; done; fail "no game-start screen"; }
