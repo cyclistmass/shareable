@@ -32,31 +32,12 @@ class InMemoryTransport(val uid: String, private val store: MemoryStore = Memory
         require(room.id !in store.rooms); publish(Snapshot(room, emptyList())); room
     }
     override fun listOpen() = operation { store.rooms.values.map { it.room }.filter { it.status == Status.lobby } }
-    override fun join(id: String, seat: Int, name: String) = operation {
-        val s = snapshot(id); require(s.room.status == Status.lobby && seat in 1..3)
-        require(s.room.seats.none { it.uid == uid }); val old = s.room.seats[seat]
-        require(old.uid == null && old.open && name.isNotBlank())
-        publish(s.copy(room = s.room.copy(seats = s.room.seats.toMutableList().also { it[seat] = old.copy(uid = uid, name = uniqueSeatName(name, s.room.seats.filter { it.uid != null }.map { it.name }), ready = false, open = false, google = google) })))
-    }
-    override fun leave(id: String) = operation {
-        val s = snapshot(id); require(s.room.status == Status.lobby && s.room.host != uid)
-        val i = s.room.seats.indexOfFirst { it.uid == uid }; require(i > 0)
-        publish(s.copy(room = s.room.copy(seats = s.room.seats.toMutableList().also { it[i] = it[i].copy(uid = null, name = "", open = true, ready = false, google = false) })))
-    }
-    override fun editLobby(id: String, seats: List<Seat>, expectedSeats: List<Seat>?) = operation {
-        val s = snapshot(id); require(s.room.status == Status.lobby && seats.size == 4)
-        require(expectedSeats == null || expectedSeats == s.room.seats) { "Lobby changed; try again" }
-        require(seats[0].uid == s.room.host)
-        require(uid == s.room.host || seats.indices.all { i -> seats[i] == s.room.seats[i] ||
-            (s.room.seats[i].uid == uid && seats[i].copy(ready = s.room.seats[i].ready) == s.room.seats[i]) })
-        publish(s.copy(room = s.room.copy(seats = seats)))
-    }
-    override fun start(id: String) = operation {
-        val s = snapshot(id); require(s.room.host == uid && s.room.status == Status.lobby)
-        require(s.room.seats.all { it.uid == null || it.ready })
-        val config = s.room.config.copy(numPlayers = s.room.players.size)
-        publish(s.copy(room = s.room.copy(config = config, status = Status.playing)))
-    }
+    /** Applies one of [RoomOps] to room [id] and publishes the result. */
+    private fun change(id: String, f: (Room) -> Room) = operation { val s = snapshot(id); publish(s.copy(room = f(s.room))) }
+    override fun join(id: String, seat: Int, name: String) = change(id) { RoomOps.join(it, uid, google, seat, name) }
+    override fun leave(id: String) = change(id) { RoomOps.leave(it, uid) }
+    override fun editLobby(id: String, seats: List<Seat>, expectedSeats: List<Seat>?) = change(id) { RoomOps.editLobby(it, uid, seats, expectedSeats) }
+    override fun start(id: String) = change(id) { RoomOps.start(it, uid) }
     override fun submit(id: String, seq: Long, seat: Int, action: String) = operation {
         val s = snapshot(id); require(s.room.status == Status.playing && seq == s.room.nextSeq)
         val driver = store.drivers.getOrPut(id) { SyncDriver() }
@@ -67,18 +48,9 @@ class InMemoryTransport(val uid: String, private val store: MemoryStore = Memory
         require(Rules.isLegal(state, a))
         publish(s.copy(room = s.room.copy(nextSeq = seq + 1), moves = s.moves + Move(seq, seat, uid, action)))
     }
-    override fun finish(id: String) = operation {
-        val s = snapshot(id); require(s.room.host == uid && s.room.status == Status.playing)
-        publish(s.copy(room = s.room.copy(status = Status.done)))
-    }
-    override fun invite(id: String, uids: List<String>) = operation {
-        val s = snapshot(id); require(s.room.host == uid && s.room.status == Status.lobby && uids.size <= 3 && uid !in uids)
-        publish(s.copy(room = s.room.copy(invited = uids)))
-    }
-    override fun setNext(id: String, next: String) = operation {
-        val s = snapshot(id); require(s.room.host == uid && s.room.status == Status.done && s.room.next == null)
-        publish(s.copy(room = s.room.copy(next = next)))
-    }
+    override fun finish(id: String) = change(id) { RoomOps.finish(it, uid) }
+    override fun invite(id: String, uids: List<String>) = change(id) { RoomOps.invite(it, uid, uids) }
+    override fun setNext(id: String, next: String) = change(id) { RoomOps.setNext(it, uid, next) }
     override fun observeInvites(onRooms: (List<Room>) -> Unit, onError: (Throwable) -> Unit): Subscription {
         val listener = { onRooms(store.rooms.values.map { it.room }.filter { it.status == Status.lobby && uid in it.invited }) }
         synchronized(store) { store.inviteListeners.add(listener); listener() }

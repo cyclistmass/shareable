@@ -79,3 +79,11 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, WGBG: two files held literal backspace bytes where `\b` was meant (SeatNamesTest's card-tester name check
   and tools/userplay.sh's menu-build check), so neither check could ever fire. Cause: `\b` passed through a non-raw
   string (Python, printf) in an edit script. Write edit scripts to a file and grep for [\x00-\x08] after scripted edits.
+- 2026-10-21, Bosun: the in-memory transport the unit tests use had its own copy of every room change, and it drifted
+  from Firestore's: a guest quitting a running game was refused in memory but handed to a bot on the server, and
+  TransportTest pinned the wrong behaviour. Both transports now apply net's RoomOps, and AppWritesTest records the
+  app's real Firestore writes into firebase/rules-test/app-writes.json, which the rules tests replay (also with 20
+  spare terms against the 1000-expression budget). A rules or app change that would refuse a real write now fails CI.
+- 2026-10-21, Bosun: slow local device runs move to CI shards (the repo is public, so Actions minutes are free):
+  friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
+  :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.

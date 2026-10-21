@@ -94,6 +94,9 @@ honestly. Never call something done with failing or skipped tests.
 - Agent hooks: every turn logs `WGBG-TURN` lines (`turn= phase= player= prompt=".." legal=TYPE:PAYLOAD,...`);
   send a move with `adb shell am broadcast -a com.mauro.wgbg.MOVE -p com.mauro.wgbg --es move TYPE:PAYLOAD`.
   Each finished local game logs a `WGBG-GAME` line.
+- Before a release: `tools/release_check.sh` runs every automated check in order (unit, rules, APK and its key, device
+  scripts on both lanes, friends_sim) and prints one timed report plus the by-hand user-test list;
+  `tools/emulator_setup.sh test|user` readies a test phone (Play Store and animations off) and hands it back.
 - Scripts: `tools/ci_monkey.sh`, `tools/ci_selfplay.sh`, `tools/ci_trade.sh` (bank and player trades by touch), `tools/ci_withdraw.sh` (withdraw an open offer by touch), `tools/ci_online.sh`, `tools/online_sim.sh`,
   `tools/record_showcase.sh` (README GIFs and the gameplay video), `tools/record_screenshots.sh` (README gallery);
   `tools/emulator.ps1` launches a landscape emulator on Windows.
