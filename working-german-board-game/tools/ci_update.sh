@@ -15,7 +15,7 @@ export MSYS_NO_PATHCONV=1
 # adb.exe on Windows needs Windows paths for the APKs it installs.
 native() { if command -v cygpath >/dev/null; then cygpath -w "$1"; else printf '%s\n' "$1"; fi; }
 
-dump() { local x; for _ in 1 2 3 4 5 6; do x=$("$ADB" exec-out uiautomator dump /dev/tty 2>/dev/null | tr '>' '\n'); case "$x" in *hierarchy*) echo "$x"; return;; esac; sleep 1; done; }
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app answers in 0.2 s; the old release (no WGBG-UI) falls back to uiautomator
 fail() {
   echo "UPDATE FAILED: $*"
   "$ADB" exec-out screencap -p > "$OUT/update-fail.png" 2>/dev/null; dump > "$OUT/update-fail.xml"
@@ -82,6 +82,18 @@ version() { "$ADB" shell dumpsys package $PKG | tr -d '\r' | sed -n 's/.*version
 debuggable() { [ "$("$ADB" shell dumpsys package $PKG | tr -d '\r' | grep -c 'flags=\[.* DEBUGGABLE ')" != 0 ]; }
 # wait_screen <label> <seconds>: the label is on screen within that time.
 wait_screen() { for _ in $(seq "$2"); do on_screen "$1" && return 0; sleep 1; done; return 1; }
+# wait_roll <seconds>: this seat's Roll is on screen within that time. A bot's turn can stop on a trade offer to this
+# seat ("White offers you a trade", Yes / No / Counter offer), which 0.3.4 waits on for good: a player says No.
+wait_roll() {
+  local end=$((SECONDS + $1)) x
+  while [ $SECONDS -lt $end ]; do
+    x=$(dump)
+    grep -qF 'text="Roll"' <<< "$x" && return 0
+    if grep -qF 'offers you a trade' <<< "$x"; then echo "  a bot offers a trade: No"; tap_text "No" 0; continue; fi
+    sleep 1
+  done
+  return 1
+}
 
 if [ -z "$OLD" ]; then
   OLD="$OUT/latest-release.apk"
@@ -104,7 +116,7 @@ my_move || fail "never got a road to place in $from"
 # The second setup round, then the bots play until it's this seat's Roll (the first seat may be a bot, #126).
 my_move || fail "never got the second homestead to place in $from"
 my_move || fail "never got the second road to place in $from"
-wait_screen "Roll" 120 || fail "no Roll after both setup rounds in $from"
+wait_roll 180 || fail "no Roll after both setup rounds in $from"
 before=$(names); echo "players in $from: $before"
 [ -n "$before" ] || fail "no player names on the screen in $from"
 "$ADB" exec-out screencap -p > "$OUT/update-1-before.png"
@@ -122,7 +134,7 @@ sleep 3
 after=$(names); echo "players in $to:  $after"
 "$ADB" exec-out screencap -p > "$OUT/update-2-after.png"
 [ "$before" = "$after" ] || fail "the players changed with the update: '$before' became '$after'"
-wait_screen "Roll" 30 || fail "the resumed game doesn't offer this seat's Roll"
+wait_roll 30 || fail "the resumed game doesn't offer this seat's Roll"
 if debuggable; then
   hooks="debug build: hooks on"
 else

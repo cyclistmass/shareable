@@ -42,7 +42,7 @@ class EndGameMenuTest {
         assertTrue("onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false }" in main)
         // The Leave dialog and a new game come up without the Menu left open over them (device check, 0.3.4).
         assertTrue("StopButton(\"Leave game\", \"menu-exit\") { confirmExit = true; panelOpen = false }" in main)
-        assertTrue("({ seed++; playing = true; panelOpen = false })" in main)
+        assertTrue("({ newGame(\"play again\"); playing = true; panelOpen = false })" in main)
     }
 
     @Test

@@ -25,7 +25,7 @@ if [ "${LIVE_BOARD:-0}" = 1 ]; then
   live_ready=0
   for attempt in $(seq 1 15); do
     "$ADB" shell am broadcast -a com.mauro.wgbg.FILAMENT_VIEW -p "$PKG" --ez live true >/dev/null
-    if "$ADB" logcat -d -s WGBG-3D-VIEW:I | grep -q 'live=true'; then live_ready=1; break; fi
+    if "$ADB" logcat -d -s WGBG-3D-VIEW:I | grep -c 'live=true' >/dev/null; then live_ready=1; break; fi
     sleep 1
   done
   if [ "$live_ready" != 1 ]; then echo "Live board receiver did not start"; exit 1; fi
