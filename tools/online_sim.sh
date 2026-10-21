@@ -6,7 +6,7 @@
 # Needs: both emulator lanes up (tools/emulator.ps1 -Lane 1 / -Lane 2), the debug APK installed on both, and
 #   firebase emulators:start --only firestore,auth --project demo-wgbg   (Java 21+ on PATH; the debug build needs no
 #   google-services.json for this: --es firebase emu sets up the demo project in code)
-# Usage (Git Bash, project root): [FIREBASE=live] [REOPEN_AT=moves] tools/online_sim.sh [ruleset: base|chivalry] [timeout seconds]
+# Usage (Git Bash, project root): [FIREBASE=live] [REOPEN_AT=moves] [EXTRA="--ez ..."] tools/online_sim.sh [ruleset: base|chivalry] [timeout seconds]
 #   REOPEN_AT=150: once the joiner has seen that many moves, close its app for good and open it again; it must rejoin,
 #   catch up and end on the same fingerprint (the 0.3.4 check).
 # Under pipefail a grep that finds nothing fails its whole pipeline: every one here is guarded (|| true, if, &&).
@@ -16,6 +16,8 @@ RULESET="${1:-base}"
 LIMIT="${2:-900}"
 # FIREBASE=live plays on the real project (needs google-services.json in the build and deployed rules).
 FB_EXTRA="--es firebase emu"; [ "${FIREBASE:-emu}" = live ] && FB_EXTRA=""
+# EXTRA: more launch extras for both phones, e.g. "--ez fakegoogle true" (tools/friends_sim.sh).
+EXTRA="${EXTRA:-}"
 HOST=emulator-5554
 GUEST=emulator-5556
 A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
@@ -52,7 +54,7 @@ for d in $HOST $GUEST; do
   "$A" -s $d logcat -c
   "$A" -s $d shell am force-stop com.mauro.wgbg
   "$A" -s $d shell pm clear com.mauro.wgbg >/dev/null   # no remembered room to rejoin, no stale sign-in
-  "$A" -s $d shell am start --activity-clear-task -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true >/dev/null
+  "$A" -s $d shell am start --activity-clear-task -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true $EXTRA >/dev/null
 done
 sleep 5
 tap_text $GUEST "Got it" 2>/dev/null || true
@@ -96,7 +98,7 @@ if [ -n "${REOPEN_AT:-}" ]; then
   for _ in $(seq 1 200); do n=$(moves $GUEST); [ "$n" -ge "$REOPEN_AT" ] && break; sleep 3; done
   echo "joiner saw $n moves; closing its app at $(date +%T)"
   "$A" -s $GUEST shell am force-stop com.mauro.wgbg; sleep 5
-  "$A" -s $GUEST shell am start -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true >/dev/null
+  "$A" -s $GUEST shell am start -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true $EXTRA >/dev/null
   for _ in $(seq 1 60); do m=$(moves $GUEST); [ "$m" -gt "$n" ] && break; sleep 2; done
   [ "$m" -gt "$n" ] || { echo "FAIL: the joiner didn't catch up after reopening ($m move lines)"; exit 1; }
   echo "joiner back at $(date +%T): $m move lines, pid $("$A" -s $GUEST shell pidof com.mauro.wgbg || true)"

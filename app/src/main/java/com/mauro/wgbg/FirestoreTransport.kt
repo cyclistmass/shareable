@@ -30,6 +30,11 @@ object LobbyRepository {
      * create it too, and the first one made is the one every caller gets.
      */
     @Volatile var emulatorHost: String? = null
+    /**
+     * Debug builds only (`--ez fakegoogle true`), and only against the emulators: this phone counts as signed in with
+     * Google, so two-phone sims can reach the friends list, invites and rematch (#72) without real Google accounts.
+     */
+    @Volatile var fakeGoogle: Boolean = false
     /** The emulators' demo project: no google-services.json needed, so any checkout and CI can play online. */
     const val EMULATOR_PROJECT = "demo-wgbg"
     internal val emulatorOptions: FirebaseOptions get() = FirebaseOptions.Builder().setProjectId(EMULATOR_PROJECT)
@@ -48,7 +53,7 @@ object LobbyRepository {
                 auth.useEmulator(emulatorHost, 9099)
             } else db.firestoreSettings = FirebaseFirestoreSettings.Builder()
                 .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build()).build()
-            FirestoreTransport(auth, db)
+            FirestoreTransport(auth, db, fakeGoogle = emulatorHost != null && fakeGoogle)
         }
         transport = result
         result.signIn() // warm anonymous authentication at entry, before a room is selected
@@ -56,12 +61,13 @@ object LobbyRepository {
     }
 }
 
-class FirestoreTransport(private val auth: FirebaseAuth, private val db: FirebaseFirestore) : GameTransport {
+class FirestoreTransport(private val auth: FirebaseAuth, private val db: FirebaseFirestore,
+                         private val fakeGoogle: Boolean = false) : GameTransport {
     private var signingIn: CompletableFuture<String>? = null
     private val games get() = db.collection("games")
     private val uid get() = auth.currentUser?.uid ?: error("Sign in first")
     /** The account calls for Settings' Google sign-in (#83). */
-    val account: GoogleAccount.Ops get() = GoogleAccount.FirebaseOps(auth)
+    val account: GoogleAccount.Ops get() = GoogleAccount.FirebaseOps(auth, fakeGoogle)
     override val google: Boolean get() = account.isGoogle
     /** After a Google sign-in or sign-out: forget the cached sign-in so the next call uses the new user. */
     @Synchronized fun accountChanged() { signingIn = null }

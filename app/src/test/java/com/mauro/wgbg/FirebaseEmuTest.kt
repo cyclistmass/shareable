@@ -61,6 +61,18 @@ class FirebaseEmuTest {
     }
 
     @Test
+    fun `a fake Google sign-in (#72 sims) needs a debug build on the emulators and nothing else sets it`() {
+        assertTrue("LobbyRepository.fakeGoogle = firebaseEmu && intent.getBooleanExtra(\"fakegoogle\", false)" in main, "emu mode only")
+        assertTrue("@Volatile var fakeGoogle: Boolean = false" in repo, "off unless asked")
+        // Even if set, only a transport on the emulators takes it.
+        assertTrue("FirestoreTransport(auth, db, fakeGoogle = emulatorHost != null && fakeGoogle)" in repo, repo)
+        for (f in File("src/main/java/com/mauro/wgbg").listFiles()!!) {
+            if (f.name != "MainActivity.kt") assertFalse("LobbyRepository.fakeGoogle =" in f.readText(), "${f.name} sets it")
+        }
+        assertEquals(1, Regex("""LobbyRepository\.fakeGoogle = """).findAll(main).count())
+    }
+
+    @Test
     fun `the scripts and docs start the emulators on the same demo project`() {
         assertTrue("PROJECT=\"\${2:-demo-wgbg}\"" in File("../tools/ci_online.sh").readText())
         assertTrue("--project demo-wgbg" in File("../tools/online_sim.sh").readText())

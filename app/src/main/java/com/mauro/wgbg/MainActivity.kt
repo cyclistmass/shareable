@@ -192,6 +192,8 @@ class MainActivity : ComponentActivity() {
                 // Debug builds: `--es firebase emu` plays online against the Firebase emulators on the dev PC.
                 val firebaseEmu = debug && intent.getStringExtra("firebase") == "emu"
                 LobbyRepository.emulatorHost = if (firebaseEmu) "10.0.2.2" else null
+                // Debug builds, with the emulators only: `--ez fakegoogle true` counts this phone as signed in with Google (#72 sims).
+                LobbyRepository.fakeGoogle = firebaseEmu && intent.getBooleanExtra("fakegoogle", false)
                 // Debug builds: `--ez autoplay true` lets a bot play your seat in online games (two-phone sims, #35).
                 val autoplay = debug && intent.getBooleanExtra("autoplay", false)
                 // Debug builds: `--ez autosetup true` lets a bot place your opening pieces (scripted UI tests).
