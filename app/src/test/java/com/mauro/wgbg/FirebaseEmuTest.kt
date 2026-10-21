@@ -20,7 +20,8 @@ class FirebaseEmuTest {
         val create = repo.substringAfter("@Synchronized fun create(context: Context): GameTransport {").substringBefore("\n    }\n")
         assertTrue("FirebaseApp.getApps(context).firstOrNull() ?: FirebaseApp.initializeApp(context)\n" +
             "            ?: emulatorHost?.let { FirebaseApp.initializeApp(context, emulatorOptions) }" in create, create)
-        assertTrue("db.useEmulator(emulatorHost, 8080)" in create && "auth.useEmulator(emulatorHost, 9099)" in create)
+        assertTrue("db.useEmulator(emulatorHost, emulatorPorts.first)" in create && "auth.useEmulator(emulatorHost, emulatorPorts.second)" in create)
+        assertTrue("@Volatile var emulatorPorts: Pair<Int, Int> = 8080 to 9099" in repo)
         assertEquals("demo-wgbg", LobbyRepository.EMULATOR_PROJECT)
         assertTrue("setProjectId(EMULATOR_PROJECT)" in repo)
     }
@@ -56,7 +57,7 @@ class FirebaseEmuTest {
         assertTrue(own in 0 until demo, create)
         assertEquals(1, Regex("""emulatorOptions\b""").findAll(repo).count() - 1, "the demo options are built once and used once")
         val emu = create.substringAfter("if (emulatorHost != null) {").substringBefore("} else")
-        assertTrue("db.useEmulator(emulatorHost, 8080)" in emu && "auth.useEmulator(emulatorHost, 9099)" in emu)
+        assertTrue("db.useEmulator(emulatorHost, emulatorPorts.first)" in emu && "auth.useEmulator(emulatorHost, emulatorPorts.second)" in emu)
         assertEquals(2, Regex("""useEmulator\(""").findAll(repo).count(), "useEmulator only behind the emulatorHost check")
     }
 

@@ -14,7 +14,9 @@ set -eEuo pipefail
 trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR
 RULESET="${1:-base}"
 LIMIT="${2:-900}"
-EXTRAS="--es firebase emu --ez fakegoogle true --ez autoplay true --ez quickbots true"
+# PORTS: the emulators' Firestore and Auth ports when not 8080/9099, e.g. PORTS="--ei fsport 8185 --ei authport 9199".
+PORTS="${PORTS:-}"
+EXTRAS="--es firebase emu --ez fakegoogle true --ez autoplay true --ez quickbots true $PORTS"
 HOST=emulator-5554
 GUEST=emulator-5556
 A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
@@ -42,7 +44,7 @@ crashed() {
 }
 
 # 1. A whole game (online_sim clears both apps first, so neither starts with friends).
-EXTRA="--ez fakegoogle true" bash tools/online_sim.sh "$RULESET" "$LIMIT"
+EXTRA="--ez fakegoogle true $PORTS" bash tools/online_sim.sh "$RULESET" "$LIMIT"
 FIRST=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 || true)
 
 # 2. Rematch from the results.

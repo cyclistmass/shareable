@@ -35,6 +35,8 @@ object LobbyRepository {
      * Google, so two-phone sims can reach the friends list, invites and rematch (#72) without real Google accounts.
      */
     @Volatile var fakeGoogle: Boolean = false
+    /** The emulators' Firestore and Auth ports (debug `--ei fsport` / `--ei authport`: a second set beside another one). */
+    @Volatile var emulatorPorts: Pair<Int, Int> = 8080 to 9099
     /** The emulators' demo project: no google-services.json needed, so any checkout and CI can play online. */
     const val EMULATOR_PROJECT = "demo-wgbg"
     internal val emulatorOptions: FirebaseOptions get() = FirebaseOptions.Builder().setProjectId(EMULATOR_PROJECT)
@@ -49,8 +51,8 @@ object LobbyRepository {
             val db = FirebaseFirestore.getInstance(app)
             val auth = FirebaseAuth.getInstance(app)
             if (emulatorHost != null) {
-                db.useEmulator(emulatorHost, 8080)
-                auth.useEmulator(emulatorHost, 9099)
+                db.useEmulator(emulatorHost, emulatorPorts.first)
+                auth.useEmulator(emulatorHost, emulatorPorts.second)
             } else db.firestoreSettings = FirebaseFirestoreSettings.Builder()
                 .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build()).build()
             FirestoreTransport(auth, db, fakeGoogle = emulatorHost != null && fakeGoogle)
