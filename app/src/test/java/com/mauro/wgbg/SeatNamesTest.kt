@@ -88,7 +88,7 @@ class SeatNamesTest {
         val s = GameSetup.decode(v1)!!
         assertEquals(NameTheme.COLOURS, s.theme)
         assertEquals(listOf("Mauro", "Blue", "Purple"), s.playerNames("Mauro"))
-        assertTrue(s.encode().startsWith("v3|"))
+        assertTrue(s.encode().startsWith("v4|"))
     }
 
     @Test

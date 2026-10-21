@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.widthIn
@@ -109,10 +110,12 @@ fun NewGameScreen(
     var naming by remember { mutableStateOf<Int?>(null) }
     // The seat whose colour picker is open, or null.
     var colouring by remember { mutableStateOf<Int?>(null) }
+    // The seat whose cameo picker is open, or null.
+    var picturing by remember { mutableStateOf<Int?>(null) }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
             keepAccess(context, uri)
-            setup = setup.copy(photo = uri.toString())
+            setup = setup.copy(photo = uri.toString()).withSeatCameo(0, null)
         }
     }
 
@@ -124,26 +127,37 @@ fun NewGameScreen(
         Panel(Modifier.weight(1f), scroll = true) {
             Text("Players", style = Wood.title(22.sp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PhotoToken(setup.photo, setup.name, seatInk(setup, 0, fill = true)) {
-                    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
+                val cameos = setup.seatCameos
+                PhotoToken(setup.photo, setup.name, seatInk(setup, 0, fill = true), cameo = cameos[0]) { picturing = 0 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Your name", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
                     NameField(setup.name) { setup = setup.copy(name = it.take(MAX_NAME)) }
                 }
-                Text("Tap photo to pick one", style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.width(90.dp))
+                Text("Tap the picture to change it", style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.width(90.dp))
             }
             // Side by side when each seat gets about 120 dp; on a narrower panel (CI's 640x320 screen) "Greedy" read "Gr",
             // so the seats stack, each with its choices across the panel.
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val names = setup.seatNames
+                val cameos = setup.seatCameos
+                // The initial a seat without a cameo shows: its theme name's, else its colour's (Colours names it so).
+                val label = { i: Int -> names[i] ?: setup.seatColours[i]?.label ?: "${i + 1}" }
                 if (maxWidth >= 380.dp) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], names[i], seatInk(setup, i), Modifier.weight(1f),
+                        picture = { PhotoToken(null, label(i), seatInk(setup, i, fill = true), 26.dp, cameos[i], "seat-$i-picture") { picturing = i } },
                         onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) }, onName = { naming = i })
                 } else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], names[i], seatInk(setup, i), Modifier.fillMaxWidth(), stacked = true,
+                        picture = { PhotoToken(null, label(i), seatInk(setup, i, fill = true), 26.dp, cameos[i], "seat-$i-picture") { picturing = i } },
                         onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) }, onName = { naming = i })
                 }
+            }
+            picturing?.let { i ->
+                CameoPicker(i, setup, setup.seats.indices.map { seatInk(setup, it, fill = true) },
+                    onPick = { setup = setup.withSeatCameo(i, it); picturing = null },
+                    onInitial = { setup = setup.copy(photo = null).withSeatCameo(0, null); picturing = null },
+                    onPhoto = { picturing = null; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onDismiss = { picturing = null })
             }
             // Each seat's colour (Mauro, 0.3.4: "random or I can pick the color when I make the game"), yours too.
             Text("Colours", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
@@ -324,17 +338,23 @@ private fun SeatColourPicker(i: Int, setup: GameSetup, onPick: (SeatColour) -> U
 /** One of seats 2-4: Friend / Bot / Empty, then the bot level and what it means, and its theme name to tap and change. */
 @Composable
 private fun SeatCard(i: Int, seat: SeatSetup, name: String?, ink: androidx.compose.ui.graphics.Color, modifier: Modifier, stacked: Boolean = false,
-                     onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit, onName: () -> Unit) {
+                     picture: @Composable () -> Unit, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit, onName: () -> Unit) {
     Column(
         modifier.background(androidx.compose.ui.graphics.Color(0x47000000), RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 7.dp).testTag("seat-$i"),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        // Stacked, the seat's name sits beside its choices to keep each seat short.
-        val title = @Composable { m: Modifier -> Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, ink), modifier = m) }
+        // Stacked, the seat's name sits beside its choices to keep each seat short. Its cameo (0.3.5) sits by the name,
+        // to tap and change; an empty seat has none.
+        val title = @Composable { m: Modifier ->
+            Row(m, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (seat.kind != SeatKind.EMPTY) picture()
+                Text("Seat ${i + 1}", style = Wood.sans(14.sp, FontWeight.Bold, ink))
+            }
+        }
         if (!stacked) title(Modifier)
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (stacked) title(Modifier.width(56.dp))
+            if (stacked) title(Modifier.width(88.dp))
             for (k in SeatKind.entries) Choice(k.label, seat.kind == k, "seat-$i-${k.name}", Modifier.weight(1f).height(28.dp),
                 radius = 7.dp, size = 12.sp) { onKind(k) }
         }
@@ -459,19 +479,26 @@ internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: Stri
     )
 }
 
-/** Your round token: the photo if you picked one, else your initial on your seat color. */
+/**
+ * A player's round token: their [cameo] (0.3.5) if they have one, else the photo you picked, else the initial on the
+ * seat colour [ring]. A cameo or photo sits in a ring of the seat colour.
+ */
 @Composable
-fun PhotoToken(photo: String?, name: String, ring: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 52.dp, onClick: (() -> Unit)? = null) {
-    val image = rememberPhoto(photo)
+fun PhotoToken(photo: String?, name: String, ring: androidx.compose.ui.graphics.Color, size: androidx.compose.ui.unit.Dp = 52.dp,
+               cameo: String? = null, tag: String = "photo", modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val art = Cameos.ART[cameo]
+    val image = rememberPhoto(photo.takeIf { art == null })
+    val pictured = art != null || image != null
     Box(
-        Modifier.size(size).clip(CircleShape).background(if (image == null) ring else Wood.WOOD_DARK)
-            .border(3.dp, if (image == null) Wood.BRASS_EDGE else ring, CircleShape)
+        modifier.size(size).clip(CircleShape).background(if (pictured) Wood.WOOD_DARK else ring)
+            .border(if (size < 40.dp) 2.dp else 3.dp, if (pictured) ring else Wood.BRASS_EDGE, CircleShape)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .semantics { contentDescription = if (onClick != null) "Change photo" else "$name's photo" }
-            .testTag("photo"),
+            .semantics { contentDescription = if (onClick != null) "Change picture" else "$name's picture" }
+            .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        if (image != null) Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (art != null) Image(painterResource(art), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else if (image != null) Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         else Text(name.trim().take(1).uppercase().ifEmpty { "?" }, style = Wood.title(size.value.times(0.4f).sp, Wood.INK))
     }
 }

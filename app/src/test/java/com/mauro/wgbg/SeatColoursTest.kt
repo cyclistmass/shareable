@@ -154,7 +154,7 @@ class SeatColoursTest {
         val v2 = "v2|Mauro||BASE|10|0|FRIEND:GREEDY:,BOT:EASY:,BOT:GREEDY:,BOT:GREEDY:|COLOURS"
         val old = GameSetup.decode(v2)!!
         assertEquals(SeatColour.DEFAULT.take(4), old.playerColours(5)); assertFalse(old.randomColours)
-        assertTrue(old.encode().startsWith("v3|"))
+        assertTrue(old.encode().startsWith("v4|"))
         assertEquals(SeatColour.DEFAULT.take(3), GameSetup.decode("v1|Mauro||BASE|10|0|FRIEND:GREEDY,BOT:EASY,EMPTY:GREEDY,BOT:GREEDY")!!.playerColours(1))
     }
 
@@ -247,7 +247,7 @@ class SeatColoursTest {
         val f = good.split("|")
         val bad = listOf(
             good.replace("BLACK", "PINK"), good.replace("BLACK", "black"), good.replace(":BLACK", ":BLACK:extra"),
-            f.dropLast(1).joinToString("|") + "|X", f.joinToString("|") + "|R", good.replace("v3|", "v4|"),
+            f.dropLast(1).joinToString("|") + "|X", f.joinToString("|") + "|R", good.replace("v4|", "v5|"),
             f.take(8).joinToString("|"), good.replace(":BLACK", ""),
         )
         for (b in bad) assertNull(GameSetup.decode(b), b)
