@@ -13,7 +13,8 @@
 set -eEuo pipefail
 trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR
 RULESET="${1:-base}"
-LIMIT="${2:-900}"
+# Age of Chivalry games between bots run long (HAVEN-428: 826 moves, just over 15 minutes), so it gets twice the time.
+LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 # FIREBASE=live plays on the real project (needs google-services.json in the build and deployed rules).
 FB_EXTRA="--es firebase emu"; [ "${FIREBASE:-emu}" = live ] && FB_EXTRA=""
 # EXTRA: more launch extras for both phones, e.g. "--ez fakegoogle true" (tools/friends_sim.sh).

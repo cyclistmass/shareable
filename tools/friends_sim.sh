@@ -13,7 +13,8 @@
 set -eEuo pipefail
 trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR
 RULESET="${1:-base}"
-LIMIT="${2:-900}"
+# Age of Chivalry games between bots run long (HAVEN-428: 826 moves, just over 15 minutes), so it gets twice the time.
+LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 # PORTS: the emulators' Firestore and Auth ports when not 8080/9099, e.g. PORTS="--ei fsport 8185 --ei authport 9199".
 PORTS="${PORTS:-}"
 EXTRAS="--es firebase emu --ez fakegoogle true --ez autoplay true --ez quickbots true $PORTS"
