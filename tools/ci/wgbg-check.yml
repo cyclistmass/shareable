@@ -59,14 +59,14 @@ jobs:
           npm install --global firebase-tools@15.33.0
           firebase emulators:exec --only firestore --project demo-wgbg "npm --prefix firebase/rules-test test"
 
-  # Every device step release_check ran on our two lanes, one emulator per shard: 16 shards plus apk, unit and rules
-  # make 19 jobs, so one check fits the 20 free concurrent jobs; a second check at once queues behind it.
+  # Every device step release_check ran on our two lanes plus every per-push shard, one emulator per shard: 17 shards
+  # plus apk, unit and rules make 20 jobs, so one check fills the 20 free concurrent jobs; anything else queues behind it.
   device:
     uses: ./.github/workflows/wgbg-device.yml
     secrets: inherit
     with:
       shards: >-
-        [{"shard":"monkey","minutes":30},{"shard":"touch-base","minutes":30},{"shard":"touch-chivalry","minutes":30},
+        [{"shard":"monkey","minutes":30},{"shard":"selfplay","minutes":20},{"shard":"touch-base","minutes":30},{"shard":"touch-chivalry","minutes":30},
          {"shard":"play-to-end","minutes":40},{"shard":"trade","minutes":40},{"shard":"withdraw","minutes":30},
          {"shard":"reach","minutes":30},{"shard":"online","minutes":30},
          {"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},

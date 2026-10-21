@@ -156,6 +156,8 @@ jobs:
   # play scripts in one shard still took ~17):
   # any crash, ANR or failed check fails the build. The emulator is booted once, snapshotted and cached, so later
   # runs start from the snapshot instead of a cold boot.
+  # Per push only the quick shards, about 6 min each (M5, 2026-10-21): trade, play-to-end, reach, friends and layout run
+  # every night (wgbg-nightly.yml) and in every release check (wgbg-check.yml), with tools/ci/shard.sh.
   device:
     needs: apk
     runs-on: ubuntu-24.04
@@ -163,8 +165,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [monkey, selfplay, touch-base, touch-chivalry, play-to-end, trade, withdraw, reach, online, friends,
-                layout-base, layout-chivalry, layout-cutout, names, colours]
+        shard: [monkey, selfplay, touch-base, touch-chivalry, withdraw, online, names, colours]
     env:
       SHARD: ${{ matrix.shard }}
     steps:
@@ -183,26 +184,21 @@ jobs:
 
       # Firebase emulators on the runner for the online two-client test (#35); the Android emulator reaches them at 10.0.2.2.
       - uses: actions/setup-java@v4
-        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        if: matrix.shard == 'online'
         with:
           distribution: temurin
           java-version: "21"
       - uses: actions/setup-node@v4
-        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        if: matrix.shard == 'online'
         with:
           node-version: "24"
       - name: Start Firebase emulators (Firestore + Auth, demo project)
-        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        if: matrix.shard == 'online'
         run: |
           npm install --global firebase-tools@15.33.0 > /dev/null
           nohup firebase emulators:start --only firestore,auth --project demo-wgbg > fbemu.log 2>&1 &
           for i in $(seq 1 60); do curl -s localhost:9099 > /dev/null && curl -s localhost:8080 > /dev/null && { echo "emulators up after $((i*2)) s"; break; }; sleep 2; done
           tail -5 fbemu.log
-
-      - uses: actions/setup-python@v5
-        if: startsWith(matrix.shard, 'layout-')
-        with:
-          python-version: '3.12'
 
       - name: Enable KVM
         run: |
@@ -245,8 +241,7 @@ jobs:
           ram-size: 4096M
           force-avd-creation: false
           disable-animations: true
-          # friends runs a second copy of this AVD beside it (tools/ci_friends.sh), so both copies boot read-only.
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save ${{ matrix.shard == 'friends' && '-read-only' || '' }}
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           working-directory: working-german-board-game
           script: |
             # Every shard needs the app; only the monkey and online scripts used to install it (the split left play and trade without it).
@@ -259,24 +254,10 @@ jobs:
             # A human seat played by tapping the screen like a finger, with 3 and 4 players; any crash fails.
             [ "$SHARD" != touch-base ] || bash tools/ci_touchplay.sh 100 10 "base:3 base:4"
             [ "$SHARD" != touch-chivalry ] || bash tools/ci_touchplay.sh 100 10 "chivalry:3 chivalry:4"
-            # A whole game to the end screen, seat 0 driven by hooks; a stalled game fails within 60 s with the reason.
-            [ "$SHARD" != play-to-end ] || STALL=60 bash tools/play_to_end.sh chivalry 4 900
-            # Then, on that finished game, the game-over panel and the dice histogram can be reached by touch at 640x320.
-            [ "$SHARD" != play-to-end ] || bash tools/ci_reach.sh end
-            # Trades by touch (#122, #135, #114): bank trades, several lots, open offers, withdrawing an offer, in both rulesets.
-            [ "$SHARD" != trade ] || bash tools/ci_trade.sh
-            [ "$SHARD" != trade ] || bash tools/ci_keyboard.sh
+            # Withdrawing an open offer by touch (#114), in both rulesets.
             [ "$SHARD" != withdraw ] || bash tools/ci_withdraw.sh 300 "base chivalry"
-            # Every button outside the board can be reached by touch on this 640x320 screen, scrolling like a player.
-            [ "$SHARD" != reach ] || bash tools/ci_reach.sh
             # Online play end to end (#35): two clients, one room, a whole game on the Firebase emulators.
             [ "$SHARD" != online ] || bash tools/ci_online.sh apk/app-debug-androidTest.apk demo-wgbg
-            # Friends, rematch and invites (#72) on two phones: this one hosts, a second copy of the emulator joins.
-            [ "$SHARD" != friends ] || bash tools/ci_friends.sh apk/app-debug.apk base
-            # The player list never overlaps itself, the dice or a camera cutout, at every screen size and font scale.
-            [ "$SHARD" != layout-base ] || MODES=base CUTOUTS="" bash tools/ci_layout.sh
-            [ "$SHARD" != layout-chivalry ] || MODES=chivalry CUTOUTS="" bash tools/ci_layout.sh
-            [ "$SHARD" != layout-cutout ] || FONTS="" bash tools/ci_layout.sh
             # Bot names and seat colours picked by taps, kept across a restart, and remembered for the next game.
             [ "$SHARD" != names ] || bash tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine"
             [ "$SHARD" != colours ] || SMALL=1 bash tools/colours_check.sh

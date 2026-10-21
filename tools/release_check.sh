@@ -6,21 +6,23 @@
 #   unit     engine, AI, net, CLI and app unit tests (rules, fuzz, break-it, the app-writes contract)
 #   rules    Firestore rules tests on a private emulator (FS_PORT), including the replay of the app's real writes
 #   apk      the debug APK, signed with the stable key (WGBG_DEBUG_KEYSTORE), and its certificate checked
-#   install  that APK on both lanes
+#   install  that APK on both lanes (local device steps, install to layout: only when asked for in STEPS; remote runs
+#            all of them on GitHub's runners instead and frees both lanes, M5 2026-10-21)
 #   lanes    device scripts, lane 1 and lane 2 side by side: trade and touch play on one, withdraw, monkey, names and
 #            colours on the other
 #   friends  friends_sim on both lanes against a private pair of Firebase emulators (FS_PORT, AUTH_PORT)
 #   layout   ci_layout on lane 1 (slow: ~25 min; CI runs it too)
 #   remote   instead of install/lanes/friends/layout: all of them, plus the update from the last release, on GitHub's
 #            runners (wgbg-check.yml on a test/<branch> Bosun pushes); waits for the run and reports each shard.
-#            STEPS="unit rules remote" leaves only the user test on a local emulator.
+#            The default, STEPS="unit rules apk remote", leaves only the user test (on the APK built here) to a local
+#            emulator. STEPS="unit rules apk install lanes friends" is the old all-local run, for when GitHub is down.
 #
-# Usage (Git Bash, project root): [STEPS="unit rules apk install lanes friends"] [RULESETS="base chivalry"]
+# Usage (Git Bash, project root): [STEPS="unit rules apk remote"] [RULESETS="base chivalry"]
 #   [HOST_SERIAL=emulator-5554] [GUEST_SERIAL=emulator-5556] [FS_PORT=8187 AUTH_PORT=9197] tools/release_check.sh
 # A step that fails is reported and the next one still runs, except that nothing runs on a device without an APK.
 # Logs: $OUT (default $TEMP/wgbg-release-check/<time>/), one file per check.
 set -uo pipefail
-STEPS="${STEPS:-unit rules apk install lanes friends}"
+STEPS="${STEPS:-unit rules apk remote}"
 RULESETS="${RULESETS:-base chivalry}"
 HOST="${HOST_SERIAL:-emulator-5554}"; GUEST="${GUEST_SERIAL:-emulator-5556}"
 FS_PORT="${FS_PORT:-8187}"; AUTH_PORT="${AUTH_PORT:-9197}"
