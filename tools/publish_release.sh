@@ -30,16 +30,17 @@ r=[w for w in json.load(sys.stdin)['workflow_runs'] if 'working' in w['name'] or
 # Every green run for this commit (a re-run may still be going); none green means don't publish.
 print(' '.join(str(w['id']) for w in r if w['conclusion']=='success'))")
 [ -n "$RUNS" ] || { echo "CI is not green for ${SHA:0:7}; not publishing"; exit 1; }
-# Only the per-push CI's APK, built with the Firebase config; never a check run's shards-apk (built without it for
-# the shards). The published 0.3.4 had no config (a local build, hand-uploaded) and was swapped for CI's.
+# Only an APK built with the Firebase config: the per-push CI's release APK, or a check run's publish-release-apk.
+# Never shards-apk (built without the config for the shards): the 0.3.4 asset was swapped for having none. Every
+# green run is searched: one that ran only unit tests (SHARDS: unit) has no APK.
 RUN=; ART=
 for r in $RUNS; do
   ART=$(api "https://api.github.com/repos/$REPO/actions/runs/$r/artifacts" | py -c "
 import json,sys
 print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'] in ('working-german-board-game-release-apk','publish-release-apk')]+[''])[0])")
-# Only an APK built with the Firebase config: the per-push CI's release APK, or a check run's publish-release-apk.
-# Never shards-apk (built without the config for the shards): the 0.3.4 asset was swapped for having none.
-[ -n "$ART" ] || { echo "run $RUN has no publishable release APK artifact (built before #147?); not publishing"; exit 1; }
+  [ -z "$ART" ] || { RUN=$r; break; }
+done
+[ -n "$ART" ] || { echo "no green run for ${SHA:0:7} has a publishable release APK (built before #147?); not publishing"; exit 1; }
 curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://api.github.com/repos/$REPO/actions/artifacts/$ART/zip"
 # The release APK (#147: not debuggable, so no test hooks), never the debug one.
 REL=$(cd "$WORK" && unzip -q apk.zip && find . -name app-release.apk | head -1)
