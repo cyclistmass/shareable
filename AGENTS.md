@@ -96,7 +96,8 @@ honestly. Never call something done with failing or skipped tests.
   Each finished local game logs a `WGBG-GAME` line.
 - Before a release: `tools/release_check.sh` runs every automated check in order (unit, rules, APK and its key, then
   every device script on GitHub's runners: `wgbg-check.yml` on a `test/<branch>`; `STEPS="unit rules apk install lanes
-  friends"` runs them on both local lanes instead) and prints one timed report plus the by-hand user-test list;
+  friends"` runs them on both local lanes instead) and prints one timed report plus the by-hand user-test list; a
+  `SHARDS: friends-base unit` line in the test branch's head commit message runs only those jobs (a script fix's re-run);
   `tools/emulator_setup.sh test|user` readies a test phone (Play Store and animations off) and hands it back.
 - Scripts: `tools/ci_monkey.sh`, `tools/ci_selfplay.sh`, `tools/ci_trade.sh` (bank and player trades by touch), `tools/ci_withdraw.sh` (withdraw an open offer by touch), `tools/ci_online.sh`, `tools/online_sim.sh`,
   `tools/record_showcase.sh` (README GIFs and the gameplay video), `tools/record_screenshots.sh` (README gallery);

@@ -22,7 +22,50 @@ defaults:
     working-directory: working-german-board-game
 
 jobs:
+  # Which jobs this run needs: all of them, unless the pushed head commit's message has a line `SHARDS: <names>` (shard
+  # names from the list below, plus `unit` and `rules` for those jobs), e.g. `SHARDS: friends-base friends-chivalry`.
+  # A script fix then re-runs 2 jobs instead of 20 and leaves the free runners to another branch's check.
+  pick:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: .
+    outputs:
+      shards: ${{ steps.pick.outputs.shards }}
+      unit: ${{ steps.pick.outputs.unit }}
+      rules: ${{ steps.pick.outputs.rules }}
+    steps:
+      - id: pick
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+          ALL: >-
+            [{"shard":"monkey","minutes":30},{"shard":"selfplay","minutes":20},{"shard":"touch-base","minutes":30},{"shard":"touch-chivalry","minutes":30},
+             {"shard":"play-to-end","minutes":40},{"shard":"trade","minutes":40},{"shard":"withdraw","minutes":30},
+             {"shard":"reach","minutes":30},{"shard":"online","minutes":30},
+             {"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},
+             {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},{"shard":"layout-cutout","minutes":60},
+             {"shard":"names","minutes":30},{"shard":"colours","minutes":30},{"shard":"update","minutes":30}]
+        run: |
+          want=$(printf '%s\n' "$MESSAGE" | sed -n 's/^SHARDS: *//p' | tail -1 | tr -s ' ,' '  ')
+          if [ -z "$want" ]; then
+            { echo "shards=$(jq -c . <<< "$ALL")"; echo unit=true; echo rules=true; } >> "$GITHUB_OUTPUT"
+            echo "every job"; exit 0
+          fi
+          # A misspelt name must not quietly check less than asked.
+          for w in $want; do
+            [ "$w" = unit ] || [ "$w" = rules ] || jq -e --arg w "$w" 'any(.[]; .shard == $w)' <<< "$ALL" > /dev/null ||
+              { echo "::error::SHARDS names '$w', which is no shard"; exit 1; }
+          done
+          sel=$(jq -c --arg w " $want " '[.[] | select(.shard as $s | $w | contains(" " + $s + " "))]' <<< "$ALL")
+          case " $want " in *" unit "*) unit=true;; *) unit=false;; esac
+          case " $want " in *" rules "*) rules=true;; *) rules=false;; esac
+          { echo "shards=$sel"; echo "unit=$unit"; echo "rules=$rules"; } >> "$GITHUB_OUTPUT"
+          echo "only: $want"
+
   unit:
+    needs: pick
+    if: needs.pick.outputs.unit == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -42,6 +85,8 @@ jobs:
         run: bash ./gradlew --no-daemon :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
 
   firestore-rules:
+    needs: pick
+    if: needs.pick.outputs.rules == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -53,22 +98,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Rules tests, with the replay of the app's real writes
+      - name: Rules tests
         run: |
           npm ci --prefix firebase/rules-test
           npm install --global firebase-tools@15.33.0
           firebase emulators:exec --only firestore --project demo-wgbg "npm --prefix firebase/rules-test test"
 
   # Every device step release_check ran on our two lanes plus every per-push shard, one emulator per shard: 17 shards
-  # plus apk, unit and rules make 20 jobs, so one check fills the 20 free concurrent jobs; anything else queues behind it.
+  # plus apk, unit and rules make 20 jobs (and the quick pick), so a full check fills the 20 free concurrent jobs; anything
+  # else queues behind it. SHARDS (see pick) runs fewer.
   device:
+    needs: pick
+    if: needs.pick.outputs.shards != '[]'
     uses: ./.github/workflows/wgbg-device.yml
     secrets: inherit
     with:
-      shards: >-
-        [{"shard":"monkey","minutes":30},{"shard":"selfplay","minutes":20},{"shard":"touch-base","minutes":30},{"shard":"touch-chivalry","minutes":30},
-         {"shard":"play-to-end","minutes":40},{"shard":"trade","minutes":40},{"shard":"withdraw","minutes":30},
-         {"shard":"reach","minutes":30},{"shard":"online","minutes":30},
-         {"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},
-         {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},{"shard":"layout-cutout","minutes":60},
-         {"shard":"names","minutes":30},{"shard":"colours","minutes":30},{"shard":"update","minutes":30}]
+      shards: ${{ needs.pick.outputs.shards }}
