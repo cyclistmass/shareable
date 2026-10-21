@@ -109,15 +109,20 @@ jobs:
           if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
             echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
           else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key"; fi
-      - name: Build debug APK (and the instrumented test APK)
-        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
-      # The APK must carry the stable key (its public certificate fingerprint), or phones can't update to it.
-      - name: Check the APK's signing key
-        run: |
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
-          got=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -i 'SHA-256 digest' | head -1 | awk '{print $NF}')
-          echo "APK certificate SHA-256: $got"
-          [ "$got" = "90235a5b47da6ee29b077ea7c4ac94d2907c2126267adb5a999afcc4b5fb0093" ] || { echo "wrong signing key: phones could not update"; exit 1; }
+      # The release APK is what players install (#147): not debuggable, so the test hooks are off. The debug APK is
+      # for the device scripts and testers.
+      - name: Build the release and debug APKs (and the instrumented test APK)
+        run: bash ./gradlew --no-daemon :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+      # Both APKs must carry the stable key (its public certificate fingerprint), or phones can't update to them; the
+      # release one must not be debuggable.
+      - name: Check the APKs' signing key, and that the release is not debuggable
+        run: bash tools/ci/apk_check.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload the release APK (what tools/publish_release.sh publishes)
+        uses: actions/upload-artifact@v4
+        with:
+          name: working-german-board-game-release-apk
+          path: working-german-board-game/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
