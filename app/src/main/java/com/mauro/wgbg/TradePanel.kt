@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -264,7 +266,8 @@ fun TradePanel(
         return
     }
     Row(modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        // Weighted, so the buttons on the right are measured first and the cards take what's left (0.3.4).
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Either tab starts clean: bank picks carried into a player offer made it unsendable (#122).
                 Tab("Players", !bankTab) { if (maritime) { maritime = false; get = IntArray(tradeCards(s)); give = IntArray(tradeCards(s)) } }
@@ -426,16 +429,44 @@ internal fun chestFits(room: Dp, cards: Int): Boolean = room >= 124.dp + (42.dp 
 internal fun tradeCardWidth(room: Dp, cards: Int): Dp =
     ((room - 124.dp) / cards.coerceAtLeast(1) - 6.dp).coerceIn(42.dp, 58.dp)
 
+/** The narrowest a chest card is drawn; a row that still doesn't fit scrolls sideways instead (0.3.4). */
+internal val MIN_CHEST_CARD = 30.dp
+
+/** How wide each of [cards] cards (6 dp apart) is drawn to fit [width]: up to [max], down to [MIN_CHEST_CARD]. */
+internal fun fitCardWidth(width: Dp, cards: Int, max: Dp): Dp =
+    ((width - 6.dp * (cards - 1).coerceAtLeast(0)) / cards.coerceAtLeast(1)).coerceIn(MIN_CHEST_CARD, max.coerceAtLeast(MIN_CHEST_CARD))
+
+/**
+ * A chest's row of [cards] cards, each [content] drawn at the width that fits the room the row is given (up to
+ * [max]); past [MIN_CHEST_CARD] it scrolls sideways, so every card can be reached. In a chest with buttons beside
+ * it, give its column `weight(1f, fill = false)`: the buttons are then measured first and never pushed off screen
+ * (0.3.4: 8 Age of Chivalry cards at font 1.3 on a 640 dp phone hid Discard, and a player who had to discard was stuck).
+ */
+@Composable
+internal fun ChestCardRow(cards: Int, max: Dp, modifier: Modifier = Modifier, content: @Composable (cardWidth: Dp) -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+        val w = if (constraints.hasBoundedWidth) fitCardWidth(maxWidth, cards, max) else max
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { content(w) }
+    }
+}
+
+/** What a chest card says under it ("have 4"), kept to the card's [width]: it shrinks rather than widen the row. */
+@Composable
+internal fun UnderCard(text: String, width: Dp, color: Color = INK, lines: Int = 1) =
+    Text(text, Modifier.width(width), color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false,
+        lineHeight = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
+
 /**
  * One row of cards for a trade: green "+N" on a card's top edge is asked for, red "−N" on its bottom edge is
  * offered. Tap the top half to ask, the bottom half to offer; the "−" under a card (or a long press) takes one back.
  */
 @Composable
-private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWidth: Dp, under: (Int) -> String?, onTap: (Int, CardTap) -> Unit) {
+private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, maxCard: Dp, under: (Int) -> String?, onTap: (Int, CardTap) -> Unit) {
     // The tap handlers below live as long as their card; they must call today's [onTap], not the one from the card's
     // first touch, or a card used in one trade went dead for the next (#122: "can't do a second maritime trade").
     val tap by androidx.compose.runtime.rememberUpdatedState(onTap)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    ChestCardRow(get.size, maxCard) { cardWidth ->
         for (r in get.indices) Column(horizontalAlignment = Alignment.CenterHorizontally) {
             val asked = get[r]; val offered = give[r]
             val lit = asked > 0 || offered > 0
@@ -465,13 +496,12 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
                     modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
             }
             // How many you hold (or the bank rate), big enough to read at a glance (#66).
-            under(r)?.let { Text(it, color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, softWrap = false, lineHeight = 13.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+            under(r)?.let { UnderCard(it, cardWidth, lines = 2) }
             // A "−" to take one back, down to none, like the discard sheet (Mauro: "need to be able to get back to
             // zero"; the long press that also does it was never found). The row keeps its height so nothing jumps.
-            Box(Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(cardWidth).height(18.dp), contentAlignment = Alignment.Center) {
                 if (editable && lit) Text("−", color = INK, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onTap(r, CardTap.TAKE_BACK) }.padding(horizontal = 12.dp).testTag("take-back-$r"))
+                    modifier = Modifier.clickable { onTap(r, CardTap.TAKE_BACK) }.padding(horizontal = 9.dp).testTag("take-back-$r"))
             }
         }
     }
@@ -495,11 +525,12 @@ fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<St
     val owner = if (s.phase == Phase.MASTER_MERCHANT) s.chivalry?.pendingTarget ?: me else me
     Column(modifier.chest().testTag("card-choice").semantics { testTagsAsResourceId = true }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(cardChoiceTitle(s, names), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Up to 8 cards (Age of Chivalry): they shrink, then scroll, to stay on screen (0.3.4).
+        ChestCardRow(choices.size, 42.dp) { w ->
             for (a in choices.sortedBy { it.a }) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { onMove(a) }.testTag("choose-card-${a.a}")) {
-                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
-                Text("${if (owner == me) "have" else "has"} ${s.card(owner, a.a)}", color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = w, height = w * (60f / 42f)))
+                UnderCard("${if (owner == me) "have" else "has"} ${s.card(owner, a.a)}", w)
             }
         }
     }

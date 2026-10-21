@@ -12,7 +12,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -285,10 +288,12 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
     var pile by remember(s.turn, owed) { mutableStateOf(IntArray(tradeCards(s))) }
     val full = pile.sum() == owed
     Row(Modifier.chest().testTag("discard-sheet").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Weighted, so the buttons are measured first and always on screen; the cards shrink, then scroll, to fit what's
+        // left (0.3.4: 8 cards at font 1.3 on a 640 dp phone covered Discard, and a player who had to discard was stuck).
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${cause ?: "A 7: you hold too many cards"}. Choose $owed to discard (${pile.sum()} chosen)", color = CHEST_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Text("Tap a card to add it · hold to take it back", color = CHEST_INK.copy(alpha = 0.7f), fontSize = 11.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ChestCardRow(pile.indices.count { holding(s, me, it) > 0 }, 42.dp) { w ->
                 for (r in pile.indices) {
                     val have = holding(s, me, r)
                     if (have == 0) continue
@@ -296,7 +301,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                         // Today's pile and counts, whatever the handler first saw (the #122 stale-tap pattern).
                         val pick by androidx.compose.runtime.rememberUpdatedState({ add: Boolean -> pile = discardPick(pile, r, add, have, owed) })
                         Box(
-                            Modifier.size(width = 42.dp, height = 60.dp)
+                            Modifier.size(width = w, height = w * (60f / 42f))
                                 .pointerInput(r) {
                                     detectTapGestures(onTap = { pick(true) }, onLongPress = { pick(false) })
                                 }.testTag("discard-card-$r"),
@@ -306,7 +311,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                             if (pile[r] > 0) Text("−${pile[r]}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
                         }
-                        Text("have $have", color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        UnderCard("have $have", w, CHEST_INK)
                     }
                 }
             }
@@ -355,10 +360,12 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
 }
 
 @Composable
-private fun Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, close: () -> Unit) {
+private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, close: () -> Unit) {
     Text(title, color = INK_LIGHT, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    // Choices that are cards show the card art, as in the trade chest; the rest stay worded buttons.
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Choices that are cards show the card art, as in the trade chest; the rest stay worded buttons. Weighted and
+    // scrolling, so Back stays on screen however many rows they wrap to (0.3.4: Windfall's 15 pairs on a 320 dp screen).
+    FlowRow(Modifier.weight(1f, fill = false).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((label, a) in options) {
             val cards = optionCards(a)
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -421,26 +428,32 @@ internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<St
         // Harbour Charter: a row of your resources for each player you can still offer one to.
         val rows = if (pick.options.all { it.type == wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER }) pick.options.groupBy { it.b }
             else mapOf(-1 to pick.options)
-        for ((who, acts) in rows) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (who >= 0) Text("To ${names.getOrElse(who) { "player ${who + 1}" }}", color = CHEST_INK, fontSize = 12.sp,
-                fontWeight = FontWeight.Bold, modifier = Modifier.width(76.dp))
-            for (a in acts) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onMove(a) }.testTag("pick-card-${a.a}-${a.b}")) {
-                when (a.type) {
-                    wgbg.engine.ChivalryActionType.TAKE_PROGRESS, wgbg.engine.ChivalryActionType.DISCARD_PROGRESS ->
-                        ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
-                            progressArt(a.a), progressHint(a.a), w = 64, h = 90)
-                    wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK ->
-                        ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], deckArt(a.a),
-                            "${chivalry.deckSize[a.a]} left", w = 64, h = 90)
-                    else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+        // The rows scroll (down, and each one sideways) and Done stays on screen below them (0.3.4: three Harbour
+        // Charter rows ran past a 320 dp screen, taking Done with them).
+        Column(Modifier.weight(1f, fill = false).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((who, acts) in rows) Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (who >= 0) Text("To ${names.getOrElse(who) { "player ${who + 1}" }}", color = CHEST_INK, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.width(76.dp))
+                for (a in acts) Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { onMove(a) }.testTag("pick-card-${a.a}-${a.b}")) {
+                    when (a.type) {
+                        wgbg.engine.ChivalryActionType.TAKE_PROGRESS, wgbg.engine.ChivalryActionType.DISCARD_PROGRESS ->
+                            ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
+                                progressArt(a.a), progressHint(a.a), w = 64, h = 90)
+                        wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK ->
+                            ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], deckArt(a.a),
+                                "${chivalry.deckSize[a.a]} left", w = 64, h = 90)
+                        else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+                    }
+                    val under = when (a.type) {
+                        wgbg.engine.ChivalryActionType.DISCARD_PROGRESS -> "have ${chivalry.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
+                        wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> "have ${s.hand(me, a.a)}"
+                        else -> null
+                    }
+                    under?.let { Text(it, color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
                 }
-                val under = when (a.type) {
-                    wgbg.engine.ChivalryActionType.DISCARD_PROGRESS -> "have ${chivalry.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
-                    wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> "have ${s.hand(me, a.a)}"
-                    else -> null
-                }
-                under?.let { Text(it, color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
             }
         }
         pick.done?.let { d -> ChestButton("Done", CHEST_NO, "pick-done") { onMove(d) } }

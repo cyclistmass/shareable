@@ -1553,7 +1553,8 @@ fun WatchGameScreen(
                   Text(if (spotList != null) "What goes here?" else confirmTitle(state, chosen[0]), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold)
                   confirmWarning(state, me, chosen[0])?.let { Text(it, color = Color(0xFFFFB4A0), fontSize = 13.sp) }
                   if (spotList != null) SpotPicker(spotList) { send(it) }
-                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                  // Wraps: three "✓ Rob <long name>" at font 1.3 pushed ✗, the only way out, off a 640 dp screen (0.3.4).
+                  FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                       // Compact: a check to place it, a cross to cancel (Mauro: "just an x or check, save space, look cleaner");
                       // a choice that needs words (who to rob) keeps them after the check.
                       if (spotList == null) for (a in chosen) ColorButton(confirmLabel(state, a, names).let { if (it == "Confirm") "✓" else "✓ $it" }, Color(0xFF3E9B4F), "confirm",
