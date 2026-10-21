@@ -73,8 +73,16 @@ class LiveBoardDeviceTest {
 
     private fun phaseLine() = log("WGBG-TURN").lineSequence().last { it.contains("phase=") }
 
-    /** Taps a [type] spot twice (pick, confirm) until [placed]; each try re-reads settled spots and moves to the next one. */
-    private fun placeByTaps(type: String, label: String, inView: (Float, Float) -> Boolean = { _, _ -> true }, placed: () -> Boolean) {
+    /** What a failure needs to be read: each WGBG-TURN line's head (turn, phase, player) and the last 3D lines. */
+    private fun history() = log("WGBG-TURN").lineSequence().filter { it.contains("phase=") }
+        .joinToString(" / ") { it.substringAfter("WGBG-TURN: ").substringBefore(" prompt=") } +
+        " | 3D: " + log("WGBG-3D").lineSequence().filter { it.isNotBlank() }.toList().takeLast(4).joinToString(" / ")
+
+    /**
+     * Taps a [type] spot twice (pick, confirm) until [placed]; each try re-reads settled spots and moves to the next one.
+     * [check] runs while it waits for spots, to fail at once on a state no tap can fix.
+     */
+    private fun placeByTaps(type: String, label: String, inView: (Float, Float) -> Boolean = { _, _ -> true }, check: () -> Unit = {}, placed: () -> Boolean) {
         repeat(4) { attempt ->
             // Right after the previous placement the settled line can still be the old one (no $type yet) on a slow
             // CI emulator: wait for the new moment's spots instead of failing at once.
@@ -89,6 +97,7 @@ class LiveBoardDeviceTest {
             val wait = SystemClock.uptimeMillis() + 15_000
             var nudges = 0
             while (spots.isEmpty() && SystemClock.uptimeMillis() < wait) {
+                check()
                 val off = all().firstOrNull()
                 if (off != null) {
                     val (sx, sy) = off
@@ -101,7 +110,8 @@ class LiveBoardDeviceTest {
                 }
                 Thread.sleep(300); spots = read()
             }
-            assertTrue("no $type spot on screen: ${line.take(400)} | now: ${phaseLine().take(200)}", spots.isNotEmpty())
+            check()
+            assertTrue("no $type spot on screen: ${line.take(400)} | history: ${history().takeLast(1500)}", spots.isNotEmpty())
             val (x, y) = spots[attempt % spots.size]
             tap(x, y); tap(x, y)
             val deadline = SystemClock.uptimeMillis() + 5_000
@@ -138,7 +148,13 @@ class LiveBoardDeviceTest {
             x in display.widthPixels * .4f..display.widthPixels * .90f && y in display.heightPixels * .15f..display.heightPixels * .85f
         }) { phaseLine().contains("phase=BUILD_INITIAL_ROAD") }
         val roadLine = phaseLine()
-        placeByTaps("BUILD_ROAD", "road placed with taps") { phaseLine() != roadLine }
+        // Release check run 39675784727: after the homestead was placed, the game came back at turn 0 asking for a
+        // homestead: the game screen was rebuilt (a new seed), which no tap can fix and a player would see too. Say so.
+        placeByTaps("BUILD_ROAD", "road placed with taps", check = {
+            val now = phaseLine()
+            if (now != roadLine && now.contains("phase=BUILD_INITIAL_SETTLEMENT"))
+                fail("the game started over after its homestead was placed (game screen rebuilt?): ${history().takeLast(1500)}")
+        }) { phaseLine() != roadLine }
         val bitmap = instrument.uiAutomation.takeScreenshot()
         context.cacheDir.resolve("live-device-after-twist.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
