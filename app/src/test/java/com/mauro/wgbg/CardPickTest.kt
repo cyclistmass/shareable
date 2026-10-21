@@ -41,7 +41,7 @@ class CardPickTest {
     @Test
     fun `the prompt says what the pick is, not "Trade, improve your towns, or end your turn"`() {
         val s = ck().also { it.ck!!.pendingTarget = 2; it.phase = Phase.SPY }
-        assertEquals("Spy: take one of Orange's progress cards", ckPrompt(s, listOf(Action.takeProgress(Progress.SPY)), names))
+        assertEquals("Informer: take one of Orange's progress cards", ckPrompt(s, listOf(Action.takeProgress(Progress.SPY)), names))
         s.phase = Phase.COMMERCIAL_HARBOR
         assertTrue(ckPrompt(s, listOf(Action.CK_DONE), names)!!.startsWith("Harbour Charter"))
     }

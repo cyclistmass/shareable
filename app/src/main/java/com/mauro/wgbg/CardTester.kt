@@ -844,18 +844,18 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.SMITH)
             val a = knightSpot(0)!!; knight(0, a); val c = knightSpot(0, setOf(a))!!; knight(0, c, level = 2)
-            howTo = "One basic and one strong knight, and no Fortress (Crown level 3). Tap Play ${name(P.SMITH)}, then tap the basic knight."
-            expect = "The basic knight goes up to strong; the strong one can't become mighty without the Fortress, so the second promotion is dropped."
+            howTo = "One basic and one strong knight, and Crown below level 3. Tap Play ${name(P.SMITH)}, then tap the basic knight."
+            expect = "The basic knight goes up to strong; the strong one can't become mighty before Crown level 3, so the second promotion is dropped."
             change("Your knights' strength", +1, strength(0))
             becomes("Free promotions still to use", 0) { it.ck!!.freePromotions }
             then(play(P.SMITH)); then(Action.promoteKnight(a))
         }
     }
-    add("forge.mighty-with-fortress", P.SMITH, "with the Fortress, strong knights become mighty") {
+    add("forge.mighty-with-fortress", P.SMITH, "at Crown level 3, strong knights become mighty") {
         opening(true).apply {
             progress(0, P.SMITH); level(0, Track.POLITICS, 3)
             val a = knightSpot(0)!!; knight(0, a, level = 2); val c = knightSpot(0, setOf(a))!!; knight(0, c, level = 2)
-            howTo = "Crown is at level 3 (the Fortress). Tap Play ${name(P.SMITH)}, then tap each strong knight."
+            howTo = "Crown is at level 3. Tap Play ${name(P.SMITH)}, then tap each strong knight."
             expect = "Both strong knights become mighty."
             change("Your knights' strength", +2, strength(0))
             then(play(P.SMITH)); then(Action.promoteKnight(a)); then(Action.promoteKnight(c))

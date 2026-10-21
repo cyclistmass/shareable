@@ -120,7 +120,7 @@ internal val FORTUNE = listOf("Sentinel", "Windfall", "Corner the Market", "Trai
 /** What each Fortune card does (same order as [FORTUNE]). */
 val FORTUNE_HINTS = listOf(
     "Move the bandit and take a card from a player next to it. Three or more win the Strongest Watch.",
-    "Take any 2 resources from the bank.",
+    "Pick 2 resources from the bank, alike or different.",
     "Name a resource: everyone gives you all of theirs.",
     "Build 2 roads for free.",
     "Worth 1 point (kept hidden until the end).",
@@ -398,7 +398,7 @@ internal fun cardPick(s: GameState, legal: List<Action>, names: List<String>): C
     fun of(t: wgbg.engine.ActionKind) = legal.filter { it.type == t }
     return when {
         wgbg.engine.CkActionType.TAKE_PROGRESS in kinds ->
-            CardPick("Spy: take one of ${names.getOrElse(ck.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.CkActionType.TAKE_PROGRESS))
+            CardPick("Informer: take one of ${names.getOrElse(ck.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.CkActionType.TAKE_PROGRESS))
         wgbg.engine.CkActionType.DISCARD_PROGRESS in kinds ->
             CardPick("Too many progress cards: discard one", of(wgbg.engine.CkActionType.DISCARD_PROGRESS))
         wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK in kinds ->
