@@ -10,13 +10,16 @@
 # Debug launch extras and broadcasts set the game up (an automated test, not user testing). Screen size, density,
 # font scale, rotation and the cutout overlay are put back on any exit, and the scenery setting goes back to its default.
 # On a failure the screen and the dumps land in $OUT (default: the working dir).
-# Usage: tools/ci_layout.sh   (the debug app installed on $ANDROID_SERIAL or the only device; python3 on the PATH,
-#        or PY="py -3.12" on Windows)
+# Usage: tools/ci_layout.sh   (the debug app installed on $ANDROID_SERIAL or the only device; Python 3: python3, python or py -3,
+#        whichever runs; or PY="py -3.12")
 set -uo pipefail
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 OUT="${OUT:-.}"
-read -ra PY <<< "${PY:-python3}"
+# The first Python that really runs: on Windows "python3" can be the Microsoft Store stub, which only prints a hint.
+if [ -z "${PY:-}" ]; then for c in python3 python "py -3"; do $c -c 'import sys; sys.exit(sys.version_info < (3, 8))' 2>/dev/null && { PY=$c; break; }; done; fi
+[ -n "${PY:-}" ] || { echo "layout: FAILED: no Python 3 found (set PY)"; exit 1; }
+read -ra PY <<< "$PY"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export MSYS_NO_PATHCONV=1
 fail=0; steps=0; t0=$SECONDS
