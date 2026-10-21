@@ -578,7 +578,8 @@ fun WatchGameScreen(
     // Play mode: you are seat 0 ("You"); Watch mode: bots in every seat at full speed. Online: your seat.
     var human by remember { mutableStateOf(!startWatching) }
     val me = net?.me ?: if (human) 0 else -1
-    val names = net?.names ?: if (human) listOf(setup.name.ifBlank { "You" }) + PLAYER_NAMES.drop(1) else PLAYER_NAMES
+    // Each seat's theme name, or its colour (0.3.4); Watch mode names seat 0's bot too.
+    val names = net?.names ?: setup.playerNames(if (human) setup.name.ifBlank { "You" } else null)
     val seats = net?.players?.size ?: setup.players.size
     // Online, a rejected move rolls the room back: the screen then rebuilds its game from the room's moves.
     var epoch by remember { mutableIntStateOf(0) }

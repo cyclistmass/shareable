@@ -160,7 +160,7 @@ fun ckButtonGroups(s: GameState, legal: List<Action>, names: List<String>): List
 fun bankLabel(a: Action) = "Give ${card(a.maritimeGive)} for ${card(a.maritimeGet)}"
 
 /** The prompt line for a C&K turn, by what the legal moves ask for. */
-fun ckPrompt(s: GameState, legal: List<Action>, names: List<String> = PLAYER_NAMES): String? {
+fun ckPrompt(s: GameState, legal: List<Action>, names: List<String>): String? {
     val kinds = legal.map { it.type }.toSet()
     val by = names.getOrElse(s.currentPlayer) { "Someone" }
     return when {

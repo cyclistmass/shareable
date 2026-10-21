@@ -24,7 +24,8 @@ enum class BotLevel(val label: String) {
     }
 }
 
-data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY)
+/** [name]: the theme name picked for this seat (null: the theme's next free name, or the colour under Colours). */
+data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, val name: String? = null)
 
 /** Rulesets the screen offers, with our names (never the original game's). */
 enum class Ruleset(val label: String, val expansion: Expansion, val defaultPoints: Int, val players: IntRange) {
@@ -51,6 +52,8 @@ data class GameSetup(
      * before 0.2.10 turns it off, so it replays the way it was played ([LocalSave.decode]).
      */
     val randomFirst: Boolean = true,
+    /** What the other seats are called (0.3.4); Colours names each player by their colour, as before. */
+    val theme: NameTheme = NameTheme.COLOURS,
 ) {
     init {
         require(seats.size == MAX_SEATS) { "always $MAX_SEATS seats (empty ones are EMPTY)" }
@@ -58,6 +61,18 @@ data class GameSetup(
 
     /** Seats that will play, in seat order (empty seats drop out). */
     val players: List<Int> get() = seats.indices.filter { it == 0 || seats[it].kind != SeatKind.EMPTY }
+
+    /** Each seat's theme name, by seat (null for you, an empty seat, or under Colours). */
+    val seatNames: List<String?> get() = theme.resolve(seats.map { it.name }, seats.indices.map { it != 0 && seats[it].kind != SeatKind.EMPTY })
+
+    /**
+     * The names the game shows, by engine player: [you] for seat 0 (null in Watch mode, where a bot sits there and takes
+     * a theme name too), each other seat's theme name, else the player's colour.
+     */
+    fun playerNames(you: String?): List<String> {
+        val names = theme.resolve(seats.map { it.name }, seats.indices.map { (it != 0 || you == null) && seats[it].kind != SeatKind.EMPTY })
+        return players.mapIndexed { p, seat -> if (seat == 0 && you != null) you else names[seat] ?: colourName(p) }
+    }
 
     val hasFriends get() = seats.drop(1).any { it.kind == SeatKind.FRIEND }
 
@@ -80,7 +95,26 @@ data class GameSetup(
     /** Seat i becomes [kind]; seat 0 (you) never changes. */
     fun withSeat(i: Int, kind: SeatKind) = if (i == 0) this else copy(seats = seats.toMutableList().also { it[i] = it[i].copy(kind = kind) })
 
-    fun withBot(i: Int, level: BotLevel) = if (i == 0) this else copy(seats = seats.toMutableList().also { it[i] = SeatSetup(SeatKind.BOT, level) })
+    fun withBot(i: Int, level: BotLevel) = if (i == 0) this else copy(seats = seats.toMutableList().also { it[i] = it[i].copy(kind = SeatKind.BOT, bot = level) })
+
+    /** A new theme starts every seat on that theme's names in order (the old picks belong to the old theme). */
+    fun withTheme(t: NameTheme) = copy(theme = t, seats = seats.map { it.copy(name = null) })
+
+    /**
+     * Seat i goes by [name], one of the theme's. No two seats share a name: if another seat has it, the two swap.
+     * Every seat's current name is pinned, so the pick never shifts the names of the seats around it.
+     */
+    fun withSeatName(i: Int, name: String): GameSetup {
+        if (i == 0 || theme.who(name) == null || seats[i].kind == SeatKind.EMPTY) return this
+        val now = seatNames
+        return copy(seats = seats.mapIndexed { j, s ->
+            when {
+                j == i -> s.copy(name = name)
+                now[j] == name -> s.copy(name = now[i])
+                else -> s.copy(name = now[j] ?: s.name)
+            }
+        })
+    }
 
     /** Switching ruleset moves points to its default unless the player had changed them. */
     fun withRuleset(r: Ruleset) = copy(ruleset = r, points = if (points == ruleset.defaultPoints) r.defaultPoints else points)
@@ -91,10 +125,11 @@ data class GameSetup(
 
     /**
      * Saved as one line (#68, #69: the start screen comes back with your last game and your name):
-     * v1|name|photo|ruleset|points|decks|kind:bot,kind:bot,kind:bot,kind:bot (name and photo URL-encoded).
+     * v2|name|photo|ruleset|points|decks|kind:bot:seatname,…(one per seat)|theme (names and photo URL-encoded).
+     * v1 had no theme and no seat names; it still reads.
      */
-    fun encode(): String = listOf("v1", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
-        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}" }).joinToString("|")
+    fun encode(): String = listOf("v2", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
+        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}:${enc(it.name ?: "")}" }, theme.name).joinToString("|")
 
     companion object {
         private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
@@ -102,12 +137,17 @@ data class GameSetup(
 
         /** The setup [encode] wrote, or null if [text] is missing, from an unknown version or damaged. */
         fun decode(text: String?): GameSetup? = runCatching {
-            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1")
-            val seats = f[6].split(",").map { s -> val (k, b) = s.split(":"); SeatSetup(SeatKind.valueOf(k), BotLevel.valueOf(b)) }
+            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1" || f.size == 8 && f[0] == "v2")
+            val theme = if (f.size == 8) NameTheme.valueOf(f[7]) else NameTheme.COLOURS
+            val seats = f[6].split(",").map { s ->
+                val p = s.split(":"); require(p.size == f.size - 5)
+                // A name the theme doesn't have (a list changed since) is dropped: the seat takes the next free one.
+                SeatSetup(SeatKind.valueOf(p[0]), BotLevel.valueOf(p[1]), p.getOrNull(2)?.let(::dec)?.takeIf { theme.who(it) != null })
+            }
             require(seats.size == MAX_SEATS && seats[0].kind == SeatKind.FRIEND)
             GameSetup(name = dec(f[1]).take(40).ifBlank { "You" }, photo = dec(f[2]).ifBlank { null }, seats = seats,
                 decks = f[5].toInt().coerceIn(0, MAX_DECKS), ruleset = Ruleset.valueOf(f[3]),
-                points = f[4].toInt().coerceIn(POINTS_RANGE))
+                points = f[4].toInt().coerceIn(POINTS_RANGE), theme = theme)
         }.getOrNull()
 
         const val MAX_SEATS = 4
