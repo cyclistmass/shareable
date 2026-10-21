@@ -17,7 +17,7 @@ fail=0
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 tap_text() { local xy; xy=$(dump | grep "text=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 1.5; }
 box() { dump | grep 'class="android.widget.EditText"' | sed -n "${1}p" | centre; }
-on() { dump | grep -q "text=\"$1\""; }
+on() { grep -q "text=\"$1\"" <<< "$(dump)"; }
 kb() { "$ADB" shell dumpsys input_method | grep -c "mInputShown=true" >/dev/null; }
 key() { "$ADB" shell input keyevent "KEYCODE_$1"; sleep 2; }
 bad() { echo "keyboard: FAILED: $*"; fail=1; "$ADB" exec-out screencap -p > "${OUT:-.}/keyboard-fail.png" 2>/dev/null; }
@@ -61,7 +61,8 @@ for _ in $(seq 1 10); do on "New game" && break; sleep 1; done
 scroll_to() { on "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
   [ "$w" -lt "$h" ] && read -r w h <<< "$h $w"
   for x in $((w * 3 / 4)) $((w / 4)); do for _ in 1 2 3; do "$ADB" shell input swipe $x $((h * 3 / 4)) $x $((h / 4)) 400; sleep 1; on "$1" && return 0; done; done; return 1; }
-go() { scroll_to "$1"; tap_text "$1" && on "$2" || { bad "\"$1\" didn't open its screen"; [ $fail = 0 ] || { echo "keyboard: FAILED"; exit 1; }; }; }
+# A busy device can drop a tap (names_check after a relaunch): while the button is still there, it gets one more.
+go() { local t; for t in 1 2; do scroll_to "$1"; tap_text "$1" && { on "$2" || { sleep 1.5; on "$2"; }; } && return 0; on "$1" || break; done; { bad "\"$1\" didn't open its screen"; [ $fail = 0 ] || { echo "keyboard: FAILED"; exit 1; }; }; }
 go "New game" "Players"
 # Game-start screen (marked by its Players heading: on a narrow screen the stacked seats push Base game below the fold);
 # leaving goes back to the start screen.
