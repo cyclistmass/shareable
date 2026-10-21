@@ -94,3 +94,4 @@ move it to **Done** with the commit when it lands.
   (Coverage.kt: empty bank, odd hands halved, turn-limit draws, every Raiders outcome). Found: random play never
   empties a progress deck (0 in 1000 games); only ChivalryRulesTest's stacked deck does. Next (Phase B): `--el seed`
   and `--es dice` debug extras so ci_trade, ci_withdraw and reach-end run on fixed dice.
+- layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d
