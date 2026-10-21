@@ -35,11 +35,12 @@ orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (th
 # The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
 dump() {
   local x
-  for _ in 1 2 3; do
+  for _ in 1 2 3 4 5 6; do
     "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
     "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
   done
+  echo "uiautomator dump failed 6 times (busy device?)" >&2
 }
 # Centre of the first on-screen text exactly $1 (optionally in $2 = a dump already taken).
 find_text() {

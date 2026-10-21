@@ -188,6 +188,8 @@ object CardTester {
         seats = listOf(SeatSetup(SeatKind.FRIEND)) + List(GameSetup.MAX_SEATS - 1) { SeatSetup(SeatKind.BOT, BotLevel.GREEDY) },
         ruleset = if (state.ck != null) Ruleset.CHIVALRY else Ruleset.BASE,
         points = state.config.vpToWin.coerceIn(GameSetup.POINTS_RANGE),
+        // The scenarios name the bots by colour ("Blue gives you 3 Grain"), so the tester's game always does too.
+        theme = NameTheme.COLOURS,
     )
 
     // ------------------------------------------------------------ the scenarios
@@ -197,9 +199,10 @@ object CardTester {
 
 // ------------------------------------------------------------------ building positions
 
-private val NAMES = listOf("you", "Blue", "Orange", "White")
-private fun who(p: Int) = NAMES[p]
-private fun Who(p: Int) = NAMES[p].replaceFirstChar { it.uppercase() }
+/** The bots by the names the tester's game shows (colours, [CardTester.setupFor]); the scenario texts use these. */
+internal val TESTER_NAMES = listOf("you") + (1 until GameSetup.MAX_SEATS).map(::colourName)
+private fun who(p: Int) = TESTER_NAMES[p]
+private fun Who(p: Int) = TESTER_NAMES[p].replaceFirstChar { it.uppercase() }
 
 /** A position under construction, with the helpers the scenarios share. Everything goes through the bank or a deck. */
 internal class Bench(val s: GameState) {

@@ -20,7 +20,8 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
     override fun close() = client.close()
     fun model(room: Room): Lobby = Lobby(id, setup.copy(decks = room.decks,
         ruleset = Ruleset.entries.first { it.expansion == room.config.expansion }, points = room.config.vpToWin),
-        room.seats.map { LobbySeat(it.name.takeIf { _ -> it.uid != null }, it.bot?.let(BotLevel::valueOf), it.ready, open = it.open) },
+        room.seats.map { LobbySeat(it.name.takeIf { _ -> it.uid != null }, it.bot?.let(BotLevel::valueOf), it.ready, open = it.open,
+            botName = it.name.takeIf { n -> it.uid == null && n.isNotBlank() }) },
         me = room.seats.indexOfFirst { it.uid == uid }.coerceAtLeast(0), host = room.host == uid)
     /**
      * What leaving tells the room, if anything. A guest leaving the lobby frees the seat; quitting a running game hands it
@@ -47,7 +48,7 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
             transport.signIn().thenCompose { uid ->
                 create(transport, setup, uid, code, attempts, nextCode) { id ->
                     val seats = Lobby.host(setup, id).seats.mapIndexed { i, s ->
-                        Seat(if (i == 0) uid else null, s.name ?: "", s.bot?.name, s.open, s.ready, google = i == 0 && transport.google)
+                        Seat(if (i == 0) uid else null, s.name ?: s.botName ?: "", s.bot?.name, s.open, s.ready, google = i == 0 && transport.google)
                     }
                     Room(id, uid, setup.config(), seed, seats, decks = setup.decks, invited = invited)
                 }
@@ -154,13 +155,18 @@ class OnlineSeats(room: Room, uid: String) {
     val isHost: Boolean = room.host == uid
     val config: wgbg.engine.GameConfig = room.config.copy(numPlayers = players.size)
     val seed: Long = room.seed
-    /** Names by engine player; your own seat shows the name you typed (Mauro: it said "You" instead of my name). */
+    /**
+     * Names by engine player; your own seat shows the name you typed (Mauro: it said "You" instead of my name). A bot
+     * goes by the host's theme name (0.3.4), or its colour: never its level, which only took room (Mauro), and never a
+     * name a person at the table already has.
+     */
     val names: List<String> = players.mapIndexed { i, s ->
         val seat = room.seats[s]
+        val people = room.seats.filter { it.uid != null }.map { it.name.trim().lowercase() }
         when {
             i == me -> seat.name.ifBlank { "You" }
-            seat.uid != null -> seat.name.ifBlank { PLAYER_NAMES[i] }
-            else -> PLAYER_NAMES[i]   // just the colour name: the bot's level only took room (Mauro)
+            seat.uid != null -> seat.name.ifBlank { colourName(i) }
+            else -> seat.name.takeIf { it.isNotBlank() && it.trim().lowercase() !in people } ?: colourName(i)
         }
     }
     private val bots: List<BotLevel?> = players.map { s -> room.seats[s].takeIf { it.uid == null }?.bot?.let(BotLevel::valueOf) }

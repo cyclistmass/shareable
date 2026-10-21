@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -97,6 +98,8 @@ fun NewGameScreen(
     // The deck size to come back to when switching Random -> Card deck (72 by default, as drawn).
     var lastDecks by rememberSaveable { mutableIntStateOf(if (initial.decks > 0) initial.decks else 2) }
     val context = LocalContext.current
+    // The seat whose name picker is open, or null.
+    var naming by remember { mutableStateOf<Int?>(null) }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
             keepAccess(context, uri)
@@ -124,13 +127,24 @@ fun NewGameScreen(
             // Side by side when each seat gets about 120 dp; on a narrower panel (CI's 640x320 screen) "Greedy" read "Gr",
             // so the seats stack, each with its choices across the panel.
             BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val names = setup.seatNames
                 if (maxWidth >= 380.dp) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.weight(1f),
-                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], names[i], Modifier.weight(1f),
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) }, onName = { naming = i })
                 } else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], Modifier.fillMaxWidth(), stacked = true,
-                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) })
+                    for (i in 1 until GameSetup.MAX_SEATS) SeatCard(i, setup.seats[i], names[i], Modifier.fillMaxWidth(), stacked = true,
+                        onKind = { setup = setup.withSeat(i, it) }, onBot = { setup = setup.withBot(i, it) }, onName = { naming = i })
                 }
+            }
+            // What the bots are called (Mauro, 0.3.4): their colours, or a theme; each seat then picks from its names.
+            // The label goes above the chips: beside them it floated loose once they wrapped on a narrow screen.
+            Text("Bot names", style = Wood.sans(14.sp, color = Wood.INK_SOFT))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (t in NameTheme.entries) Choice(t.label, setup.theme == t, "theme-${t.name}", Modifier.height(30.dp),
+                    radius = 8.dp, size = 12.sp) { setup = setup.withTheme(t) }
+            }
+            naming?.let { i ->
+                SeatNamePicker(i, setup, onPick = { setup = setup.withSeatName(i, it); naming = null }, onDismiss = { naming = null })
             }
             Text("Game", style = Wood.title(18.sp), modifier = Modifier.padding(top = 4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -217,9 +231,10 @@ private fun Panel(modifier: Modifier, scroll: Boolean = false, content: @Composa
     )
 }
 
-/** One of seats 2-4: Friend / Bot / Empty, then the bot level and what it means. */
+/** One of seats 2-4: Friend / Bot / Empty, then the bot level and what it means, and its theme name to tap and change. */
 @Composable
-private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, stacked: Boolean = false, onKind: (SeatKind) -> Unit, onBot: (BotLevel) -> Unit) {
+private fun SeatCard(i: Int, seat: SeatSetup, name: String?, modifier: Modifier, stacked: Boolean = false, onKind: (SeatKind) -> Unit,
+                     onBot: (BotLevel) -> Unit, onName: () -> Unit) {
     Column(
         modifier.background(androidx.compose.ui.graphics.Color(0x47000000), RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 7.dp).testTag("seat-$i"),
@@ -244,6 +259,36 @@ private fun SeatCard(i: Int, seat: SeatSetup, modifier: Modifier, stacked: Boole
             SeatKind.FRIEND -> Text("Kept open for a friend when you Host a room. Play on this phone: a bot sits here.",
                 style = Wood.sans(12.sp, color = Wood.INK_SOFT))
             SeatKind.EMPTY -> Text("Nobody sits here", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
+        }
+        if (name != null && seat.kind != SeatKind.EMPTY) Choice("$name ▾", false, "seat-$i-name", Modifier.fillMaxWidth().height(28.dp),
+            radius = 7.dp, size = 13.sp, onClick = onName)
+    }
+}
+
+/** The names of the setup's theme for seat [i], and which seat already has each (picking it swaps the two). */
+@Composable
+private fun SeatNamePicker(i: Int, setup: GameSetup, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val names = setup.seatNames
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.widthIn(max = 420.dp).brassEdgedWood().padding(horizontal = 14.dp, vertical = 12.dp).testTag("seat-name-picker"),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Seat ${i + 1}: ${setup.theme.label}", style = Wood.title(18.sp, Wood.SEAT_TEXT[i]))
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                setup.theme.names.forEachIndexed { k, t ->
+                    val holder = names.indexOf(t.name).takeIf { it >= 0 && it != i }
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .background(if (names[i] == t.name) Wood.BRASS.copy(alpha = 0.35f) else androidx.compose.ui.graphics.Color(0x47000000), RoundedCornerShape(8.dp))
+                            .clickable(role = Role.RadioButton) { onPick(t.name) }.padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag("seat-name-$k"),
+                    ) {
+                        // Names only (option for Mauro): the "who she was" lines stay in NameTheme for later.
+                        Text(t.name + (holder?.let { "  (Seat ${it + 1}: swaps)" } ?: ""), style = Wood.sans(15.sp, FontWeight.Bold))
+                    }
+                }
+            }
         }
     }
 }

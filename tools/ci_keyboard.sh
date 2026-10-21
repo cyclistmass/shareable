@@ -13,8 +13,8 @@ PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
 fail=0
 
-dump() { for _ in 1 2 3; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; }
+dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 tap_text() { local xy; xy=$(dump | grep "text=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 1.5; }
 box() { dump | grep 'class="android.widget.EditText"' | sed -n "${1}p" | centre; }

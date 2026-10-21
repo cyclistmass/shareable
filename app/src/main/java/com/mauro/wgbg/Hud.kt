@@ -51,7 +51,7 @@ private val HUD_TEXT = Color(0xFFEDE6D8)
 
 /** The roll and what came of it, pinned to a corner of the board. */
 @Composable
-fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String> = PLAYER_NAMES, modifier: Modifier = Modifier,
+fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String>, modifier: Modifier = Modifier,
             /** This phone's player (their turns read "Your turn"), or -1 when only bots play. */
             me: Int = -1,
             /** Earlier turns, newest first: shown below this turn so you can scroll back to see what everyone did (#65). */
