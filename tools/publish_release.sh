@@ -57,7 +57,18 @@ if [ -n "${APK:-}" ]; then
 fi
 # Whatever is published: the stable key, not debuggable, and the Firebase config (an APK= from a debug or a local
 # build is refused here too: local builds never have the config, and 0.3.4's hand-uploaded one had none).
-bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
+verify() { bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$1"; }
+verify "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
+APK_SHA=$(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)
+# back <what> <curl args...>: downloads the APK as players or the API serve it (three tries: the CDN can lag a moment)
+# and checks it is the one checked above, byte for byte, and passes the same check.
+back() {
+  local what="$1" f="$WORK/back.apk" got=; shift
+  for _ in 1 2 3; do rm -f "$f"; curl -sSfL -m 900 -o "$f" "$@" && got=$(sha256sum < "$f" | cut -c1-64) && [ "$got" = "$APK_SHA" ] && break; sleep 10; done
+  [ "$got" = "$APK_SHA" ] || { echo "$what: downloaded back as ${got:-nothing}, not $APK_SHA" >&2; return 1; }
+  verify "$f" >&2 || { echo "$what: the APK served fails its check" >&2; return 1; }
+  echo "$what: served APK matches ($APK_SHA) and passes its check" >&2
+}
 
 # KNOWN=<text> adds a Known issues section (read from the environment, so its quotes and $ stay as written).
 KNOWN="${KNOWN:-}" py -c "
