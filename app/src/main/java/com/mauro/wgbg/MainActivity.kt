@@ -306,9 +306,10 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
     var screen by rememberSaveable { mutableStateOf(if (start != null) Screen.GAME else if (inviteCode != null) Screen.JOIN else Screen.START) }
     val context0 = LocalContext.current.applicationContext
     // Your last game's settings and your name, kept across restarts (#68, #69); debug starts use the defaults.
-    val savedSetup = remember { context0.getSharedPreferences("setup", android.content.Context.MODE_PRIVATE) }
+    // Saved on every change on the game-start screen too (0.3.4), so closing the app before Play keeps them.
+    val setupStore = remember { SetupStore.of(context0.getSharedPreferences("setup", android.content.Context.MODE_PRIVATE)) }
     var setup by remember {
-        val last = if (start == null && players == 0) GameSetup.decode(savedSetup.getString("last", null)) else null
+        val last = if (start == null && players == 0) setupStore.load() else null
         val base = last ?: if (start == "chivalry") GameSetup().withRuleset(Ruleset.CHIVALRY) else GameSetup()
         // `--ei players N` (debug): you plus N-1 bots, the other seats empty.
         mutableStateOf(if (players in 2..GameSetup.MAX_SEATS) base.copy(seats = List(GameSetup.MAX_SEATS) { i ->
@@ -439,31 +440,32 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
                 env = splashEnv, sound = splashSound,
             )
             Screen.SETUP -> { BackHandler { screen = Screen.START }; NewGameScreen(
-                onStart = { setup = it.trimmedName(); savedSetup.edit().putString("last", setup.encode()).apply(); resuming = null; gameNo++; screen = Screen.GAME },
+                onStart = { setup = it.trimmedName(); setupStore.save(setup); resuming = null; gameNo++; screen = Screen.GAME },
                 initial = setup,
                 onOpenLobby = { picked -> val s = picked.trimmedName()
-                    setup = s; savedSetup.edit().putString("last", s.encode()).apply(); busy = true; problem = null
+                    setup = s; setupStore.save(s); busy = true; problem = null
                     withTransport { t -> LobbySession.host(t, s, java.security.SecureRandom().nextLong()).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
                     } }
                 },
-                onJoinRoom = { s -> setup = s; savedSetup.edit().putString("last", s.encode()).apply(); problem = null; screen = Screen.JOIN },
+                onJoinRoom = { s -> setup = s; setupStore.save(s); problem = null; screen = Screen.JOIN },
                 resumeRoom = resumeCode.takeIf { session == null && !busy },
                 onResume = { resumeCode?.let { rejoin(it) } },
                 resumeGame = localSave?.let { "Resume your ${it.setup.ruleset.label.removeSuffix(" game")} game" },
                 onResumeGame = { localSave?.let { setup = it.setup; resuming = it; gameNo++; screen = Screen.GAME } },
                 // Look & art shows the ruleset chosen on screen, and the choices are still there on the way back.
-                onLookAndArt = { s -> setup = s; savedSetup.edit().putString("last", s.encode()).apply(); screen = Screen.LOOK },
+                onLookAndArt = { s -> setup = s; setupStore.save(s); screen = Screen.LOOK },
                 onPlayIntro = { intro = true },
                 onFeedback = { feedback = true },
                 // The card tester (#133): debug builds only, never in a release.
                 onCardTester = if (context0.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) ({ screen = Screen.CARD_TEST }) else null,
+                onChange = { s -> setup = s; setupStore.save(s) },
             ) }
             Screen.CARD_TEST -> CardTesterRoot(setup.name, onExit = { screen = Screen.SETUP })
             Screen.JOIN -> {
                 BackHandler { screen = Screen.SETUP }
                 JoinRoomScreen(setup.name, busy, initialCode = inviteCode ?: "", onJoin = { code, name ->
-                    setup = setup.copy(name = name.trim()); busy = true; problem = null
+                    setup = setup.copy(name = name.trim()); setupStore.save(setup); busy = true; problem = null
                     withTransport { t -> joinFirstOpenSeat(t, setup, code).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
                     } }
