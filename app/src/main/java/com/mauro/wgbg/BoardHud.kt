@@ -69,7 +69,9 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 /** The turn whose roll the mini cards show (#47); null shows none. */
                 roll: TurnReport? = null,
                 /** False inside the one left side panel (#73), which draws the frame for both halves. */
-                framed: Boolean = true) {
+                framed: Boolean = true,
+                /** Each player's cameo id (0.3.5), or null for the plain colour dot. */
+                cameos: List<String?> = emptyList()) {
     version // the state object is mutated in place; this changing value makes the strip redraw after each move
     // Taller than the height it's given (the room above the dice: a short screen, a large font, the Raiders warning, six
     // seats), the whole list shrinks to fit, so every row stays in sight; it never scrolls White away (0.3.4, Mauro).
@@ -102,16 +104,26 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 Modifier.then(if (turn) Modifier.border(1.dp, Color(0xFFC9A04A), RoundedCornerShape(8.dp)) else Modifier).padding(horizontal = 6.dp, vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // The score sits in the player's colour dot, so the strip needs no score column (Mauro).
-                Box(Modifier.size(26.dp).background(PLAYER_COLORS[p], CircleShape).border(1.dp, Color(0xFFF1D58A), CircleShape).testTag("score-$p"),
+                // The score sits in the player's colour dot, so the strip needs no score column (Mauro). The dot is a fixed
+                // size, so its number is sized to the dot, not the font scale (at 1.3 it shrank to a speck); 10 and more
+                // shrink a step rather than wrap (0.3.4).
+                val fs = LocalDensity.current.fontScale
+                val score = @Composable { max: Float, min: Float, ink: Color ->
+                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = (max / fs).sp, fontWeight = FontWeight.Bold,
+                        lineHeight = ((max + 2) / fs).sp, maxLines = 1, softWrap = false,
+                        autoSize = TextAutoSize.StepBased(minFontSize = (min / fs).sp, maxFontSize = (max / fs).sp), modifier = Modifier.padding(horizontal = 1.dp),
+                        color = ink)
+                }
+                val cameo = cameos.getOrNull(p)?.takeIf { it in Cameos.PAINTED }
+                // With a cameo (0.3.5, sheet B): the portrait in a ring of the player's colour, the score on a worn brass badge.
+                if (cameo != null) Box(Modifier.size(30.dp).testTag("score-$p")) {
+                    CameoDisc(cameo, PLAYER_COLORS[p], 30.dp)
+                    Box(Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 3.dp).size(17.dp).background(Wood.BRASS, CircleShape)
+                        .border(1.dp, Wood.BRASS_EDGE, CircleShape), contentAlignment = Alignment.Center) { score(10f, 6f, Color(0xFF2B2118)) }
+                }
+                else Box(Modifier.size(26.dp).background(PLAYER_COLORS[p], CircleShape).border(1.dp, Color(0xFFF1D58A), CircleShape).testTag("score-$p"),
                     contentAlignment = Alignment.Center) {
-                    // The dot is a fixed 26 dp, so its number is sized to the dot, not the font scale (at 1.3 it shrank to a
-                    // speck); 10 and more shrink a step rather than wrap (0.3.4).
-                    val fs = LocalDensity.current.fontScale
-                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = (14 / fs).sp, fontWeight = FontWeight.Bold,
-                        lineHeight = (16 / fs).sp, maxLines = 1, softWrap = false,
-                        autoSize = TextAutoSize.StepBased(minFontSize = (9 / fs).sp, maxFontSize = (14 / fs).sp), modifier = Modifier.padding(horizontal = 2.dp),
-                        color = if (PLAYER_COLORS[p].luminance() > 0.35f) Color(0xFF2B2118) else Color.White)
+                    score(14f, 9f, if (PLAYER_COLORS[p].luminance() > 0.35f) Color(0xFF2B2118) else Color.White)
                 }
                 Column(Modifier.width(74.dp)) {
                     // A long name (16 letters online) or a large font shrinks, then ends in "…", on one line (0.3.4).
