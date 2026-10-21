@@ -23,11 +23,12 @@ read -r W H < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x 
 
 dump() {
   local x
-  for _ in 1 2 3; do
+  for _ in 1 2 3 4 5 6; do
     "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
     "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
   done
+  echo "uiautomator dump failed 6 times (busy device?)" >&2
 }
 # Centre of the first element whose text matches the regex $1 (whole text), in dump $2 or a fresh one.
 find_re() {
@@ -42,7 +43,8 @@ fail() { echo "NAMES $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | gr
 reach() {
   local x="${2:-$((W / 4))}" xy d
   for i in $(seq 0 8); do
-    d=$(dump); xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
+    d=$(dump); [ -n "$d" ] || d=$(dump)   # no dump (a busy device) says nothing about the screen: look again first
+    xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
   done
