@@ -3,8 +3,8 @@
 #   1. a fresh start, New game, the theme, then each seat's name picked from the picker (screenshots of both);
 #   2. Play: the player list shows the names (screenshot); then closed mid-game and resumed from the start screen, the
 #      names are still there;
-#   3. closed again and New game opened: it remembers the names from the last game. (The game-start screen is saved
-#      when a game starts, so choices made there are lost if the app is closed before Play, names and all.)
+#   3. closed again and New game opened: it remembers the names from the last game.
+#   Between 1 and 2, the app is closed before Play: the game-start screen saves every change, so the names come back.
 #   4. monkey on the New game screen, failing on a crash.
 # Debug extras: none. The game's log is only read to know the game has started.
 # Usage: ANDROID_SERIAL=emulator-5554 tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine" [monkey events=2000]
@@ -103,6 +103,12 @@ for k in "${!PICKS[@]}"; do
 done
 shot picked
 echo "NAMES $TAG: picked ${PICKS[*]}"
+
+# Closed before Play: every change was saved as it was made.
+sleep 1; "$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
+for name in "${PICKS[@]}"; do reach "$(re "$name") ▾" >/dev/null || fail "$name was lost when the app closed before Play"; done
+xy=$(reach "$(re "$THEME")") || fail "no \"$THEME\" theme after reopening"
+echo "NAMES $TAG: kept after closing the app before Play"
 
 # 2. Play: the player list shows them; close mid-game and resume, still there.
 xy=$(reach 'Play' $((W * 3 / 4))) || fail "no Play"; tap $xy

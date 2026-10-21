@@ -37,6 +37,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,8 +96,11 @@ fun NewGameScreen(
     onFeedback: (() -> Unit)? = null,
     /** Debug builds only (#133): the card tester's checklist. */
     onCardTester: (() -> Unit)? = null,
+    /** Gets every change as it's made (0.3.4), so the choices are saved before Play, Back or the app closing. */
+    onChange: ((GameSetup) -> Unit)? = null,
 ) {
     var setup by remember { mutableStateOf(initial) }
+    if (onChange != null) LaunchedEffect(Unit) { snapshotFlow { setup }.drop(1).collect { onChange(it) } }
     // The deck size to come back to when switching Random -> Card deck (72 by default, as drawn).
     var lastDecks by rememberSaveable { mutableIntStateOf(if (initial.decks > 0) initial.decks else 2) }
     val context = LocalContext.current
