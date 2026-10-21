@@ -27,6 +27,19 @@ export MSYS_NO_PATHCONV=1
 . "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
 # The screen of device $1 (and the same uiautomator fallback, retried, for a busy host's "null root node").
 dump() { UI_SERIAL=$1 ADB=$A ui_dump; }
+# On any failure, each phone's screen, screen dump and log beside the shard log (the device workflow uploads *.png,
+# *.xml and *.logcat.txt), so a CI failure can be read from its artifact alone.
+evidence() {
+  local d f
+  for d in $HOST $GUEST; do
+    f="${OUT:-.}/online-fail-$d"
+    "$A" -s "$d" exec-out screencap -p > "$f.png" 2>/dev/null || true
+    dump "$d" > "$f.xml" 2>/dev/null || true
+    "$A" -s "$d" logcat -d > "$f.logcat.txt" 2>/dev/null || true
+  done
+  echo "  screens, dumps and logs: ${OUT:-.}/online-fail-*"
+}
+trap 'rc=$?; trap - EXIT; [ $rc = 0 ] || evidence; exit $rc' EXIT
 centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' '; }
 # Taps the Nth node whose text is exactly $2 on device $1.
 tap_text() {
