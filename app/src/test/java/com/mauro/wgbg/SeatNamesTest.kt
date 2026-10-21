@@ -231,7 +231,8 @@ class SeatNamesTest {
         val room = Room("ROVER-42", "h", wgbg.engine.GameConfig(numPlayers = 4), 7, listOf(
             Seat("h", "Anne", ready = true), Seat(null, "anne", "GREEDY", open = false),
             Seat(null, "", "EASY", open = false), Seat(null, "Potter", "GREEDY", open = false)))
-        assertEquals(listOf("Anne", "Blue", "Purple", "Potter"), OnlineSeats(room, "h").names)
+        // No colours (a room from before 0.3.4): the third seat is Orange, as 0.3.3 named it, never 0.3.4's Purple.
+        assertEquals(listOf("Anne", "Blue", "Orange", "Potter"), OnlineSeats(room, "h").names)
     }
 
     @Test
