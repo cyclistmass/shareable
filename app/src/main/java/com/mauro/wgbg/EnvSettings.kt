@@ -176,6 +176,13 @@ class EnvSettings(private val store: FloatStore) {
         get() = TileEdge.entries.getOrElse(edge.floatValue.toInt()) { TileEdge.THIN }
         set(v) { edge.floatValue = v.ordinal.toFloat(); store.put(EDGE, edge.floatValue) }
 
+    private val palette = mutableFloatStateOf(store.get(PALETTE, 0f))
+
+    /** Board terrain colours (#86): each palette grades the terrain art its own way. Saved; not used in Space. */
+    var terrainPalette: TerrainPalette
+        get() = TerrainPalette.entries.getOrElse(palette.floatValue.toInt()) { TerrainPalette.TODAY }
+        set(v) { palette.floatValue = v.ordinal.toFloat(); store.put(PALETTE, palette.floatValue) }
+
     private val eventDie = mutableFloatStateOf(store.get(EVENT_DIE, 0f))
 
     /** Pirate event die art, an index into DiceArt.EVENT_STYLES (Mauro: all four as options). Saved. */
@@ -185,7 +192,7 @@ class EnvSettings(private val store: FloatStore) {
 
     /** Every setting back to its default (saved): scenery, board, look and play. */
     fun reset() {
-        for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; pirateTheme = false; tileEdge = TileEdge.THIN; eventDieStyle = 0
+        for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; pirateTheme = false; tileEdge = TileEdge.THIN; terrainPalette = TerrainPalette.TODAY; eventDieStyle = 0
         liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false
         art = ArtChoice(ArtSet.DEFAULT); tiles3d = false; seeThrough = false; bugButton = false
     }
@@ -201,6 +208,7 @@ class EnvSettings(private val store: FloatStore) {
         fun artKey(o: ArtObject) = "art-${o.name.lowercase()}"
         const val EDGE = "tile-edge"
         const val EVENT_DIE = "event-die-style"
+        const val PALETTE = "terrain-palette"
         const val DENSITY = "env-density"
         const val VIEW_BARS = "view-bars"
         const val TILES_3D = "tiles-3d"
@@ -301,6 +309,16 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (e in EnvSettings.TileEdge.entries)
                         Choice(e.label, selected = env.tileEdge == e, tag = "edge-${e.name.lowercase()}", modifier = Modifier.height(36.dp).width(100.dp), size = 13.sp) { env.tileEdge = e }
+                }
+            }
+            // Terrain colours grade the painted and 3D tiles; Space has its own board, so the row hides there.
+            if (!env.art.space(ArtObject.BOARD)) Setting("Terrain colours") {
+                // Two by two, as the event die: four in a row ran past the panel's edge.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (pair in TerrainPalette.entries.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (p in pair) Choice(p.label, selected = env.terrainPalette == p, tag = "palette-${p.name.lowercase()}",
+                            modifier = Modifier.height(36.dp).width(122.dp), size = 13.sp) { env.terrainPalette = p }
+                    }
                 }
             }
             LiveBoardChoice(env)

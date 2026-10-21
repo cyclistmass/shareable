@@ -212,6 +212,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
     private fun model(name: String): Model = models.getOrPut(name) {
         val bytes = if (name.startsWith("digit_")) liveNumberGlb(context, name.removePrefix("digit_").toInt()) else {
             val data = context.assets.open(if (name.startsWith("critters/")) name else "filament/${liveModelFile(name)}.glb").use { it.readBytes() }
+                .let { glb -> TerrainPalette.liveGrades(name)?.let { TerrainPalette.gradeGlb(glb, it) } ?: glb } // terrain colours (#86)
             ByteBuffer.allocateDirect(data.size).apply { put(data); flip() }
         }
         val instances = arrayOfNulls<FilamentInstance>(1)
@@ -421,7 +422,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
         if (intervals.isNotEmpty()) Log.i("WGBG-3D-PERF", "frames=${intervals.size} elapsedMs=${(now - windowStart) / 1e6} " +
             "fps=${intervals.size * 1e9 / (now - windowStart)} p50Ms=${percentile(intervals, .50)} p95Ms=${percentile(intervals, .95)} " +
             "submitP95Ms=${percentile(submit, .95)} prepareP95Ms=${percentile(prepare, .95)} skipped=$skipped tilt=${p.tilt} rotation=${p.rotation} " +
-            "lod=${shown.firstOrNull { it.model.startsWith("tile_") }?.model?.takeLast(1)} pirate=${shown.any { it.model.startsWith("pirate_") }} " +
+            "lod=${shown.firstOrNull { it.model.startsWith("tile_") }?.model?.substringBefore('@')?.takeLast(1)} pirate=${shown.any { it.model.startsWith("pirate_") }} " +
             "placements=${shown.size} moving=${moving.size} renderables=${scene.renderableCount}")
         if (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && intervals.isNotEmpty()) {
             val sample = org.json.JSONObject().apply {
@@ -429,7 +430,7 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
                 put("submitMs", org.json.JSONArray(submit)); put("skipped", skipped)
                 put("prepareMs", org.json.JSONArray(prepare))
                 put("tilt", p.tilt); put("rotation", p.rotation)
-                put("lod", shown.firstOrNull { it.model.startsWith("tile_") }?.model?.takeLast(1)?.toIntOrNull() ?: 0)
+                put("lod", shown.firstOrNull { it.model.startsWith("tile_") }?.model?.substringBefore('@')?.takeLast(1)?.toIntOrNull() ?: 0)
                 put("pirate", shown.any { it.model.startsWith("pirate_") })
                 put("placements", shown.size); put("renderables", scene.renderableCount)
                 put("moving", moving.size)
