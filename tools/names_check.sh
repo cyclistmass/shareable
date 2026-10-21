@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Bot names on a device (0.3.4, Mauro: "I would also like to name my AI"), all by taps on CI's small screen (640x320 dp):
 #   1. a fresh start, New game, the theme, then each seat's name picked from the picker (screenshots of both);
-#   2. the app closed and opened again: New game still shows the three names;
-#   3. Play: the player list shows the names (screenshot); then closed mid-game and resumed from the start screen, the
+#   2. Play: the player list shows the names (screenshot); then closed mid-game and resumed from the start screen, the
 #      names are still there;
+#   3. closed again and New game opened: it remembers the names from the last game. (The game-start screen is saved
+#      when a game starts, so choices made there are lost if the app is closed before Play, names and all.)
 #   4. monkey on the New game screen, failing on a crash.
 # Debug extras: none. The game's log is only read to know the game has started.
 # Usage: ANDROID_SERIAL=emulator-5554 tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine" [monkey events=2000]
@@ -34,7 +35,7 @@ find_re() {
   echo "$d" | grep -o "text=\"$1\"[^/]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]" | head -1 |
     grep -o '\[[0-9]*,[0-9]*\]' | tr -d '[]' | tr '\n' ' ' | awk '{split($1,a,",");split($2,b,",");print int((a[1]+b[1])/2), int((a[2]+b[2])/2)}'
 }
-tap() { "$ADB" shell input tap "$1" "$2" </dev/null; sleep 0.8; }
+tap() { [ $# -ge 2 ] || return 1; "$ADB" shell input tap "$1" "$2" </dev/null; sleep 0.8; }   # no coordinates (nothing found): fail, so `|| fail` runs
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 fail() { echo "NAMES $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
 # Find a regex on screen, scrolling the panel under x=$2 (the left one by default) a little at a time, as a player would.
@@ -100,12 +101,7 @@ done
 shot picked
 echo "NAMES $TAG: picked ${PICKS[*]}"
 
-# 2. Closed and opened again: the start screen remembers them.
-"$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
-for name in "${PICKS[@]}"; do reach "$(re "$name") ▾" >/dev/null || fail "$name was lost when the app closed"; done
-echo "NAMES $TAG: kept after closing the app"
-
-# 3. Play: the player list shows them; close mid-game and resume, still there.
+# 2. Play: the player list shows them; close mid-game and resume, still there.
 xy=$(reach 'Play' $((W * 3 / 4))) || fail "no Play"; tap $xy
 for _ in $(seq 1 60); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
 "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started"
@@ -118,8 +114,12 @@ sleep 6; shot resumed
 d=$(dump); for name in "${PICKS[@]}"; do echo "$d" | grep -q "text=\"$name\"" || fail "$name is gone after resuming"; done
 echo "NAMES $TAG: kept in the resumed game"
 
-# 4. Monkey on the game-start screen (taps, swipes and the picker), no system keys.
+# 3. Closed again, New game: the last game's names are still picked.
 "$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
+for name in "${PICKS[@]}"; do reach "$(re "$name") ▾" >/dev/null || fail "$name was lost when the app closed"; done
+echo "NAMES $TAG: New game remembers them after closing the app"
+
+# 4. Monkey on the game-start screen (taps, swipes and the picker), no system keys.
 "$ADB" logcat -b crash -c 2>/dev/null || true
 "$ADB" shell monkey -p $PKG -s 34 --pct-syskeys 0 --pct-appswitch 0 --throttle 30 -v "$EVENTS" > "$OUT/$TAG-monkey.txt" 2>&1
 grep -q "Monkey finished" "$OUT/$TAG-monkey.txt" || fail "monkey stopped early: $(grep -m3 'CRASH\|ANR\|aborted' "$OUT/$TAG-monkey.txt")"
