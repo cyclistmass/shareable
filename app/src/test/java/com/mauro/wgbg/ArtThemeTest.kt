@@ -94,4 +94,17 @@ class ArtThemeTest {
         assertNull(at(2f, 1.25f), "terrain")
         assertNull(inventoryObjectAt(Offset(10f, 10f), 1f, 1f, 0f), "not laid out yet")
     }
+
+    // Break-it (0.3.4): resizing the screen to 640x320 while the Inventory was open crashed with "ending radius must
+    // be > 0": for a frame the canvas was shorter than the cards row, so everything was drawn at a scale <= 0.
+    @Test fun `break-it - the Inventory neither draws nor takes taps when its canvas is shorter than the cards row`() {
+        val inset = 126f
+        for ((w, h) in listOf(640f to 100f, 640f to 126f, 640f to 127f, 1f to 800f, 0f to 0f))
+            assertFalse(inventoryDrawable(w, h, inset), "$w x $h")
+        for ((w, h) in listOf(640f to 320f, 2400f to 1080f, 640f to 128f)) assertTrue(inventoryDrawable(w, h, inset), "$w x $h")
+        assertNull(inventoryObjectAt(Offset(10f, 10f), 640f, 100f, inset), "mid-resize")
+        val src = java.io.File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
+        assertTrue("if (!inventoryDrawable(size.width, size.height, bottomInset)) return" in src, "drawInventory guards its scale")
+        assertTrue(".coerceAtLeast(MIN_FIT_SCALE)" in src, "the board's fit never scales by zero either")
+    }
 }

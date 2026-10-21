@@ -1310,6 +1310,11 @@ fun WatchGameScreen(
         if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
         }
+        // Inventory: a sample panel in its hammered-brass frame (0.3.4), so the frame is checked with the rest of the art.
+        if (inventory) Box(Modifier.align(Alignment.CenterEnd).padding(12.dp).size(width = 130.dp, height = 84.dp).brassEdgedWood()
+            .testTag("inventory-panel"), contentAlignment = Alignment.Center) {
+            Text("Panel", style = Wood.sans(17.sp, FontWeight.Bold, Color(0xFFFFF4D8)))
+        }
         // Inventory: the illustrated resource cards along the bottom, then the dice faces.
         // Look & art page (#71): Done goes back to the start screen. The Tiles: compare page is gone (Mauro, #136).
         if (lookAndArt) Row(Modifier.align(Alignment.TopStart).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1892,6 +1897,8 @@ private class Layout(val board: Board, val center: Offset, val scale: Float, val
 
         /** Gap kept between the board (ports included) and the screen edge at fit zoom. */
         const val BORDER_PX = 3f
+        /** The least board scale [fit] gives, px per hex side. */
+        const val MIN_FIT_SCALE = 0.01f
 
         /**
          * Fits everything that is drawn (tiles with their thickness and shadow, port water,
@@ -1919,7 +1926,8 @@ private class Layout(val board: Board, val center: Offset, val scale: Float, val
         private fun computeFit(board: Board, width: Float, height: Float, camera: Camera): Layout {
             val b = extent(board)
             val left = leftInset.coerceIn(0f, width / 2f)
-            val scale = min((width - left - 2 * BORDER_PX) / b.width, (height - 2 * BORDER_PX) / b.height)
+            // Never zero or below, even on a canvas a few px across mid-resize: the tokens' gradients need a radius.
+            val scale = min((width - left - 2 * BORDER_PX) / b.width, (height - 2 * BORDER_PX) / b.height).coerceAtLeast(MIN_FIT_SCALE)
             val mid = Offset(left + (width - left) / 2f, height / 2f)
             val fitOrigin = mid - b.center * scale
             return Layout(board, camera.map(fitOrigin, mid), scale * camera.zoom, camera.tilt)
@@ -2425,9 +2433,12 @@ private fun inventoryFrame(w: Float, h: Float, bottomInset: Float, full: Boolean
     return scale to w / 2f - 5 * 2.05f * scale / 2f
 }
 
+/** Whether the Inventory has room to draw (and take taps) above its cards row: a positive scale. */
+internal fun inventoryDrawable(w: Float, h: Float, bottomInset: Float) = w >= 2f && h - bottomInset >= 2f
+
 /** The piece set under a tap at [at] on the flat Inventory: the players' buildings, the knights row or the Merchant. */
 internal fun inventoryObjectAt(at: Offset, w: Float, h: Float, bottomInset: Float): ArtObject? {
-    if (w < 2f || h - bottomInset < 2f) return null
+    if (!inventoryDrawable(w, h, bottomInset)) return null
     val (scale, left) = inventoryFrame(w, h, bottomInset)
     val u = (at.x - left) / scale; val v = at.y / scale
     return when {
@@ -2441,7 +2452,9 @@ internal fun inventoryObjectAt(at: Offset, w: Float, h: Float, bottomInset: Floa
 private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, bandit: List<ImageBitmap>? = null,
                                     faces: Map<Int, ImageBitmap>? = null, tileLine: Boolean = false, art: InventoryArt? = null, bottomInset: Float = 0f,
                                     chosen: ArtChoice? = null, space: SpaceSprites? = null) {
-    if (size.minDimension < 2f) return
+    // Mid-resize (a rotation, or the screen size changing) the canvas can be shorter than the cards row for a frame;
+    // drawing then would scale everything by zero or less, and a token's gradient crashed with "ending radius must be > 0".
+    if (!inventoryDrawable(size.width, size.height, bottomInset)) return
     val (scale, left) = inventoryFrame(size.width, size.height, bottomInset, art != null)
     fun label(text: String, at: Offset) {
         val t = measurer.measure(text, TextStyle(fontSize = (0.2f * scale / density).sp, color = Color(0xFFE8E2D6)))
