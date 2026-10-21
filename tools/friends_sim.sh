@@ -37,6 +37,19 @@ dump() {
   echo "[$1] uiautomator dump failed 6 times (busy device?)" >&2
   return 0
 }
+# On any failure, each phone's screen, screen dump and log beside the shard log (the device workflow uploads *.png,
+# *.xml and *.logcat.txt), so a CI failure can be read from its artifact alone.
+evidence() {
+  local d f
+  for d in $HOST $GUEST; do
+    f="${OUT:-.}/friends-fail-$d"
+    "$A" -s "$d" exec-out screencap -p > "$f.png" 2>/dev/null || true
+    dump "$d" > "$f.xml" 2>/dev/null || true
+    "$A" -s "$d" logcat -d > "$f.logcat.txt" 2>/dev/null || true
+  done
+  echo "  screens, dumps and logs: ${OUT:-.}/friends-fail-*"
+}
+trap 'rc=$?; trap - EXIT; [ $rc = 0 ] || evidence; exit $rc' EXIT
 centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' '; }
 tap_text() {
   local b; b=$(dump "$1" | grep "\(text\|content-desc\)=\"$2\"" | sed -n "${3:-1}p" | centre) || true
@@ -122,9 +135,16 @@ wait_for $HOST "Erin" 15
 tap_text $HOST "☆" 1                    # star the guest: the star must stick
 wait_for $HOST "★" 10
 tap_text $HOST "Erin"                   # pick them
+choosers=$("$A" -s $HOST logcat -d -s ActivityTaskManager:I 2>/dev/null | grep -c 'act=android.intent.action.CHOOSER' || true)
 tap_text $HOST "Start"
-wait_for $HOST "join my game: room [A-Z]*-[0-9]*" 30   # the invite link's share sheet opens over the new room
-"$A" -s $HOST shell input keyevent KEYCODE_BACK
+# Start sends the invite link through Android's share sheet. CI's aosp_atd image may show no sheet (and never our text),
+# so what is checked is that the app asked for one: a CHOOSER start in the log. A sheet that does show is closed with Back.
+chooser() { "$A" -s $HOST logcat -d -s ActivityTaskManager:I 2>/dev/null | grep -c 'act=android.intent.action.CHOOSER' || true; }
+shared=; for _ in $(seq 1 30); do [ "$(chooser)" -gt "$choosers" ] && { shared=1; break; }; sleep 1; done
+[ -n "$shared" ] || { echo "FAIL: Start sent no invite (no share sheet asked for in 30 s)"; texts $HOST; exit 1; }
+sleep 2
+top=$("$A" -s $HOST shell dumpsys activity activities | tr -d '\r' | grep 'topResumedActivity' || true)
+case "$top" in ""|*com.mauro.wgbg/*) ;; *) echo "share sheet on top, closed with Back: ${top##*u0 }"; "$A" -s $HOST shell input keyevent KEYCODE_BACK;; esac
 wait_for $HOST "Room [A-Z]*-[0-9]*" 15
 R3=$(room_code $HOST)
 [ -n "$R3" ] && [ "$R3" != "$R2" ] || { echo "FAIL: no new room for the quick game ('$R3')"; texts $HOST; exit 1; }
