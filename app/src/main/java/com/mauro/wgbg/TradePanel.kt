@@ -432,28 +432,48 @@ internal fun tradeCardWidth(room: Dp, cards: Int): Dp =
 /** The narrowest a chest card is drawn; a row that still doesn't fit scrolls sideways instead (0.3.4). */
 internal val MIN_CHEST_CARD = 30.dp
 
-/** How wide each of [cards] cards (6 dp apart) is drawn to fit [width]: up to [max], down to [MIN_CHEST_CARD]. */
-internal fun fitCardWidth(width: Dp, cards: Int, max: Dp): Dp =
-    ((width - 6.dp * (cards - 1).coerceAtLeast(0)) / cards.coerceAtLeast(1)).coerceIn(MIN_CHEST_CARD, max.coerceAtLeast(MIN_CHEST_CARD))
+/** Chest cards sit [CHEST_GAP] dp apart when they fit; else they overlap, like the hand, by up to [CHEST_OVERLAP] of a card. */
+internal const val CHEST_GAP = 4f
+internal const val CHEST_OVERLAP = 0.1f
+
+/** How a chest's cards are laid out: each [card] wide, [spacing] apart (negative: overlapping). */
+internal data class ChestFit(val card: Dp, val spacing: Dp)
+
+/**
+ * How [cards] chest cards fit [width], in the order Mauro asked for (0.3.4, "don't cards overlap a little"): at [max]
+ * with a small gap; else still at [max], overlapping up to [CHEST_OVERLAP] of a card ([fanSpacing], the hand's rule);
+ * only then smaller, keeping that overlap, down to [MIN_CHEST_CARD]; past that the row scrolls.
+ */
+internal fun chestFit(width: Dp, cards: Int, max: Dp): ChestFit {
+    val top = max.coerceAtLeast(MIN_CHEST_CARD)
+    val n = cards.coerceAtLeast(1)
+    val spacing = fanSpacing(width.value, n, top.value, CHEST_GAP, -CHEST_OVERLAP * top.value).dp
+    if (!width.value.isFinite() || top * n + spacing * (n - 1) <= width + 0.01.dp) return ChestFit(top, spacing)
+    val card = (width / (n - CHEST_OVERLAP * (n - 1))).coerceIn(MIN_CHEST_CARD, top)
+    return ChestFit(card, card * -CHEST_OVERLAP)
+}
 
 /**
  * A chest's row of [cards] cards, each [content] drawn at the width that fits the room the row is given (up to
- * [max]); past [MIN_CHEST_CARD] it scrolls sideways, so every card can be reached. In a chest with buttons beside
- * it, give its column `weight(1f, fill = false)`: the buttons are then measured first and never pushed off screen
+ * [max]): a small gap, else a little overlap, then smaller cards ([chestFit]); past [MIN_CHEST_CARD] it scrolls
+ * sideways, so every card can be reached. In a chest with buttons beside it, give its column `weight(1f, fill = false)`: the buttons are then measured first and never pushed off screen
  * (0.3.4: 8 Age of Chivalry cards at font 1.3 on a 640 dp phone hid Discard, and a player who had to discard was stuck).
  */
 @Composable
 internal fun ChestCardRow(cards: Int, max: Dp, modifier: Modifier = Modifier, content: @Composable (cardWidth: Dp) -> Unit) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
-        val w = if (constraints.hasBoundedWidth) fitCardWidth(maxWidth, cards, max) else max
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { content(w) }
+        val fit = if (constraints.hasBoundedWidth) chestFit(maxWidth, cards, max) else ChestFit(max, CHEST_GAP.dp)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(fit.spacing)) { content(fit.card) }
     }
 }
 
-/** What a chest card says under it ("have 4"), kept to the card's [width]: it shrinks rather than widen the row. */
+/**
+ * What a chest card says under it ("have 4"), kept to the card's [width] less the slice the next card may overlap
+ * ([CHEST_OVERLAP]), so two labels never run into each other: it shrinks rather than widen the row.
+ */
 @Composable
 internal fun UnderCard(text: String, width: Dp, color: Color = INK, lines: Int = 1) =
-    Text(text, Modifier.width(width), color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false,
+    Text(text, Modifier.width(width).padding(horizontal = width * (CHEST_OVERLAP / 2)), color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false,
         lineHeight = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
 

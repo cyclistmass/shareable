@@ -392,18 +392,28 @@ class TradePanelTest {
     }
 
     @Test
-    fun chestCardsShrinkToTheRoomLeftThenScrollNeverWider() {
+    fun chestCardsGapThenOverlapThenShrinkThenScroll() {
         // 0.3.4 blocker: 8 Age of Chivalry cards at font 1.3 on a 640 dp phone, beside the side panel, covered Discard.
-        // The cards now get what the buttons leave: they shrink to fit, down to the smallest, and past that scroll.
-        assertEquals(42.dp, fitCardWidth(400.dp, 5, 42.dp), "room to spare: the usual size, never bigger")
-        val w8 = fitCardWidth(300.dp, 8, 42.dp)
-        assertTrue(w8 < 42.dp && w8 * 8 + 6.dp * 7 <= 300.dp + 0.01.dp, "8 cards in 300 dp shrink to fit: $w8")
-        assertEquals(MIN_CHEST_CARD, fitCardWidth(200.dp, 8, 42.dp), "too narrow: the smallest card, and the row scrolls")
+        // The cards get what the buttons leave and, like the hand (Mauro: "don't cards overlap a little"), fit it by
+        // a small gap, else a little overlap at full size, else smaller cards, and past the smallest they scroll.
+        fun span(f: ChestFit, n: Int) = f.card * n + f.spacing * (n - 1)
+        assertEquals(ChestFit(42.dp, CHEST_GAP.dp), chestFit(400.dp, 5, 42.dp), "room to spare: the usual size and gap")
+        val tight = chestFit(200.dp, 5, 42.dp)   // 5 cards are 210 dp edge to edge, 193 at 10% overlapping
+        assertEquals(42.dp, tight.card, "a little short: full size, overlapping")
+        assertTrue(tight.spacing < 0.dp && tight.spacing >= 42.dp * -CHEST_OVERLAP, "overlap at most 10%: ${tight.spacing}")
+        assertEquals(200f, span(tight, 5).value, 0.01f, "and exactly as close as needed")
+        val small = chestFit(300.dp, 8, 42.dp)
+        assertTrue(small.card < 42.dp && small.spacing == small.card * -CHEST_OVERLAP, "8 in 300 dp: smaller, still 10% over: $small")
+        assertEquals(300f, span(small, 8).value, 0.01f, "8 cards fill 300 dp")
+        assertEquals(MIN_CHEST_CARD, chestFit(200.dp, 8, 42.dp).card, "too narrow: the smallest card, and the row scrolls")
         for (n in 0..8) for (room in 0..800 step 7) {
-            val w = fitCardWidth(room.dp, n, 58.dp)
-            assertTrue(w in MIN_CHEST_CARD..58.dp, "$n cards in $room dp: $w")
-            if (w > MIN_CHEST_CARD && n > 0) assertTrue(w * n + 6.dp * (n - 1) <= room.dp + 0.01.dp, "$n cards in $room dp fit without scrolling: $w")
+            val f = chestFit(room.dp, n, 58.dp)
+            assertTrue(f.card in MIN_CHEST_CARD..58.dp, "$n cards in $room dp: $f")
+            assertTrue(f.spacing <= CHEST_GAP.dp && f.spacing >= f.card * -CHEST_OVERLAP - 0.01.dp, "never more than a 10% overlap: $f")
+            if (f.card < 58.dp) assertTrue(f.spacing < 0.dp, "cards shrink only once they overlap: $n in $room dp, $f")
+            if (f.card > MIN_CHEST_CARD && n > 0) assertTrue(span(f, n) <= room.dp + 0.01.dp, "$n cards in $room dp fit without scrolling: $f")
         }
-        assertEquals(MIN_CHEST_CARD, fitCardWidth(100.dp, 3, 20.dp), "a max below the floor still draws the smallest card")
+        assertEquals(MIN_CHEST_CARD, chestFit(100.dp, 3, 20.dp).card, "a max below the floor still draws the smallest card")
+        for (room in listOf(-50.dp, 0.dp)) assertEquals(MIN_CHEST_CARD, chestFit(room, 4, 42.dp).card, "room $room")
     }
 }
