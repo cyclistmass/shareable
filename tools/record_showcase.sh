@@ -45,7 +45,7 @@ tap_text_opt() { ( tap_text "$1" ) >/dev/null || true; }
 
 
 # Watch bots in ruleset $1 at the given tilt/zoom; then set the speed by tapping the speed button $2 times
-# (Max -> 1x -> 2x -> 4x -> 8x).
+# (Max -> 1x -> 2x -> 4x -> 8x). With $5=keep, Settings stays open on This game (the bots play on behind it).
 watch() {
   "$A" shell am start --activity-clear-task -n $PKG/.MainActivity --es start "$1" --ez watch true --ef tilt "$3" --ef zoom "$4" >/dev/null
   sleep 3
@@ -53,7 +53,7 @@ watch() {
   for _ in $(seq 1 "$2"); do "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     local label; label=$("$A" shell cat /sdcard/ui.xml | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2 || true)
     [ -n "$label" ] && tap_text_opt "$label"; done
-  tap_text_opt "Hide"
+  [ "${5:-}" = keep ] || tap_text_opt "Hide"
 }
 
 clip() { # record $SECS s to $OUT/$1.mp4
@@ -73,14 +73,36 @@ watch base 1 0.55 1.5
 sleep 4
 clip base
 
-# 2. Pirate theme, Age of Chivalry: 8x for two minutes so walls, Capitals and knights are out, then 1x.
-settings "view-bars=0.0" "theme-pirate=1.0" "event-die-style=3.0"
-watch chivalry 4 0.55 1.5
-sleep 120
-tap_text "Menu"; tap_text "Settings"; for _ in 1 2 3 4; do "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+# 2. Pirate theme, Age of Chivalry: 8x for 90 s so walls, Capitals and knights are out, then 1x.
+# Below Max a finished game stays on screen, so a game that ends before the clip leaves a still board
+# (0.3.3 re-record): if one ends in the warm-up, start again and warm up a little less.
+# Settings stays open on This game through the warm-up, so pausing is one tap: opening the menus at 8x
+# took long enough for a nearly finished game to end.
+warm=90
+for try in 1 2 3 4; do
+  settings "view-bars=0.0" "theme-pirate=1.0" "event-die-style=3.0"
+  watch chivalry 4 0.55 1.5 keep
+  "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  pause=$("$A" shell cat /sdcard/ui.xml | tr '>' '\n' | grep -o 'text="Pause"[^/]*bounds="\[[0-9]*,[0-9]*\]' | grep -o '\[[0-9]*,[0-9]*\]' | tr -d '[]' | head -1 || true)
+  [ -n "$pause" ] || { echo "no Pause button under This game"; exit 1; }
+  # Only a game that ends at 8x counts: watch starts at Max, where whole games finish while the speed is tapped down.
+  "$A" logcat -c
+  over=""
+  for _ in $(seq 1 $((warm / 5))); do sleep 5; "$A" logcat -d -s WGBG-GAME:I | grep -q " over " && { over=1; break; }; done
+  [ -z "$over" ] && { "$A" shell input tap $(( ${pause%,*} + 20 )) $(( ${pause#*,} + 20 )); sleep 0.8
+    "$A" logcat -d -s WGBG-GAME:I | grep -q " over " || break; over=1; }
+  echo "the warm-up game ended (try $try); starting again"; warm=$((warm * 2 / 3))
+done
+[ -z "$over" ] || { echo "every warm-up game ended before the clip"; exit 1; }
+# Paused now. 8x to 1x goes through Max, where a whole game plays out in a second (a finished board again), so step
+# the speed down while paused, then the same button (now Play; the Settings group of that name is further down)
+# starts it again.
+for _ in 1 2 3 4; do "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   label=$("$A" shell cat /sdcard/ui.xml | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2 || true)
   [ "$label" = "1×" ] && break; [ -n "$label" ] && tap_text_opt "$label"; done
+"$A" shell input tap $(( ${pause%,*} + 20 )) $(( ${pause#*,} + 20 )); sleep 0.8
 tap_text_opt "Hide"
+"$A" logcat -d -s WGBG-GAME:I | grep -q " over " && { echo "the game ended before the clip"; exit 1; }
 sleep 2
 clip chivalry
 

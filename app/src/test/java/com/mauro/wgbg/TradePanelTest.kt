@@ -224,14 +224,20 @@ class TradePanelTest {
     }
 
     @Test
-    fun `one row of cards - top asks, bottom offers, the other half switches, hold takes one back`() {
+    fun `one row of cards - top counts up, bottom counts down through none to an offer, hold takes one back`() {
         val z = IntArray(5)
         var (g, v) = askOffer(z, z, 0, CardTap.ASK, have = 0)
         assertEquals(1, g[0]); assertEquals(0, v[0])
         askOffer(g, v, 0, CardTap.ASK, have = 0).let { g = it.first; v = it.second }
         assertEquals(2, g[0])
-        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }   // switch over
+        // Players: the other half counts back down to none first, then switches over.
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }
+        assertEquals(1, g[0]); assertEquals(0, v[0])
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }
+        assertEquals(0, g[0]); assertEquals(0, v[0])
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }   // now it's offered
         assertEquals(0, g[0]); assertEquals(1, v[0])
+        askOffer(g, v, 0, CardTap.ASK, have = 3).let { assertEquals(0, it.first[0]); assertEquals(0, it.second[0]) }   // and back to none
         askOffer(g, v, 0, CardTap.OFFER, have = 1).let { g = it.first; v = it.second }   // can't offer more than held
         assertEquals(1, v[0])
         assertEquals(0, askOffer(z, z, 2, CardTap.OFFER, have = 0).second[2])              // nothing to offer
@@ -253,7 +259,14 @@ class TradePanelTest {
         assertEquals(0, askOffer(g, z, 0, CardTap.OFFER, have = 3, bankRate = 4).second[0])                 // can't pay 4 with 3
         askOffer(g, v, 1, CardTap.TAKE_BACK, have = 8, bankRate = 4).let { assertEquals(4, it.second[1]) }  // one lot back
         askOffer(g, v, 3, CardTap.TAKE_BACK, have = 0, bankRate = 4).let { assertEquals(1, it.first[3]) }   // one card back
-        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { assertEquals(0, it.second[1]); assertEquals(1, it.first[1]) } // switch over
+        // The top takes a lot back, down to none, before it asks for that card.
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { g = it.first; v = it.second }
+        assertEquals(4, v[1]); assertEquals(0, g[1])
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { g = it.first; v = it.second }
+        assertEquals(0, v[1]); assertEquals(0, g[1])
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { assertEquals(0, it.second[1]); assertEquals(1, it.first[1]) }
+        // And the bottom asks one less, down to none, before it pays a lot.
+        askOffer(g, v, 3, CardTap.OFFER, have = 4, bankRate = 4).let { assertEquals(1, it.first[3]); assertEquals(0, it.second[3]) }
     }
 
     /** A 3-player game at [seed] on a main-phase turn (rolled, END_TURN legal), driven there by bots. */
@@ -389,5 +402,40 @@ class TradePanelTest {
         assertFalse(chestFits(beside, 8), "Chivalry: 8 cards do not fit beside the panel")
         assertTrue(chestFits(640.dp - 16.dp, 8), "Chivalry: 8 cards fit across the whole screen")
         assertTrue(chestFits(915.dp - 16.dp - 250.dp, 8), "a usual phone fits 8 beside the panel")
+    }
+
+    @Test
+    fun chestCardsGapThenOverlapThenShrinkThenScroll() {
+        // 0.3.4 blocker: 8 Age of Chivalry cards at font 1.3 on a 640 dp phone, beside the side panel, covered Discard.
+        // The cards get what the buttons leave and, like the hand (Mauro: "don't cards overlap a little"), fit it by
+        // a small gap, else a little overlap at full size, else smaller cards, and past the smallest they scroll.
+        fun span(f: ChestFit, n: Int) = f.card * n + f.spacing * (n - 1)
+        assertEquals(ChestFit(42.dp, CHEST_GAP.dp), chestFit(400.dp, 5, 42.dp), "room to spare: the usual size and gap")
+        val tight = chestFit(200.dp, 5, 42.dp)   // 5 cards are 210 dp edge to edge, 193 at 10% overlapping
+        assertEquals(42.dp, tight.card, "a little short: full size, overlapping")
+        assertTrue(tight.spacing < 0.dp && tight.spacing >= 42.dp * -CHEST_OVERLAP, "overlap at most 10%: ${tight.spacing}")
+        assertEquals(200f, span(tight, 5).value, 0.01f, "and exactly as close as needed")
+        val small = chestFit(300.dp, 8, 42.dp)
+        assertTrue(small.card < 42.dp && small.spacing == small.card * -CHEST_OVERLAP, "8 in 300 dp: smaller, still 10% over: $small")
+        assertEquals(300f, span(small, 8).value, 0.01f, "8 cards fill 300 dp")
+        assertEquals(MIN_CHEST_CARD, chestFit(200.dp, 8, 42.dp).card, "too narrow: the smallest card, and the row scrolls")
+        for (n in 0..8) for (room in 0..800 step 7) {
+            val f = chestFit(room.dp, n, 58.dp)
+            assertTrue(f.card in MIN_CHEST_CARD..58.dp, "$n cards in $room dp: $f")
+            assertTrue(f.spacing <= CHEST_GAP.dp && f.spacing >= f.card * -CHEST_OVERLAP - 0.01.dp, "never more than a 10% overlap: $f")
+            if (f.card < 58.dp) assertTrue(f.spacing < 0.dp, "cards shrink only once they overlap: $n in $room dp, $f")
+            if (f.card > MIN_CHEST_CARD && n > 0) assertTrue(span(f, n) <= room.dp + 0.01.dp, "$n cards in $room dp fit without scrolling: $f")
+        }
+        assertEquals(MIN_CHEST_CARD, chestFit(100.dp, 3, 20.dp).card, "a max below the floor still draws the smallest card")
+        for (room in listOf(-50.dp, 0.dp)) assertEquals(MIN_CHEST_CARD, chestFit(room, 4, 42.dp).card, "room $room")
+    }
+
+    @Test
+    fun aNarrowCardSaysJustTheCount() {
+        // 0.3.4, 320x640 dp at font 1.3: "have 4 have 4 have 4" ran together in tiny type; a narrow card says "×4".
+        assertEquals("×4", shortUnder("have 4"))
+        assertEquals("×12", shortUnder("has 12"))
+        assertEquals("×3\n4:1", shortUnder("have 3\n4:1"), "the bank rate stays")
+        for (same in listOf("4:1", "Choose", "have", "have four", "")) assertEquals(same, shortUnder(same))
     }
 }

@@ -302,3 +302,29 @@ fun StopButton(label: String, tag: String, modifier: Modifier = Modifier, onClic
         Text(label, style = Wood.sans(15.sp, FontWeight.Bold, Color.White), maxLines = 1)
     }
 }
+
+/**
+ * Lets one tap through, then ignores any other for [window] ms (0.3.4 player report: a double tap on Roll also ended
+ * the turn, because End turn takes Roll's place under the finger). One guard, [MoveTaps], is shared by every button
+ * that sends a move or can't be undone, so a second tap is caught whichever button has appeared in its place.
+ */
+class TapGuard(private val window: Long = 500, private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
+    private var last: Long? = null
+
+    /** True (and the window starts again) when a tap now may go through. */
+    fun allow(): Boolean {
+        val now = clock()
+        last?.let { if (now - it in 0 until window) return false }
+        last = now
+        return true
+    }
+
+    /** [action], run only when [allow] lets the tap through. */
+    fun wrap(action: () -> Unit): () -> Unit = { if (allow()) action() }
+}
+
+/** The guard on every move button: Roll, End turn, the chest buttons, card picks, board confirms, Fortune plays. */
+val MoveTaps = TapGuard()
+
+/** [action] behind [MoveTaps]: a second tap within half a second does nothing. */
+fun moveTap(action: () -> Unit): () -> Unit = MoveTaps.wrap(action)

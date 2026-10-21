@@ -169,7 +169,7 @@ fun chivalryPrompt(s: GameState, legal: List<Action>, names: List<String>): Stri
         s.phase == Phase.WEDDING -> "$by played Feast against you: give them ${s.chivalry?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s)"
         s.phase == Phase.COMMERCIAL_HARBOR_RESPOND -> "$by played Harbour Charter: give back one commodity for the card you got"
         s.phase == Phase.BARBARIAN_LOSS -> "The Raiders won: tap one of your towns to lose to them"
-        s.phase == Phase.SPY -> "Spy: take one of ${names.getOrElse(s.chivalry?.pendingTarget ?: -1) { "their" }}'s progress cards"
+        s.phase == Phase.SPY -> "Informer: take one of ${names.getOrElse(s.chivalry?.pendingTarget ?: -1) { "their" }}'s progress cards"
         s.phase == Phase.COMMERCIAL_HARBOR -> "Harbour Charter: give each player a resource for a commodity, or Done"
         ChivalryActionType.CHOOSE_PROGRESS_DECK in kinds -> "Raiders beaten: draw a progress card from a deck"
         ChivalryActionType.DISCARD_PROGRESS in kinds -> "Too many progress cards: discard one"

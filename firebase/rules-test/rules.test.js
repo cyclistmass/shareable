@@ -1,5 +1,6 @@
 import { before, after, beforeEach, test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, collection, query, where, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, onSnapshot, orderBy, disableNetwork, enableNetwork, Timestamp } from 'firebase/firestore';
 let env;
@@ -285,3 +286,36 @@ test('the heaviest real writes fit the rules budget: a Google host with colours 
   await assertSucceeds(setDoc(doc(gdb('host'),'games/re'),v3({rematchOf:'old',invited:['gus','hal','ivy'],options:o,seats:s0})));
   await assertSucceeds(updateDoc(doc(gdb('gus',true),'games/re'),{'seats.1':{...seat('gus','Gus',null,false),google:true}}));
   await assertSucceeds(updateDoc(doc(gdb('host'),'games/re'),{invited:[],'options.vpToWin':11,'seats.3.bot':'EASY'}));});
+// Every request's rules share a budget of 1000 expressions. This plays a whole rematch at its largest (6 colours, 3 invites,
+// Google marks, a guest without Google joining after one with it, the bug found 2026-10-21) under the rules plus 20 spare
+// checks on every create and update, so a rules change that eats the spare room fails here before it refuses real players.
+test('every real write of a full rematch fits the rules budget with room to spare',async()=>{
+  const pad = ' && ' + Array(20).fill('request.time != null').join(' && ');
+  const rules = readFileSync('../../firestore.rules','utf8').replace('createOk(request.resource.data);',`createOk(request.resource.data)${pad};`)
+    .replace('updateOk(resource.data, request.resource.data);',`updateOk(resource.data, request.resource.data)${pad};`);
+  assert.equal((rules.match(/request\.time != null/g)||[]).length, 40);
+  const e = await initializeTestEnvironment({projectId:'demo-wgbg-margin',firestore:{rules,host:'127.0.0.1',port:Number((process.env.FIRESTORE_EMULATOR_HOST||'').split(':')[1]||8080)}});
+  try {
+    await e.clearFirestore();
+    const as = (uid, google) => (google ? e.authenticatedContext(uid,{firebase:{sign_in_provider:'google.com',identities:{'google.com':['g-'+uid]}}}) : e.authenticatedContext(uid)).firestore();
+    const o = {...room().options,numPlayers:4,randomFirstPlayer:true,colours:['RED','BLUE','PURPLE','WHITE','YELLOW','BLACK']};
+    const seats = {'0':{...seat('host','Host',null,false,true),google:true},'1':seat(),'2':seat(null,'','GREEDY',false),'3':seat()};
+    await e.withSecurityRulesDisabled(async c=>{ const f=c.firestore(); const r=v3({status:'done',invited:[],options:o});
+      r.seats={'0':seats['0'],'1':seat('gus','Gus',null,false,true),'2':seat('hal','Hal',null,false,true),'3':seat('ivy','Ivy',null,false,true)};
+      await setDoc(doc(f,'games/old'),r);
+      for (const u of ['erin','bo','cy']) await setDoc(doc(f,`users/${u}/met/host`),{name:'Host',lastPlayed:Timestamp.now(),games:1,starred:false}); });
+    const re = uid => doc(as(uid, uid==='host'||uid==='gus'),'games/re');
+    await assertSucceeds(setDoc(doc(as('host',true),'games/fr'),v3({invited:['erin','bo','cy'],options:o,seats})));
+    await assertSucceeds(updateDoc(doc(as('host',true),'games/fr'),{'options.vpToWin':11,invited:['cy','bo','erin']}));
+    await assertSucceeds(setDoc(re('host'),v3({rematchOf:'old',invited:['gus','hal','ivy'],options:o,seats})));
+    await assertSucceeds(updateDoc(re('gus'),{'seats.1':{...seat('gus','Gus',null,false),google:true}}));
+    await assertSucceeds(updateDoc(re('ivy'),{'seats.3':seat('ivy','Ivy',null,false)}));
+    await assertSucceeds(updateDoc(re('ivy'),{'seats.3.ready':true}));
+    await assertSucceeds(updateDoc(re('gus'),{'seats.1.ready':true}));
+    await assertSucceeds(updateDoc(re('host'),{invited:[],'seats.2.bot':'EASY'}));
+    await assertSucceeds(updateDoc(re('host'),{status:'playing',expireAt:inDays(30)}));
+    await assertSucceeds(updateDoc(re('ivy'),{'seats.3':seat(null,'','EASY',false)}));
+    await assertSucceeds(updateDoc(re('host'),{status:'done',expireAt:inDays(7)}));
+    await assertSucceeds(updateDoc(doc(as('host',true),'games/old'),{next:'re'}));
+  } finally { await e.cleanup(); }
+});

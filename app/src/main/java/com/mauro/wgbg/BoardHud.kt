@@ -413,10 +413,17 @@ internal fun handCardCount(s: GameState, me: Int): Int {
  * The spacing (dp, negative: overlap) between [cards] hand cards in [room] dp: the usual 5 dp overlap when they fit,
  * else as close as needed to fit, but never closer than [HAND_MIN_SLICE] showing per card (then the row scrolls).
  */
-internal fun handOverlap(room: Float, cards: Int): Float {
-    if (cards <= 1 || !room.isFinite()) return -5f
-    val fit = (room - HAND_CARD_W) / (cards - 1) - HAND_CARD_W
-    return fit.coerceIn(HAND_MIN_SLICE - HAND_CARD_W, -5f)
+internal fun handOverlap(room: Float, cards: Int): Float = fanSpacing(room, cards, HAND_CARD_W, -5f, HAND_MIN_SLICE - HAND_CARD_W)
+
+/**
+ * The spacing (dp, negative: overlap) between [cards] cards [card] dp wide in [room] dp: [most] when they fit, else as
+ * close as needed to fit, but never closer than [least] (then the row scrolls, or a chest shrinks its cards first).
+ * Shared by the hand and the chests ([chestFit]), so cards fan the same way everywhere.
+ */
+internal fun fanSpacing(room: Float, cards: Int, card: Float, most: Float, least: Float): Float {
+    if (cards <= 1 || !room.isFinite()) return most
+    val fit = (room - card) / (cards - 1) - card
+    return fit.coerceIn(least, most)
 }
 
 /**

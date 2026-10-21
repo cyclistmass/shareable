@@ -112,10 +112,16 @@ else
   read -r _ _ _ pb < <(echo "$x" | grep 'content-desc="Players"' | bounds); read -r _ dt _ _ < <(echo "$x" | grep 'content-desc="Dice"' | bounds)
   if [ -z "${pb:-}" ] || [ -z "${dt:-}" ]; then bad "the player list or the dice row is missing"
   elif [ "$dt" -lt "$pb" ]; then bad "the dice row (top $dt) overlaps the player list (bottom $pb)"; fi
-  # Both taps from one shell, close enough together to count as a double tap.
-  [ -n "$xy" ] && "$ADB" shell "input tap $xy; input tap $xy"; sleep 1.5
-  # One look serves both: over the moving board a dump takes about 15 s.
-  x=$(dump); echo "$x" | grep -q 'text="Event die"' || bad "double-tapping the dice didn't open the histogram"
+  # A double tap: each `input tap` starts its own process, and on CI's slower emulator two in a row landed further apart
+  # than Android's double-tap window (0.3.3 CI). So the first runs in the background and the second starts a beat
+  # later, both starting up together; try again with other gaps if it was still read as two taps.
+  # One look serves both checks: over the moving board a dump takes about 15 s.
+  x=""
+  for gap in 0.12 0.06 0.2; do
+    [ -n "$xy" ] && "$ADB" shell "input tap $xy & sleep $gap; input tap $xy; wait"; sleep 1.5
+    x=$(dump); echo "$x" | grep -q 'text="Event die"' && break
+  done
+  echo "$x" | grep -q 'text="Event die"' || bad "double-tapping the dice didn't open the histogram"
   DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
 fi
 

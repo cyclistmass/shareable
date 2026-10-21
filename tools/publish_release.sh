@@ -4,7 +4,7 @@
 #   https://github.com/cyclistmass/shareable/releases/latest/download/working-german-board-game.apk
 # always serves the newest version. Run from the project root after CI is green for the pushed commit.
 # The GitHub token comes from Git Credential Manager for one command at a time; it is never printed or saved.
-# Usage: [APK=<tested apk>] tools/publish_release.sh [path to gameplay mp4]
+# Usage: [APK=<tested apk>] [KNOWN=<known issues, markdown>] tools/publish_release.sh [path to gameplay mp4]
 set -euo pipefail
 VIDEO="${1:-$TEMP/wgbg-showcase/working-german-board-game-gameplay.mp4}"
 REPO="${REPO:-cyclistmass/shareable}"   # REPO=cyclistmass/sharable until the rename has run
@@ -41,8 +41,10 @@ if [ -n "${APK:-}" ]; then
   cp "$APK" "$WORK/working-german-board-game.apk"
 fi
 
-py -c "
-import json,sys
+# KNOWN=<text> adds a Known issues section (read from the environment, so its quotes and $ stay as written).
+KNOWN="${KNOWN:-}" py -c "
+import json,sys,os
+known=os.environ.get('KNOWN','').strip()
 print(json.dumps({'tag_name':'wgbg-v$VERSION','target_commitish':'$SHA','name':'Working German Board Game $VERSION','make_latest':'true',
  'body':'''Android build $VERSION of Working German Board Game (debug-signed, for testing).
 
@@ -50,7 +52,7 @@ print(json.dumps({'tag_name':'wgbg-v$VERSION','target_commitish':'$SHA','name':'
 
 Always-latest link: https://github.com/$REPO/releases/latest/download/working-german-board-game.apk
 
-Built by CI from commit $SHA; source in [working-german-board-game/](https://github.com/$REPO/tree/main/working-german-board-game). GPL-3.0.'''}))" > "$WORK/release.json"
+Built by CI from commit $SHA; source in [working-german-board-game/](https://github.com/$REPO/tree/main/working-german-board-game). GPL-3.0.'''+((chr(10)*2+'**Known issues:**'+chr(10)+known) if known else '')}))" > "$WORK/release.json"
 ID=$(api -X POST "https://api.github.com/repos/$REPO/releases" -d @"$WORK/release.json" | py -c "import json,sys;d=json.load(sys.stdin);print(d.get('id') or d)")
 case "$ID" in *[!0-9]*) echo "release not created: $ID"; exit 1;; esac
 up() { api -H "Content-Type: $2" --data-binary @"$1" "https://uploads.github.com/repos/$REPO/releases/$ID/assets?name=$(basename "$1")" |

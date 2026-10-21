@@ -18,6 +18,9 @@ dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shel
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 at() { dump | grep "\(text\|content-desc\)=\"$1\"" | centre; }
 tap_text() { local xy; xy=$(at "$1"); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
+# Taps the element whose test tag (resource-id) is $1: the chest's tabs go by tag, since the player list is also
+# labelled "Players" (0.3.4) and a tap by text hit it first.
+tap_id() { local xy; xy=$(dump | grep "resource-id=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
 # A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
 # wm size gives the portrait size; the app is landscape, so the long side is the width (a swipe from below the screen does nothing).
 panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
@@ -29,7 +32,9 @@ move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "
 # Steps are kept and printed when a ruleset fails, so a CI log says why without a rerun.
 TRAIL=(); say() { TRAIL+=("$(date +%T) $*"); [ ${#TRAIL[@]} -gt 25 ] && TRAIL=("${TRAIL[@]:1}"); [ -n "${VERBOSE:-}" ] && echo "  · $*"; return 0; }
 bad() { echo "withdraw $ruleset: FAILED: $*"; fail=1; rfail=1; [ -n "${VERBOSE:-}" ] || printf "  · %s\n" "${TRAIL[@]}"; TRAIL=()
-  "$ADB" exec-out screencap -p > "${OUT:-.}/withdraw-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/withdraw-fail-$ruleset.png"; }
+  "$ADB" exec-out screencap -p > "${OUT:-.}/withdraw-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/withdraw-fail-$ruleset.png"
+  # The screen as uiautomator saw it, so a tap that went astray (whose bounds, which element first) can be traced.
+  dump > "${OUT:-.}/withdraw-fail-$ruleset.xml" 2>/dev/null && echo "  dump: ${OUT:-.}/withdraw-fail-$ruleset.xml"; }
 
 for ruleset in $RULESETS; do
   rfail=0; TRAIL=()
@@ -67,7 +72,7 @@ for ruleset in $RULESETS; do
     # Our turn with cards: Trade, Players, offer the first card we hold for nothing, Offer, then Withdraw at once.
     tap_text "Trade" || { tap_text "Close"; tap_text "Trade"; } || { say "no Trade button (the moment passed?), end turn"; move END_TURN:0; continue; }
     say "trade chest open"
-    tap_text "Players" || { bad "no Players tab"; break; }
+    tap_id tab-Players || { bad "no Players tab"; break; }
     card=$(dump | grep 'text="have [1-9]' | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), $2}')
     if [ -z "$card" ]; then say "no cards, end turn"; tap_text "Close" || true; move END_TURN:0; continue; fi
     # The label sits under the card; the card's bottom half (just above the label) offers it.

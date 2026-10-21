@@ -219,6 +219,12 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Painted tile faces (Mauro's ChatGPT art) by resource; the desert last. */
+/**
+ * Room kept free at the top for the Menu button (8 dp in, 40 dp tall, 8 dp under it): the trade chest and every card
+ * sheet stop below it (0.3.4: Windfall's picker at 320x640 dp ran its title under Menu).
+ */
+internal val MENU_CLEAR = 56.dp
+
 internal val TILE_FACES = listOf(R.drawable.tile_timber, R.drawable.tile_clay, R.drawable.tile_fleece, R.drawable.tile_grain, R.drawable.tile_stone)
 internal val TILE_DESERT = R.drawable.tile_desert
 /** The original painted faces with their coloured frame (Tile edges: Classic frame). */
@@ -1506,7 +1512,7 @@ fun WatchGameScreen(
                   // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
                   // It starts at the side panel's edge, not a fixed 384 dp, which left one card's room on a 640 dp screen.
                   Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = handStart(panelDp), end = 196.dp, bottom = 6.dp),
-                  fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { fortuneAsk = it },
+                  fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { c -> MoveTaps.wrap { fortuneAsk = c }() },   // a double tap on Sentinel played two
                   fortuneArt = { GuideArt.fortuneArt(it, env.art.pirate(ArtObject.KNIGHTS)) })
           }
           if (me >= 0 && !inventory) {
@@ -1516,7 +1522,7 @@ fun WatchGameScreen(
               val panelEdge = with(LocalDensity.current) { stripWidth.toDp() } + 16.dp
               // On a narrow screen (640 dp across, CI's emulator and small phones) the Age of Chivalry chest's 8 cards and its
               // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
-              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, bottom = 8.dp, end = 8.dp)) {
+              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, top = MENU_CLEAR, bottom = 8.dp, end = 8.dp)) {
                   val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
                   TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
                       room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
@@ -1533,7 +1539,7 @@ fun WatchGameScreen(
                       color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold)
                   ColorButton("Cancel", Color(0xFFC0392B), "card-pick-cancel") { cardPick = emptyList(); cardSecond = false }
               }
-              else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
+              else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, top = MENU_CLEAR, end = 8.dp, bottom = 8.dp),
                   onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
                   fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
                   discardCause = tick.let {
@@ -1555,11 +1561,12 @@ fun WatchGameScreen(
                   Text(if (spotList != null) "What goes here?" else confirmTitle(state, chosen[0]), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold)
                   confirmWarning(state, me, chosen[0])?.let { Text(it, color = Color(0xFFFFB4A0), fontSize = 13.sp) }
                   if (spotList != null) SpotPicker(spotList) { send(it) }
-                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                  // Wraps: three "✓ Rob <long name>" at font 1.3 pushed ✗, the only way out, off a 640 dp screen (0.3.4).
+                  FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                       // Compact: a check to place it, a cross to cancel (Mauro: "just an x or check, save space, look cleaner");
                       // a choice that needs words (who to rob) keeps them after the check.
                       if (spotList == null) for (a in chosen) ColorButton(confirmLabel(state, a, names).let { if (it == "Confirm") "✓" else "✓ $it" }, Color(0xFF3E9B4F), "confirm",
-                          androidx.compose.ui.Modifier.confirmA11y("Confirm")) { send(a) }
+                          androidx.compose.ui.Modifier.confirmA11y("Confirm"), onClick = moveTap { send(a) })
                       ColorButton("✗", Color(0xFFC0392B), "cancel", androidx.compose.ui.Modifier.confirmA11y("Cancel")) {
                           pending = emptyList(); if (cardSecond) { cardPick = emptyList(); cardSecond = false } }
                   }

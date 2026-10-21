@@ -128,6 +128,10 @@ data class GameSetup(
         return seats.indices.map { s -> players.indexOf(s).takeIf { it >= 0 }?.let(drawn::get) }
     }
 
+    /** Every playing seat pinned to [byPlayer]'s colour for its engine player (a game saved before 0.3.4). */
+    fun withColours(byPlayer: List<SeatColour>): GameSetup = copy(randomColours = false,
+        seats = seats.mapIndexed { i, s -> players.indexOf(i).takeIf { it >= 0 }?.let { s.copy(colour = byPlayer[it]) } ?: s })
+
     /** The colours of a game started with [seed], by engine player. */
     fun playerColours(seed: Long): List<SeatColour> = seatColoursFor(seed).let { c -> players.map { c[it]!! } }
 
