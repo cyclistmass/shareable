@@ -64,7 +64,7 @@ object LobbyRepository {
 }
 
 class FirestoreTransport(private val auth: FirebaseAuth, private val db: FirebaseFirestore,
-                         private val fakeGoogle: Boolean = false) : GameTransport {
+                         val fakeGoogle: Boolean = false) : GameTransport {
     private var signingIn: CompletableFuture<String>? = null
     private val games get() = db.collection("games")
     private val uid get() = auth.currentUser?.uid ?: error("Sign in first")

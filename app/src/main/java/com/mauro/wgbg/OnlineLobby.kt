@@ -22,6 +22,19 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
         ruleset = Ruleset.entries.first { it.expansion == room.config.expansion }, points = room.config.vpToWin),
         room.seats.map { LobbySeat(it.name.takeIf { _ -> it.uid != null }, it.bot?.let(BotLevel::valueOf), it.ready, open = it.open) },
         me = room.seats.indexOfFirst { it.uid == uid }.coerceAtLeast(0), host = room.host == uid)
+    /**
+     * What leaving tells the room, if anything. A guest leaving the lobby frees the seat; quitting a running game hands it
+     * to a bot. A host leaving their lobby takes back its invites (#72): a guest's start screen showed the dead room's
+     * "Mauro invited you" above the live one's, word for word the same.
+     */
+    fun leave(): CompletableFuture<Unit>? {
+        val room = client.view().room ?: return null
+        return when {
+            room.host != uid && (room.status == Status.lobby || room.status == Status.playing) -> transport.leave(id)
+            room.host == uid && room.status == Status.lobby && room.invited.isNotEmpty() -> transport.invite(id, emptyList())
+            else -> null
+        }
+    }
     fun onChange(lobby: Lobby, room: Room): CompletableFuture<Unit> = transport.editLobby(id,
         lobby.seats.mapIndexed { i, s -> room.seats[i].copy(bot = s.bot?.name, ready = s.ready) }, room.seats)
     companion object {

@@ -6,6 +6,24 @@ import wgbg.engine.*
 import wgbg.net.*
 
 class OnlineLobbyTest {
+    @Test fun `#72 a host leaving their lobby withdraws its invites, and a guest leaving frees the seat`() {
+        val store = MemoryStore(); val h = InMemoryTransport("host", store, google = true); val erin = InMemoryTransport("erin", store, google = true)
+        var invites = listOf<String>()
+        erin.observeInvites({ rooms -> invites = rooms.map { it.id } }) { throw it }
+        val dead = LobbySession.host(h, GameSetup(), 1, code = "OAK-1", invited = listOf("erin")).join()
+        val live = LobbySession.host(h, GameSetup().withSeat(1, SeatKind.FRIEND), 2, code = "ELM-2", invited = listOf("erin")).join()
+        assertEquals(setOf("OAK-1", "ELM-2"), invites.toSet())
+        dead.leave()!!.join()
+        assertEquals(listOf("ELM-2"), invites)
+        assertEquals(emptyList<String>(), dead.client.view().room!!.invited); dead.close()
+        erin.join("ELM-2", 1, "Erin").join()
+        val guest = LobbySession(erin, GameSetup(), "ELM-2", "erin")
+        guest.leave()!!.join(); guest.close()
+        val r = live.client.view().room!!
+        assertEquals(null, r.seats[1].uid)
+        assertEquals(listOf("erin"), r.invited) // the live room still asks for them
+        live.close()
+    }
     @Test fun `Firestore wire preserves every config field and long seeds`() {
         for (expansion in Expansion.entries) for (seed in listOf(Long.MIN_VALUE, Long.MAX_VALUE, 0L)) {
             val config = GameConfig(expansion, 3, 16, BoardLayout.BEGINNER, false, 9, 321, true, true, true)

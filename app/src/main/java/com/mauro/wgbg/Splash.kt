@@ -133,10 +133,11 @@ fun SplashScreen(
 ) {
     val context = LocalContext.current
     // Sign-in needs Firebase and a Google client id; builds without them have no Log in button (as AccountSection).
-    // Set up off the main thread (#111): the menu draws at once and Log in appears when Firebase is ready.
+    // Set up off the main thread (#111): the menu draws at once and Log in appears when Firebase is ready. A #72 sim's
+    // fake Google seat (debug, emulators only) has no client id but must still reach friends and invites.
     val account by androidx.compose.runtime.produceState<FirestoreTransport?>(null) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { GoogleAccount.webClientId(context) != null }
+            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }
         }
     }
     var panel by remember { mutableStateOf<Splash.Action?>(null) }

@@ -377,9 +377,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
     fun forgetRoom() { savedRoom.edit().remove("room").remove("paused").apply(); resumeCode = null }
     fun leaveRoom() {
         session?.let { s ->
-            // A guest leaving the lobby frees the seat; quitting a running game hands it to a bot.
-            val room = s.client.view().room
-            if (room != null && room.host != s.uid && (room.status == Status.lobby || room.status == Status.playing)) s.transport.leave(s.id)
+            s.leave()?.whenComplete { _, e -> if (e != null) runCatching { android.util.Log.w("WGBG-ONLINE", "leave not saved", e) } }
             s.close()
         }
         forgetRoom()

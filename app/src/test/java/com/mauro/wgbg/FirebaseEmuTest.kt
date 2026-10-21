@@ -71,6 +71,10 @@ class FirebaseEmuTest {
             if (f.name != "MainActivity.kt") assertFalse("LobbyRepository.fakeGoogle =" in f.readText(), "${f.name} sets it")
         }
         assertEquals(1, Regex("""LobbyRepository\.fakeGoogle = """).findAll(main).count())
+        // The start screen offers friends and invites to it without a Google client id (sim builds have none), and to
+        // nothing else: the gate reads the transport's own flag.
+        val splash = File("src/main/java/com/mauro/wgbg/Splash.kt").readText()
+        assertTrue(".takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }" in splash, "the start screen's gate")
     }
 
     @Test
