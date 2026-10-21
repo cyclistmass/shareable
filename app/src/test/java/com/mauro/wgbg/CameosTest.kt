@@ -39,7 +39,7 @@ class CameosTest {
         assertEquals(listOf(null, "fq_alienor", "fq_blanche", "fq_jeanne"), fq.seatCameos)
         assertEquals(listOf(null, "fq_alienor", "fq_blanche", "fq_jeanne"), fq.playerCameos("Mauro"))
         assertEquals(List(4) { null }, GameSetup().seatCameos, "Colours: initials, as before")
-        assertEquals(List(4) { null }, GameSetup().withTheme(NameTheme.ENGLISH_QUEENS).seatCameos, "not painted yet")
+        assertEquals(listOf(null, "eq_matilda", "eq_eleanor", "eq_isabella"), GameSetup().withTheme(NameTheme.ENGLISH_QUEENS).seatCameos)
     }
 
     @Test
@@ -79,7 +79,9 @@ class CameosTest {
     fun `a new theme drops the old theme's cameos but keeps yours and the others`() {
         val s = fq.withSeatCameo(0, "fq_marie").withSeatCameo(1, "owl").withSeatCameo(2, "fq_eugenie")
         val t = s.withTheme(NameTheme.OLD_TRADES)
-        assertEquals(listOf("fq_marie", "owl", null, null), t.seatCameos)
+        val names = t.seatNames.drop(2).map { Cameos.forName(NameTheme.OLD_TRADES, it) }
+        assertTrue(names.all { it != null && it.startsWith("ot_") }, "$names")
+        assertEquals(listOf("fq_marie", "owl") + names, t.seatCameos, "the empty seats take their new name's cameo")
         assertEquals(listOf("fq_marie", "owl", null, null), t.seats.map { it.cameo })
     }
 
