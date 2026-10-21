@@ -40,7 +40,6 @@ unless another path is given.
   blow), 8 headings and 8 tilts, imported by `tools/import_sea3d.py`; it swims by the critter spec
   (`assets/critters/whale.critter.json`, docs/design/critter-spec.md).
 - App icon (`ic_launcher*`): our gull over deep sea in an old-brass roundel (option A, Mauro's pick 2026-10-10), rendered by OpenAI Codex for Mauro.
-- Bandit V2 "skeleton corsair" (`bandit_tilt_0..7`): the painted-miniature finish with an aged ivory skull, bigger afro and upturned brim, a 3D model rendered in Blender, 8 tilt steps (Mauro's pick, 2026-10-10).
 - Tile candidates for Menu › Tiles: compare (`tile3d_v2_*`, `tile_a1_relief_*`): 3D renders and relief faces,
   for picking only, not on the board yet.
 - 3D knights (`kn_*`): Normal armoured knights and the Pirate skeleton crew, levels 1-3, original Blender models built
@@ -49,6 +48,10 @@ unless another path is given.
 - V3 3D tiles (`t3d_*`), Settings › Tiles › 3D (preview): original Blender models built by OpenAI Codex and rendered on
   Mauro's PC, 8 tilt steps, imported by `tools/import_tiles3d.py`. The Pirate buildings' flat view was re-rendered
   (it was turned 180 degrees).
+
+## Art: made with Claude Code for Mauro DiBenedetto
+
+- Bandit V3 "Raccoon Thief" (`bandit_tilt_0..7`, the 3D board's `bandit.glb`): our own model, a masked raccoon with a red neckerchief, a spotted bundle on a stick and a gold coin, rendered in Blender on Mauro's PC by `wgbg-art/bandit-v3/render_bandit_v3.py`, 8 tilt steps, imported by `tools/import_bandit.py` (#86, Mauro's pick, 2026-10-20). It replaces the V2 skeleton corsair.
 
 ## Fonts
 

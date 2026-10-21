@@ -2,7 +2,7 @@
 
 Run one asset per process. No original file is saved or modified.
 """
-import argparse, hashlib, inspect, json, math, os, sys, time
+import argparse, hashlib, json, math, os, sys, time
 from pathlib import Path
 import bpy, bmesh
 from mathutils import Matrix
@@ -234,18 +234,14 @@ def building(theme,name):
     return result,{'source':str(path),'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'pivot':'original base anchor (0,0,0)'}
 
 def bandit():
-    sys.path.insert(0,str(ART/'bandit-v2'))
-    import render_bandit_final as final
-    original=final.original;original.setup()
-    original.woodmat=original.mat('dark carved wood plinth',(.065,.028,.014),0)
-    original.wood(original.woodmat,(.065,.028,.014))
-    source=inspect.getsource(original.model).replace('def model(finish):','def final_model(finish):',1)
-    source=source.replace('return .24*max(0,-math.sin(a))**2*(r/.46)**2','return .12*max(0,-math.sin(a))**2*(r/.46)**2',1)
-    ns=dict(original.__dict__);exec(compile(source,'final_model','exec'),ns)
-    meta=ns['final_model']('B');final.aged_ivory(bpy.data.materials['ivory skull insert'])
+    # The Raccoon Thief (#86, Mauro's pick, 0.3.4): the same model the sprites are rendered from.
+    sys.path.insert(0,str(ART/'bandit-v3'))
+    import render_bandit_v3 as v3
+    scene,_=v3.setup();v3.build('coon',scene)
     objects=[o for o in bpy.context.scene.objects if o.type=='MESH']
-    apply_source_modifiers(objects);o=merge(objects,'Bandit');reduce(o,3900);bake_colour(o,'Bandit_Painted_AgedIvory',0,.58)
-    return [o],meta
+    apply_source_modifiers(objects);o=merge(objects,'Bandit');reduce(o,3900);bake_colour(o,'Bandit_Painted_Raccoon',0,.6)
+    path=ART/'bandit-v3'/'render_bandit_v3.py'
+    return [o],{'character':'Raccoon Thief','source':str(path),'source_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'model_scale':.80,'foot_anchor':[0,0,0]}
 
 def simple(name):
     bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
