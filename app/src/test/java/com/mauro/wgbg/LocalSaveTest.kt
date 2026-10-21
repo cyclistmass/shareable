@@ -144,7 +144,7 @@ class LocalSaveTest {
     }
 
     @Test
-    fun `a game saved by 0_3_3 keeps the colours it was played in after the update; a new game uses the new defaults`() {
+    fun `a game saved by 0_3_3 keeps the colours it was played in after the update, and a new game uses the new defaults`() {
         // 0.3.3's own setup line (v1) inside a 0.3.3 save, 4 players and then 3 with seat 2 empty.
         val four = LocalSave.decode("wgbg-local v2\nv1|You||BASE|10|0|FRIEND:GREEDY,BOT:GREEDY,BOT:GREEDY,BOT:GREEDY\n7")!!
         assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE), four.setup.playerColours(7))
