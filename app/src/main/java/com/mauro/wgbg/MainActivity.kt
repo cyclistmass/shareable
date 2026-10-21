@@ -192,6 +192,9 @@ class MainActivity : ComponentActivity() {
                 // Debug builds: `--es firebase emu` plays online against the Firebase emulators on the dev PC.
                 val firebaseEmu = debug && intent.getStringExtra("firebase") == "emu"
                 LobbyRepository.emulatorHost = if (firebaseEmu) "10.0.2.2" else null
+                // Debug builds, with the emulators only: `--ez fakegoogle true` counts this phone as signed in with Google (#72 sims).
+                LobbyRepository.fakeGoogle = firebaseEmu && intent.getBooleanExtra("fakegoogle", false)
+                if (firebaseEmu) LobbyRepository.emulatorPorts = intent.getIntExtra("fsport", 8080) to intent.getIntExtra("authport", 9099)
                 // Debug builds: `--ez autoplay true` lets a bot play your seat in online games (two-phone sims, #35).
                 val autoplay = debug && intent.getBooleanExtra("autoplay", false)
                 // Debug builds: `--ez autosetup true` lets a bot place your opening pieces (scripted UI tests).
@@ -294,7 +297,7 @@ private fun polygon(points: List<Offset>) = Path().apply {
 private fun pips(n: Int) = 6 - kotlin.math.abs(7 - n)
 
 // START is the splash (#132); SETUP is the game-start screen (players, ruleset, dice, online) behind its New game.
-private enum class Screen { START, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME, LOOK, SETUP, CARD_TEST }
+private enum class Screen { START, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME, LOOK, SETUP, CARD_TEST, FRIENDS }
 
 /**
  * Splash (#132) -> New game -> game start (#3) -> the game, or online: host a room (lobby #19) or join one by code -> the online game (#7).
@@ -342,6 +345,21 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
         screen = Screen.ONLINE_LOBBY
     }
     fun failed(e: Throwable) { busy = false; problem = onlineProblem(e) }
+    // Quick game with friends (#72): the list the start screen loaded, and a room code to join from an invite.
+    var friendList by remember { mutableStateOf(emptyList<wgbg.net.Friend>()) }
+    var joinCode by remember { mutableStateOf<String?>(null) }
+    /**
+     * When an online game starts, signed in with Google: the other people signed in there go on your list of people
+     * played with (#72), once per room.
+     */
+    fun recordMet(s: LobbySession, room: wgbg.net.Room) {
+        if (!s.transport.google || savedRoom.getString("met", null) == room.id) return
+        savedRoom.edit().putString("met", room.id).apply()
+        s.transport.friends().thenCompose { known ->
+            val writes = wgbg.net.Friends.met(room, s.uid, known.associateBy { it.uid }, System.currentTimeMillis()).map { s.transport.putFriend(it) }
+            java.util.concurrent.CompletableFuture.allOf(*writes.toTypedArray())
+        }.whenComplete { _, e -> if (e != null) runCatching { android.util.Log.w("WGBG-ONLINE", "friends not saved", e) } }
+    }
     /**
      * Runs [then] with the online transport, set up off the main thread: a first Join, Host or Resume used to wait for
      * Firebase there, and the app could stop answering taps. Says "Connecting…" while it waits.
@@ -359,9 +377,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
     fun forgetRoom() { savedRoom.edit().remove("room").remove("paused").apply(); resumeCode = null }
     fun leaveRoom() {
         session?.let { s ->
-            // A guest leaving the lobby frees the seat; quitting a running game hands it to a bot.
-            val room = s.client.view().room
-            if (room != null && room.host != s.uid && (room.status == Status.lobby || room.status == Status.playing)) s.transport.leave(s.id)
+            s.leave()?.whenComplete { _, e -> if (e != null) runCatching { android.util.Log.w("WGBG-ONLINE", "leave not saved", e) } }
             s.close()
         }
         forgetRoom()
@@ -437,7 +453,32 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
                 onNewGame = { screen = Screen.SETUP },
                 onEndGame = { localStore.clear(); localSave = null },
                 env = splashEnv, sound = splashSound,
+                onFriends = { friendList = it; screen = Screen.FRIENDS },
+                // The Join screen, with the code filled in: your name for the room is checked there, as for a link.
+                onJoinInvite = { code -> joinCode = code; problem = null; screen = Screen.JOIN },
             )
+            Screen.FRIENDS -> { BackHandler { screen = Screen.START }; FriendsScreen(friendList, busy,
+                onStart = { picked ->
+                    // Hosting needs a name the others can tell apart, as on the game-start screen.
+                    if (!onlineName(setup.name)) { problem = "Set your name on the New game screen first"; return@FriendsScreen }
+                    busy = true; problem = null
+                    withTransport { t -> LobbySession.host(t, setup, java.security.SecureRandom().nextLong(), invited = picked.map { it.uid }).whenComplete { r, e ->
+                        scope.launch {
+                            if (e != null) failed(e) else {
+                                busy = false; enterRoom(r)
+                                // Friends with the app closed have no way to see the invite (no push): send the link as well.
+                                shareLink(context0, Lobby.host(setup, r.id), picked.singleOrNull()?.name)
+                            }
+                        }
+                    } }
+                },
+                onStar = { f -> val g = f.copy(starred = !f.starred)
+                    friendList = wgbg.net.Friends.shown(friendList.map { if (it.uid == f.uid) g else it }, System.currentTimeMillis())
+                    withTransport { t -> t.putFriend(g).whenComplete { _, e -> if (e != null) scope.launch { failed(e) } } } },
+                onForget = { f -> friendList = friendList - f
+                    withTransport { t -> t.forgetFriend(f.uid).whenComplete { _, e -> if (e != null) scope.launch { failed(e) } } } },
+                onBack = { screen = Screen.START },
+            ) }
             Screen.SETUP -> { BackHandler { screen = Screen.START }; NewGameScreen(
                 onStart = { setup = it.trimmedName(); savedSetup.edit().putString("last", setup.encode()).apply(); resuming = null; gameNo++; screen = Screen.GAME },
                 initial = setup,
@@ -461,23 +502,38 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
             ) }
             Screen.CARD_TEST -> CardTesterRoot(setup.name, onExit = { screen = Screen.SETUP })
             Screen.JOIN -> {
-                BackHandler { screen = Screen.SETUP }
-                JoinRoomScreen(setup.name, busy, initialCode = inviteCode ?: "", onJoin = { code, name ->
+                BackHandler { joinCode = null; screen = Screen.SETUP }
+                JoinRoomScreen(setup.name, busy, initialCode = joinCode ?: inviteCode ?: "", onJoin = { code, name ->
                     setup = setup.copy(name = name.trim()); busy = true; problem = null
                     withTransport { t -> joinFirstOpenSeat(t, setup, code).whenComplete { r, e ->
                         scope.launch { if (e != null) failed(e) else { busy = false; enterRoom(r) } }
                     } }
-                }, onBack = { screen = Screen.SETUP })
+                }, onBack = { joinCode = null; screen = Screen.SETUP })
             }
             Screen.ONLINE_LOBBY -> session?.let { s ->
                 BackHandler { leaveRoom() }
-                OnlineLobbyScreen(s, onPlaying = { if (screen == Screen.ONLINE_LOBBY) { gameNo++; screen = Screen.ONLINE_GAME } },
-                    onSettings = { leaveRoom(); screen = Screen.SETUP }, onError = { e -> scope.launch { problem = onlineProblem(e) } })
+                OnlineLobbyScreen(s, onPlaying = { v -> v.room?.let { recordMet(s, it) }; if (screen == Screen.ONLINE_LOBBY) { gameNo++; screen = Screen.ONLINE_GAME } },
+                    onSettings = { val host = s.client.view().room?.host == s.uid; leaveRoom(); if (host) screen = Screen.SETUP }, onError = { e -> scope.launch { problem = onlineProblem(e) } })
             } ?: RejoiningOr(savedRoom) { screen = Screen.START }
             Screen.ONLINE_GAME -> session?.let { s ->
                 key(gameNo) {
                     WatchGameScreen(Modifier.fillMaxSize().background(Color.Black), initialCamera, setup, onExit = { pauseRoom() }, online = s, autoplay = autoplay, quickBots = quickBots,
-                        onDeleteRoom = { deleteRoom() }, onQuitRoom = { leaveRoom() }, onGameOver = { roomOver = true; forgetRoom() })
+                        onDeleteRoom = { deleteRoom() }, onQuitRoom = { leaveRoom() }, onGameOver = { roomOver = true; forgetRoom() },
+                        // #72: the host plays the same people again; a guest follows the host's rematch.
+                        onRematch = { old ->
+                            busy = true; problem = "Opening the rematch…"
+                            LobbySession.rematch(s.transport, s.setup, old, java.security.SecureRandom().nextLong()).thenCompose { r ->
+                                s.transport.setNext(old.id, r.id).thenApply { r }
+                            }.whenComplete { r, e ->
+                                scope.launch { if (e != null) failed(e) else { problem = null; busy = false; s.close(); enterRoom(r) } }
+                            }
+                        },
+                        onJoinRematch = { code ->
+                            busy = true; problem = "Joining the rematch…"
+                            joinFirstOpenSeat(s.transport, setup, code).whenComplete { r, e ->
+                                scope.launch { if (e != null) failed(e) else { problem = null; busy = false; s.close(); enterRoom(r) } }
+                            }
+                        })
                 }
             } ?: RejoiningOr(savedRoom) { screen = Screen.START }
             Screen.LOOK -> WatchGameScreen(Modifier.fillMaxSize().tableTop(), Camera.FIT,   // wood, not a black box (Fable T6)
@@ -555,6 +611,10 @@ fun WatchGameScreen(
     onQuitRoom: (() -> Unit)? = null,
     /** Online: the game has ended (the phone forgets the room; nothing to rejoin). */
     onGameOver: () -> Unit = {},
+    /** Online, the host, after the game: play the finished room's people again (#72). */
+    onRematch: ((wgbg.net.Room) -> Unit)? = null,
+    /** Online, a guest, after the game: join the host's rematch, by its code (#72). */
+    onJoinRematch: ((String) -> Unit)? = null,
     /** Debug: a bot plays your seat, online (two-phone simulations) and local (straight to the end of a game). */
     autoplay: Boolean = false,
     /** Debug: a bot places your opening homesteads and roads, then you play. */
@@ -1450,8 +1510,15 @@ fun WatchGameScreen(
             }
             if (tick.let { state.isOver }) {
                 var folded by remember(seed) { mutableStateOf(false) }
-                CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it },
-                    if (online == null) ({ seed++; playing = true; panelOpen = false }) else null, onExit)
+                val room = onlineView?.room
+                val rematch: (() -> Unit)? = when {
+                    online == null -> ({ seed++; playing = true; panelOpen = false })
+                    room == null -> null
+                    room.host == online.uid -> onRematch?.let { go -> { go(room) } }
+                    else -> room.next?.let { code -> onJoinRematch?.let { go -> { go(code) } } }
+                }
+                CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it }, rematch, onExit,
+                    playAgainLabel = if (online != null && room?.host != online.uid) "Join rematch" else "Play again")
             }
         }
       }

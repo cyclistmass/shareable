@@ -20,7 +20,8 @@ class FirebaseEmuTest {
         val create = repo.substringAfter("@Synchronized fun create(context: Context): GameTransport {").substringBefore("\n    }\n")
         assertTrue("FirebaseApp.getApps(context).firstOrNull() ?: FirebaseApp.initializeApp(context)\n" +
             "            ?: emulatorHost?.let { FirebaseApp.initializeApp(context, emulatorOptions) }" in create, create)
-        assertTrue("db.useEmulator(emulatorHost, 8080)" in create && "auth.useEmulator(emulatorHost, 9099)" in create)
+        assertTrue("db.useEmulator(emulatorHost, emulatorPorts.first)" in create && "auth.useEmulator(emulatorHost, emulatorPorts.second)" in create)
+        assertTrue("@Volatile var emulatorPorts: Pair<Int, Int> = 8080 to 9099" in repo)
         assertEquals("demo-wgbg", LobbyRepository.EMULATOR_PROJECT)
         assertTrue("setProjectId(EMULATOR_PROJECT)" in repo)
     }
@@ -56,8 +57,24 @@ class FirebaseEmuTest {
         assertTrue(own in 0 until demo, create)
         assertEquals(1, Regex("""emulatorOptions\b""").findAll(repo).count() - 1, "the demo options are built once and used once")
         val emu = create.substringAfter("if (emulatorHost != null) {").substringBefore("} else")
-        assertTrue("db.useEmulator(emulatorHost, 8080)" in emu && "auth.useEmulator(emulatorHost, 9099)" in emu)
+        assertTrue("db.useEmulator(emulatorHost, emulatorPorts.first)" in emu && "auth.useEmulator(emulatorHost, emulatorPorts.second)" in emu)
         assertEquals(2, Regex("""useEmulator\(""").findAll(repo).count(), "useEmulator only behind the emulatorHost check")
+    }
+
+    @Test
+    fun `a fake Google sign-in (#72 sims) needs a debug build on the emulators and nothing else sets it`() {
+        assertTrue("LobbyRepository.fakeGoogle = firebaseEmu && intent.getBooleanExtra(\"fakegoogle\", false)" in main, "emu mode only")
+        assertTrue("@Volatile var fakeGoogle: Boolean = false" in repo, "off unless asked")
+        // Even if set, only a transport on the emulators takes it.
+        assertTrue("FirestoreTransport(auth, db, fakeGoogle = emulatorHost != null && fakeGoogle)" in repo, repo)
+        for (f in File("src/main/java/com/mauro/wgbg").listFiles()!!) {
+            if (f.name != "MainActivity.kt") assertFalse("LobbyRepository.fakeGoogle =" in f.readText(), "${f.name} sets it")
+        }
+        assertEquals(1, Regex("""LobbyRepository\.fakeGoogle = """).findAll(main).count())
+        // The start screen offers friends and invites to it without a Google client id (sim builds have none), and to
+        // nothing else: the gate reads the transport's own flag.
+        val splash = File("src/main/java/com/mauro/wgbg/Splash.kt").readText()
+        assertTrue(".takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }" in splash, "the start screen's gate")
     }
 
     @Test
@@ -67,5 +84,19 @@ class FirebaseEmuTest {
         val docs = File("../docs/online-play.md").readText()
         assertTrue("firebase emulators:start --only firestore,auth --project demo-wgbg" in docs)
         assertFalse("emulators:start --only firestore,auth --project workinggermangame" in docs)
+    }
+
+    @Test
+    fun `expired rooms (#72, no TTL) clear once per launch, off the main thread, for a player already signed in, moves first`() {
+        val splash = File("src/main/java/com/mauro/wgbg/Splash.kt").readText()
+        assertTrue("withContext(kotlinx.coroutines.Dispatchers.IO) { LobbyRepository.cleanExpiredOnce(context) }" in splash, "background, from the start screen")
+        assertTrue("if (cleaned) return\n        cleaned = true" in repo, "once per launch")
+        val clean = repo.substringAfter("override fun cleanExpired(").substringBefore("private fun deleteRoom")
+        assertTrue("auth.currentUser?.uid ?: return CompletableFuture.completedFuture(emptyList())" in clean, "never signs anyone in")
+        assertFalse("signIn()" in clean, "never signs anyone in")
+        assertTrue("whereEqualTo(\"host\", me)" in clean && "Expired.pick(" in clean, "only their own rooms, by the shared rule")
+        assertTrue("Status.playing.name" in clean && "Expired.latest(at, " in clean, "a game still being played lives as long as its last move")
+        val delete = repo.substringAfter("private fun deleteRoom").substringBefore("\n    }\n")
+        assertTrue(delete.indexOf("collection(\"moves\")") in 0 until delete.indexOf("ref.delete()"), "moves before the room")
     }
 }

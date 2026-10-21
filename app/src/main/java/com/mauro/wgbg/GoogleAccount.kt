@@ -101,11 +101,11 @@ object GoogleAccount {
     } catch (_: NoCredentialException) { null to Outcome.Failed("No Google account on this phone")
     } catch (e: GetCredentialException) { null to Outcome.Failed(e.message ?: "Couldn't open the account picker") }
 
-    /** [Ops] on Firebase Auth. */
-    class FirebaseOps(private val auth: FirebaseAuth) : Ops {
+    /** [Ops] on Firebase Auth; [fakeGoogle] (debug sims against the emulators only) counts the guest as a Google user. */
+    class FirebaseOps(private val auth: FirebaseAuth, private val fakeGoogle: Boolean = false) : Ops {
         override val uid get() = auth.currentUser?.uid
         override val email get() = auth.currentUser?.email
-        override val isGoogle get() = auth.currentUser?.providerData?.any { it.providerId == GoogleAuthProvider.PROVIDER_ID } == true
+        override val isGoogle get() = fakeGoogle && auth.currentUser != null || auth.currentUser?.providerData?.any { it.providerId == GoogleAuthProvider.PROVIDER_ID } == true
         override suspend fun link(idToken: String) {
             val user = auth.currentUser ?: error("Not signed in")
             try { user.linkWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await() }

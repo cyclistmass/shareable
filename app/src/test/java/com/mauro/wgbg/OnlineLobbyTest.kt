@@ -6,12 +6,41 @@ import wgbg.engine.*
 import wgbg.net.*
 
 class OnlineLobbyTest {
+    @Test fun `#72 a host leaving their lobby withdraws its invites, and a guest leaving frees the seat`() {
+        val store = MemoryStore(); val h = InMemoryTransport("host", store, google = true); val erin = InMemoryTransport("erin", store, google = true)
+        var invites = listOf<String>()
+        erin.observeInvites({ rooms -> invites = rooms.map { it.id } }) { throw it }
+        val dead = LobbySession.host(h, GameSetup(), 1, code = "OAK-1", invited = listOf("erin")).join()
+        val live = LobbySession.host(h, GameSetup().withSeat(1, SeatKind.FRIEND), 2, code = "ELM-2", invited = listOf("erin")).join()
+        assertEquals(setOf("OAK-1", "ELM-2"), invites.toSet())
+        dead.leave()!!.join()
+        assertEquals(listOf("ELM-2"), invites)
+        assertEquals(emptyList<String>(), dead.client.view().room!!.invited); dead.close()
+        erin.join("ELM-2", 1, "Erin").join()
+        val guest = LobbySession(erin, GameSetup(), "ELM-2", "erin")
+        guest.leave()!!.join(); guest.close()
+        val r = live.client.view().room!!
+        assertEquals(null, r.seats[1].uid)
+        assertEquals(listOf("erin"), r.invited) // the live room still asks for them
+        live.close()
+    }
     @Test fun `Firestore wire preserves every config field and long seeds`() {
         for (expansion in Expansion.entries) for (seed in listOf(Long.MIN_VALUE, Long.MAX_VALUE, 0L)) {
             val config = GameConfig(expansion, 3, 16, BoardLayout.BEGINNER, false, 9, 321, true, true, true)
             val r = Room("ROVER-42", "host", config, seed, listOf(Seat("host", "Host"), Seat("guest", "Guest", ready = true), Seat(bot = "STRONG", open = false), Seat()), Status.playing, 123, 4)
             assertEquals(r, room(r.id, r.wire()))
         }
+    }
+    @Test fun `#72 invites, the rematch link and the Google mark survive the wire, and rooms without them read as none`() {
+        val seats = listOf(Seat("host", "Host", google = true), Seat("erin", "Erin", open = false, google = true), Seat(), Seat())
+        val r = Room("ROVER-42", "host", GameSetup().config(), 9, seats, Status.done, 0, 0, listOf("erin", "bo"), "OAK-12", "ELM-310")
+        assertEquals(r, room(r.id, r.wire()))
+        val plain = r.copy(invited = emptyList(), rematchOf = null, next = null)
+        assertFalse("next" in plain.wire() || "rematchOf" in plain.wire())
+        @Suppress("UNCHECKED_CAST")
+        val bare = plain.wire().toMutableMap().also { w -> w.remove("invited")
+            w["seats"] = (w["seats"] as Map<String, Map<String, Any?>>).mapValues { it.value - "google" } }
+        assertEquals(plain.copy(seats = seats.map { it.copy(google = false) }), room(r.id, bare))
     }
     @Test fun `#126 online games start from the seed's seat, and a room made before #126 reads as seat 0 starting`() {
         assertTrue(GameSetup().config().randomFirstPlayer)

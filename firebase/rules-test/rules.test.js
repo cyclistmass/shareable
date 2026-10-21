@@ -1,7 +1,7 @@
 import { before, after, beforeEach, test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, collection, query, where, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, onSnapshot, orderBy, disableNetwork, enableNetwork } from 'firebase/firestore';
+import { doc, collection, query, where, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, onSnapshot, orderBy, disableNetwork, enableNetwork, Timestamp } from 'firebase/firestore';
 let env;
 const seat = (uid=null, name='', bot=null, open=true, ready=false) => ({uid,name,bot,open,ready});
 const room = (status='lobby') => ({host:'host', status, seed:'42', nextSeq:0, lastMove:'', decks:0, version:1, createdAt:serverTimestamp(), options:{expansion:'BASE',numPlayers:2,vpToWin:10,layout:'RANDOM',avoidAdjacentRedNumbers:true,discardLimit:7,maxTurns:1000,randomDiscard:false,generateTradeOffers:false}, seats:{'0':seat('host','Host',null,false,true),'1':seat(),'2':seat(null,'','GREEDY',false),'3':seat(null,'',null,false)}});
@@ -10,11 +10,11 @@ const ref = uid => doc(db(uid),'games/g');
 async function seed(status='lobby') { await env.withSecurityRulesDisabled(async c => { const r=room(status); if(status !== 'lobby') r.seats['1']=seat('guest','Guest',null,false,true); await setDoc(doc(c.firestore(),'games/g'),r); }); }
 async function append(uid='host', seq=0, s='0', id=String(seq).padStart(10,'0'), action='1:BUILD_SETTLEMENT:0') {
   return setDoc(doc(db(uid),`games/g/moves/${id}`), {seq,seat:s,uid,action,prev:seq===0?'':String(seq-1).padStart(10,'0')});
-}before(async () => { env=await initializeTestEnvironment({projectId:'demo-wgbg',firestore:{rules:readFileSync('../../firestore.rules','utf8'),host:'127.0.0.1',port:8080}}); });
+}before(async () => { env=await initializeTestEnvironment({projectId:'demo-wgbg',firestore:{rules:readFileSync('../../firestore.rules','utf8'),host:'127.0.0.1',port:Number((process.env.FIRESTORE_EMULATOR_HOST||'').split(':')[1]||8080)}}); });
 after(async()=>{await env.cleanup();});
 beforeEach(async()=>{await env.clearFirestore();});
 test('signed-in host creates; anonymous, forged host, playing create denied',async()=>{await assertSucceeds(setDoc(ref('host'),room())); await assertFails(setDoc(doc(db(null),'games/no'),room())); await assertFails(setDoc(doc(db('other'),'games/no'),room())); await assertFails(setDoc(doc(db('host'),'games/no'),room('playing')));});
-test('room versions: 1 (0.2.9) and 2 (0.2.10, random first player) create; 0, 3 and a string denied',async()=>{await assertSucceeds(setDoc(doc(db('host'),'games/v1'),room())); await assertSucceeds(setDoc(doc(db('host'),'games/v2'),{...room(),version:2})); for(const version of [0,3,'2'])await assertFails(setDoc(doc(db('host'),`games/v${version}x`),{...room(),version}));});
+test('room versions: 1 (0.2.9), 2 (0.2.10, random first player) and 3 (0.3.4, friends) create; 0, 4 and a string denied',async()=>{await assertSucceeds(setDoc(doc(db('host'),'games/v1'),room())); await assertSucceeds(setDoc(doc(db('host'),'games/v2'),{...room(),version:2})); await assertSucceeds(setDoc(doc(db('host'),'games/v3'),{...room(),version:3})); for(const version of [0,4,'2'])await assertFails(setDoc(doc(db('host'),`games/v${version}x`),{...room(),version}));});
 test('a free room code can be checked before creating (the app reads it in a transaction); unsigned denied',async()=>{await assertSucceeds(getDoc(doc(db('host'),'games/free'))); await assertFails(getDoc(doc(db(null),'games/free')));});
 test('lobby read and filtered listing; unsigned denied',async()=>{await seed(); await assertSucceeds(getDoc(ref('other'))); await assertSucceeds(getDocs(query(collection(db('other'),'games'),where('status','==','lobby')))); await assertFails(getDoc(ref(null)));});
 test('playing and done visible only to seated players',async()=>{for(const status of ['playing','done']){await seed(status);await assertSucceeds(getDoc(ref('host')));await assertSucceeds(getDoc(ref('guest')));await assertFails(getDoc(ref('other')));await assertFails(getDoc(ref(null)));}});
@@ -130,3 +130,88 @@ test('report screenshots (#128): anyone signed in may add one under the size cap
   await assertFails(getDoc(doc(db('p1'), 'shots/s1')));
   await assertFails(deleteDoc(doc(db('p1'), 'shots/s1')));
 });
+
+// #72: friends, in-app invites, the online rematch and rooms that expire.
+const inDays = d => Timestamp.fromMillis(Date.now() + d * 86400000);
+const v3 = (extra={}) => ({...room(), version:3, invited:['erin'], expireAt:inDays(1), ...extra});
+test('a v3 room carries invites, its rematch link and an expiry; too many invites or too far an expiry denied',async()=>{
+  await assertSucceeds(setDoc(doc(db('host'),'games/a'),v3({rematchOf:'ROVER-42'})));
+  await assertFails(setDoc(doc(db('host'),'games/b'),v3({invited:['a','b','c','d']})));
+  await assertFails(setDoc(doc(db('host'),'games/c'),v3({expireAt:inDays(90)})));
+  await assertFails(setDoc(doc(db('host'),'games/d'),v3({expireAt:'soon'})));
+  await assertFails(setDoc(doc(db('host'),'games/e'),v3({rematchOf:'A-VERY-LONG-CODE-1'})));});
+test('the invited find their rooms by query, in any state; nobody else can list them',async()=>{
+  for(const [id,status] of [['l','lobby'],['p','playing']]) await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'games/'+id),{...v3(),status});});
+  const q=uid=>query(collection(db(uid),'games'),where('invited','array-contains',uid));
+  const r=await assertSucceeds(getDocs(q('erin'))); if(r.size!==2) throw Error('expected 2 invites, got '+r.size);
+  await assertSucceeds(getDoc(doc(db('erin'),'games/p')));
+  await assertFails(getDoc(doc(db('other'),'games/p')));
+  await assertFails(getDocs(query(collection(db('other'),'games'),where('invited','array-contains','erin'))));});
+test('the host invites in the lobby and starts with a new expiry; a guest cannot change invites',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'games/g'),v3());});
+  await assertFails(updateDoc(ref('guest'),{invited:['guest']}));
+  await assertSucceeds(updateDoc(ref('host'),{invited:['erin','bo']}));
+  await assertSucceeds(updateDoc(ref('host'),{status:'playing',expireAt:inDays(30)}));});
+test('a seat may say its player signed in with Google, as a bool',async()=>{await seed();
+  await assertFails(updateDoc(ref('guest'),{'seats.1':{...seat('guest','Guest',null,false),google:'yes'}}));
+  await assertSucceeds(updateDoc(ref('guest'),{'seats.1':{...seat('guest','Guest',null,false),google:true}}));});
+test('ending a game sets its expiry; the host links a finished room to its rematch once; nobody else can',async()=>{await seed('playing');
+  await assertFails(updateDoc(ref('host'),{next:'ROVER-43'}));
+  await assertSucceeds(updateDoc(ref('host'),{status:'done',expireAt:inDays(7)}));
+  await assertFails(updateDoc(ref('guest'),{next:'ROVER-43'}));
+  await assertFails(updateDoc(ref('host'),{next:'ROVER-43',status:'lobby'}));
+  await assertSucceeds(updateDoc(ref('host'),{next:'ROVER-43'}));
+  await assertFails(updateDoc(ref('host'),{next:'ROVER-44'}));});
+test('a move may carry an expiry, never further off than two months',async()=>{await seed('playing');
+  await assertFails(setDoc(doc(db('host'),'games/g/moves/0000000000'),{seq:0,seat:'0',uid:'host',action:'1:BUILD_SETTLEMENT:0',prev:'',expireAt:inDays(90)}));
+  await assertSucceeds(setDoc(doc(db('host'),'games/g/moves/0000000000'),{seq:0,seat:'0',uid:'host',action:'1:BUILD_SETTLEMENT:0',prev:'',expireAt:inDays(30)}));});
+test('the people you played with are yours alone',async()=>{
+  const f={name:'Erin',lastPlayed:Timestamp.now(),games:1,starred:false};
+  const met=(uid,owner,other)=>doc(db(uid),`users/${owner}/met/${other}`);
+  await assertSucceeds(setDoc(met('host','host','erin'),f));
+  await assertSucceeds(getDoc(met('host','host','erin')));
+  await assertSucceeds(getDocs(collection(db('host'),'users/host/met')));
+  await assertFails(getDoc(met('erin','host','erin')));
+  await assertFails(getDocs(collection(db('erin'),'users/host/met')));
+  await assertFails(setDoc(met('erin','host','bo'),f));
+  await assertFails(setDoc(met('host','host','host'),f));
+  for(const bad of [{extra:1},{games:-1},{starred:'yes'},{name:'x'.repeat(81)},{lastPlayed:5}]) await assertFails(setDoc(met('host','host','bo'),{...f,...bad}));
+  await assertSucceeds(updateDoc(met('host','host','erin'),{starred:true}));
+  await assertFails(deleteDoc(met('erin','host','erin')));
+  await assertSucceeds(deleteDoc(met('host','host','erin')));
+  await assertFails(setDoc(met(null,'host','x'),f));});
+
+// #72 without TTL (billing is off): the host's app deletes its own expired rooms, moves first.
+async function seedExpiring(id, host, expireAt, moves=2, status='done') { await env.withSecurityRulesDisabled(async c => {
+  const r={...room(status), host, version:3, invited:[], ...(expireAt===undefined?{}:{expireAt})};
+  r.seats['0']=seat(host,'Host',null,false,true); r.seats['1']=seat('guest','Guest',null,false,true);
+  await setDoc(doc(c.firestore(),`games/${id}`),r);
+  for(let i=0;i<moves;i++) await setDoc(doc(c.firestore(),`games/${id}/moves/${String(i).padStart(10,'0')}`),{seq:i,seat:'0',uid:host,action:'1:ROLL:0',prev:i?String(i-1).padStart(10,'0'):''});
+}); }
+const mv = (uid,id,i) => doc(db(uid),`games/${id}/moves/${String(i).padStart(10,'0')}`);
+test('the host deletes an expired room of theirs, moves first, in any state',async()=>{
+  for(const status of ['lobby','playing','done']){ await seedExpiring('old','host',inDays(-1),2,status);
+    await assertSucceeds(deleteDoc(mv('host','old',0))); await assertSucceeds(deleteDoc(mv('host','old',1)));
+    await assertSucceeds(deleteDoc(doc(db('host'),'games/old')));
+    await env.withSecurityRulesDisabled(async c => { if((await getDoc(doc(c.firestore(),'games/old'))).exists()) throw new Error('room left'); }); }});
+test('the host lists their own rooms by host, in any state; the query names only them',async()=>{
+  await seedExpiring('a','host',inDays(-1),0,'done'); await seedExpiring('b','host',inDays(5),0,'playing'); await seedExpiring('c','bo',inDays(-1),0,'done');
+  const q=await assertSucceeds(getDocs(query(collection(db('host'),'games'),where('host','==','host'))));
+  if(q.docs.map(d=>d.id).sort().join()!=='a,b') throw new Error(q.docs.map(d=>d.id).join());
+  await assertFails(getDocs(query(collection(db('erin'),'games'),where('host','==','host'))));});
+test('break-it: nobody else deletes an expired room or its moves, not even its seated guest',async()=>{
+  await seedExpiring('old','host',inDays(-1));
+  for(const uid of ['guest','erin',null]){ await assertFails(deleteDoc(doc(db(uid),'games/old'))); await assertFails(deleteDoc(mv(uid,'old',0))); }
+  await assertSucceeds(getDoc(doc(db('host'),'games/old')));});
+test('break-it: nobody deletes before expiry, nor a room without one (made before #72), nor with a garbage expiry',async()=>{
+  for(const [id,at] of [['soon',inDays(1)],['none',undefined],['text','yesterday'],['num',5]]){
+    await env.withSecurityRulesDisabled(async c => { await seedExpiring(id,'host',at); });
+    await assertFails(deleteDoc(mv('host',id,0))); await assertFails(deleteDoc(doc(db('host'),`games/${id}`)));
+    await assertFails(deleteDoc(mv('guest',id,0))); }});
+test('break-it: an expired room still refuses new moves, edits and a forged expiry to get it deleted',async()=>{
+  await seedExpiring('live','host',inDays(5),1,'playing');
+  await assertFails(updateDoc(doc(db('host'),'games/live'),{expireAt:inDays(-1)}));
+  await assertFails(deleteDoc(doc(db('host'),'games/live')));
+  await seedExpiring('old','host',inDays(-1),1,'done');
+  await assertFails(setDoc(mv('host','old',1),{seq:1,seat:'0',uid:'host',action:'1:ROLL:0',prev:'0000000000'}));
+  await assertFails(updateDoc(doc(db('host'),'games/old'),{expireAt:inDays(30)}));});

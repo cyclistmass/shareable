@@ -3,8 +3,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signed() { return request.auth != null; }
     function seated(g) { return signed() && (g.seats['0'].uid == request.auth.uid || g.seats['1'].uid == request.auth.uid || g.seats['2'].uid == request.auth.uid || g.seats['3'].uid == request.auth.uid); }
-    function seat(s) { return s.keys().hasOnly(['uid','name','bot','open','ready']) && (s.uid == null || s.uid is string) && s.name is string && s.name.size() <= 80 && (s.bot == null || s.bot in ['EASY','GREEDY','STRONG']) && s.open is bool && s.ready is bool; }
-    function valid(g) { return g.keys().hasOnly(['host','status','seed','nextSeq','decks','seats','options','version','createdAt','lastMove']) && g.host is string && g.status in ['lobby','playing','done'] && g.seed is string && g.version in [1, 2] && g.nextSeq is int && g.nextSeq >= 0 && g.decks is int && g.decks >= 0 && g.decks <= 4 && g.options is map && g.createdAt is timestamp && g.seats.keys().hasAll(['0','1','2','3']) && g.seats.size() == 4 && seat(g.seats['0']) && seat(g.seats['1']) && seat(g.seats['2']) && seat(g.seats['3']) && g.seats['0'].uid == g.host; }
+    function seat(s) { return s.keys().hasOnly(['uid','name','bot','open','ready','google']) && (s.uid == null || s.uid is string) && s.name is string && s.name.size() <= 80 && (s.bot == null || s.bot in ['EASY','GREEDY','STRONG']) && s.open is bool && s.ready is bool && s.get('google', false) is bool; }
+    // A room and its moves expire at expireAt (#72); the host's app then deletes them (see delete below). The app sets at most 30 days
+    // ahead by the phone's clock; 60 here leaves room for a clock that is off, so its moves are never refused.
+    function expiry(d) { return d.get('expireAt', request.time) is timestamp && d.get('expireAt', request.time) <= request.time + duration.value(60, 'd'); }
+    function code(c) { return c is string && c.size() <= 12; }
+    function expired(d) { return d.get('expireAt', null) is timestamp && d.expireAt < request.time; }
+    // #72: who the host invited (seen on their start screen), the room this one plays again, and its own rematch.
+    function links(g) { return g.get('invited', []) is list && g.get('invited', []).size() <= 3 && code(g.get('rematchOf', '')) && code(g.get('next', '')); }
+    function valid(g) { return g.keys().hasOnly(['host','status','seed','nextSeq','decks','seats','options','version','createdAt','lastMove','invited','rematchOf','next','expireAt']) && g.host is string && g.status in ['lobby','playing','done'] && g.seed is string && g.version in [1, 2, 3] && expiry(g) && links(g) && g.nextSeq is int && g.nextSeq >= 0 && g.decks is int && g.decks >= 0 && g.decks <= 4 && g.options is map && g.createdAt is timestamp && g.seats.keys().hasAll(['0','1','2','3']) && g.seats.size() == 4 && seat(g.seats['0']) && seat(g.seats['1']) && seat(g.seats['2']) && seat(g.seats['3']) && g.seats['0'].uid == g.host; }
     function selfSeat(k) {
       let a = resource.data.seats[k]; let b = request.resource.data.seats[k];
       return resource.data.seats.diff(request.resource.data.seats).affectedKeys().hasOnly([k]) &&
@@ -45,15 +52,30 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time;
       allow read, update, delete: if false;
     }
+    // The people you played online with (#72): yours alone, never anyone else's to read.
+    match /users/{uid}/met/{other} {
+      allow read, delete: if signed() && request.auth.uid == uid;
+      allow create, update: if signed() && request.auth.uid == uid && other != uid &&
+        request.resource.data.keys().hasOnly(['name','lastPlayed','games','starred']) && request.resource.data.name is string &&
+        request.resource.data.name.size() <= 80 && request.resource.data.lastPlayed is timestamp && request.resource.data.games is int &&
+        request.resource.data.games >= 0 && request.resource.data.starred is bool;
+    }
     match /games/{game} {
       // A missing room is readable (it only says the code is free): creating a room checks that in a transaction.
-      allow read: if signed() && (resource == null || resource.data.status == 'lobby' || seated(resource.data));
+      // An invited player may see the room in any state: their start screen asks for the rooms that invite them (#72).
+      // The host finds their own rooms by query to clear the expired ones.
+      allow read: if signed() && (resource == null || resource.data.status == 'lobby' || seated(resource.data) ||
+        request.auth.uid in resource.data.get('invited', []) || resource.data.host == request.auth.uid);
+      // No TTL without billing: the host's app deletes its own rooms once expireAt is past (moves first, below).
+      allow delete: if signed() && resource.data.host == request.auth.uid && expired(resource.data);
       allow create: if signed() && valid(request.resource.data) && request.resource.data.host == request.auth.uid && request.resource.data.status == 'lobby' && request.resource.data.nextSeq == 0 && request.resource.data.createdAt == request.time && request.resource.data.seats['1'].uid == null && request.resource.data.seats['2'].uid == null && request.resource.data.seats['3'].uid == null;
       allow update: if signed() && valid(request.resource.data) && (
-        (resource.data.status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats','status','options']) &&
+        (resource.data.status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats','status','options','invited','expireAt']) &&
           ((resource.data.host == request.auth.uid && request.resource.data.status in ['lobby','playing']) ||
            (request.resource.data.status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats']) && selfChange()))) ||
-        (resource.data.status == 'playing' && resource.data.host == request.auth.uid && request.resource.data.status == 'done' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+        (resource.data.status == 'playing' && resource.data.host == request.auth.uid && request.resource.data.status == 'done' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','expireAt'])) ||
+        // The host points a finished room at its rematch, once (#72).
+        (resource.data.status == 'done' && resource.data.host == request.auth.uid && resource.data.get('next', '') == '' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['next'])) ||
         (resource.data.status == 'playing' && request.resource.data.status == 'playing' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats']) && quitChange())
       );
       match /moves/{move} {
@@ -65,8 +87,9 @@ service cloud.firestore {
              get(/databases/$(database)/documents/games/$(game)/moves/$(m.prev)).data.seq == m.seq - 1);
         }
         allow read: if signed() && (parent().status == 'lobby' || seated(parent()));
+        allow delete: if signed() && parent().host == request.auth.uid && expired(parent());
         allow create: if signed() && parent().status == 'playing' && seated(parent()) &&
-          request.resource.data.keys().hasOnly(['seq','seat','uid','action','prev']) && request.resource.data.seq >= 0 && request.resource.data.seq <= 9999999999 &&
+          request.resource.data.keys().hasOnly(['seq','seat','uid','action','prev','expireAt']) && expiry(request.resource.data) && request.resource.data.seq >= 0 && request.resource.data.seq <= 9999999999 &&
           request.resource.data.seq is int && request.resource.data.seat in ['0','1','2','3'] && request.resource.data.uid == request.auth.uid &&
           (parent().seats[request.resource.data.seat].uid == request.auth.uid || (parent().host == request.auth.uid && parent().seats[request.resource.data.seat].uid == null && parent().seats[request.resource.data.seat].bot != null)) &&
           request.resource.data.action is string && request.resource.data.action.size() <= 100 && request.resource.data.action.matches('1:[A-Z_]+:[0-9]+') &&

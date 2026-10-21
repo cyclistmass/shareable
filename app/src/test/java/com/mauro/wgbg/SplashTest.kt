@@ -17,6 +17,16 @@ class SplashTest {
     }
 
     @Test
+    fun `#72 Quick game with friends shows when signed in with someone to play with, under New game`() {
+        assertEquals(listOf(Action.NEW_GAME, Action.FRIENDS, Action.LOG_IN, Action.SETTINGS), Splash.buttons(false, null, true, signedIn = true, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = false, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = true, friends = false).map { it.action })
+        val r = wgbg.net.Room("OAK-12", "h", GameSetup().withRuleset(Ruleset.CHIVALRY).config(), 1,
+            listOf(wgbg.net.Seat("h", "Mauro"), wgbg.net.Seat(), wgbg.net.Seat(), wgbg.net.Seat()))
+        assertEquals("Mauro invited you: ${Ruleset.CHIVALRY.label}", Splash.inviteLine(r))
+    }
+
+    @Test
     fun `exactly one green button, the first one`() {
         for (local in listOf(true, false)) for (room in listOf(null, "OAK-12")) {
             val b = Splash.buttons(local, room, true)
