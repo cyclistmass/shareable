@@ -212,6 +212,8 @@ class MainActivity : ComponentActivity() {
                 val players = if (debug) intent.getIntExtra("players", 0) else 0
                 // Debug builds: `--es dice "3,3 4,4"` throws these dice in local games, in order and over again (TestDice).
                 TestDice.use(if (debug) intent.getStringExtra("dice") else null)
+                // ci_trade reads this to know the build took them (0.3.4 ignores the extra and plays real dice).
+                TestDice.rolls?.let { android.util.Log.i("WGBG-DICE", "fixed dice: ${it.size} rolls, over and over") }
                 // An invite link (wgbg://join/ROOM-42) opens the Join screen with that code filled in.
                 val inviteCode = joinCodeFrom(intent.dataString)
                 AppRoot(debugCamera(), start, autoplay, autoSetup, watch, crashTest, players, inviteCode, quickBots)
