@@ -266,7 +266,7 @@ private fun SeatCard(i: Int, seat: SeatSetup, name: String?, modifier: Modifier,
     }
 }
 
-/** The names of the setup's theme for seat [i]: who each was, and which seat already has it (picking it swaps the two). */
+/** The names of the setup's theme for seat [i], and which seat already has each (picking it swaps the two). */
 @Composable
 private fun SeatNamePicker(i: Int, setup: GameSetup, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     val names = setup.seatNames
@@ -285,8 +285,8 @@ private fun SeatNamePicker(i: Int, setup: GameSetup, onPick: (String) -> Unit, o
                             .clickable(role = Role.RadioButton) { onPick(t.name) }.padding(horizontal = 10.dp, vertical = 6.dp)
                             .testTag("seat-name-$k"),
                     ) {
+                        // Names only (option for Mauro): the "who she was" lines stay in NameTheme for later.
                         Text(t.name + (holder?.let { "  (Seat ${it + 1}: swaps)" } ?: ""), style = Wood.sans(15.sp, FontWeight.Bold))
-                        Text(t.who, style = Wood.sans(12.sp, color = Wood.INK_SOFT))
                     }
                 }
             }
