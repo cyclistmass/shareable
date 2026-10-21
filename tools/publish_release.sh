@@ -7,8 +7,7 @@
 # The GitHub token comes from Git Credential Manager for one command at a time; it is never printed or saved.
 # Usage: [APK=<tested apk>] [KNOWN=<known issues, markdown>] [PRERELEASE=1] tools/publish_release.sh [path to gameplay mp4]
 # PRERELEASE=1: a test build from a test/* branch (SHA=<its commit>, CI = its green release check). It is marked
-# pre-release and never becomes latest, so the always-latest link keeps serving the last real release. The APK must
-# still come from a per-push CI run (built with the Firebase config): a check run's shards-apk is never published.
+# pre-release and never becomes latest, so the always-latest link keeps serving the last real release.
 set -euo pipefail
 VIDEO="${1:-$TEMP/wgbg-showcase/working-german-board-game-gameplay.mp4}"
 REPO="${REPO:-cyclistmass/shareable}"   # REPO=cyclistmass/sharable until the rename has run
