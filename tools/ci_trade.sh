@@ -30,6 +30,8 @@ panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell
   for _ in 1 2 3 4; do "$ADB" shell input swipe $((w * 7 / 10)) $((h * 4 / 5)) $((w * 7 / 10)) $((h * 3 / 10)) 400; sleep 0.8; tap_text "$1" && return 0; done; return 1; }
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }
+# Poll the screen up to $2 s for a pattern (a fixed sleep then one look raced slow CI emulators).
+seen() { for _ in $(seq 1 "$2"); do dump | grep -q "$1" && return 0; sleep 1; done; return 1; }
 move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "$1" >/dev/null; }
 # The chest's cards, left to right: "x held rate" (rate 0 on the Players tab), from the labels under them.
 cards() { dump | grep 'text="have [0-9]*' | sed 's/.*text="have \([0-9]*\)\(&#10;\([0-9]\):1\)\{0,1\}".*bounds="\[\([0-9]*\),[0-9]*\]\[\([0-9]*\),[0-9]*\]".*/\4 \5 \1 \3/' |
@@ -94,7 +96,7 @@ for ruleset in $RULESETS; do
       [ "${HELD[$g]}" = $((before_g - rate)) ] && [ "${HELD[$w]}" = $((before_w + 1)) ] ||
         { bad "A: bank trade didn't take (card $g: $before_g -> ${HELD[$g]}, card $w: $before_w -> ${HELD[$w]})"; break; }
       # #125: the new counts are shown after the trade ("Now: 4 Grain (+1) · 0 Stone (−3)").
-      now=$(dump | grep -o 'text="Now: [^"]*"' | head -1)
+      seen 'text="Now: ' 8; now=$(dump | grep -o 'text="Now: [^"]*"' | head -1)
       echo "$now" | grep -q "(+1)" && echo "$now" | grep -q "(−$rate)" ||
         { bad "A: no new-counts line after the trade (#125): '${now:-none}'"; break; }
       # B: both cards just used must still answer: asking each shows +1.
@@ -159,8 +161,7 @@ for ruleset in $RULESETS; do
           if [ -n "$partner" ]; then
             tap_text "$partner" || bad "D: couldn't tap $partner"
             tap_text "Trade" || bad "D: no Trade button after picking $partner"
-            sleep 1
-            dump | grep -q 'text="Now: ' || bad "D: no new counts after trading with $partner"
+            seen 'text="Now: ' 8 || bad "D: no new counts after trading with $partner"
             turn_line | grep -q 'phase=PLAY_TURN' || bad "D: not back to the turn after Trade"
             echo "trade $ruleset: D took $partner's answer to an open $kind"; took=1
           else tap_text "Cancel" || bad "D: no way out of the answers"; fi
