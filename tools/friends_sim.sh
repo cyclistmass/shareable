@@ -18,9 +18,9 @@ LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 # PORTS: the emulators' Firestore and Auth ports when not 8080/9099, e.g. PORTS="--ei fsport 8185 --ei authport 9199".
 PORTS="${PORTS:-}"
 EXTRAS="--es firebase emu --ez fakegoogle true --ez autoplay true --ez quickbots true $PORTS"
-HOST=emulator-5554
-GUEST=emulator-5556
-A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+HOST="${HOST_SERIAL:-emulator-5554}"
+GUEST="${GUEST_SERIAL:-emulator-5556}"
+A="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 export MSYS_NO_PATHCONV=1
 LABEL="Base game"; [ "$RULESET" = chivalry ] && LABEL="Age of Chivalry"
 
