@@ -149,3 +149,4 @@ jobs:
             working-german-board-game/emu2.log
             working-german-board-game/*.png
             working-german-board-game/*.xml
+            working-german-board-game/*.logcat.txt
