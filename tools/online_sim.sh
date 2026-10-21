@@ -24,19 +24,9 @@ GUEST="${GUEST_SERIAL:-emulator-5556}"
 A="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 export MSYS_NO_PATHCONV=1
 
-# The screen of device $1 as one element per line. A busy host makes uiautomator answer "null root node" now and then:
-# up to 6 tries, then a note on stderr and empty output (status 0, as before, so callers under pipefail are unchanged).
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$A" -s "$1" shell rm -f /sdcard/ui.xml; "$A" -s "$1" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$A" -s "$1" shell cat /sdcard/ui.xml 2>/dev/null) || true
-    case "$x" in *hierarchy*) printf '%s\n' "$x" | tr '>' '\n'; return 0;; esac
-    sleep 1
-  done
-  echo "[$1] uiautomator dump failed 6 times (busy device?)" >&2
-  return 0
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
+# The screen of device $1 (and the same uiautomator fallback, retried, for a busy host's "null root node").
+dump() { UI_SERIAL=$1 ADB=$A ui_dump; }
 # On any failure, each phone's screen, screen dump and log beside the shard log (the device workflow uploads *.png,
 # *.xml and *.logcat.txt), so a CI failure can be read from its artifact alone.
 evidence() {
@@ -77,12 +67,12 @@ fill() {
   "$A" -s "$1" shell input keyevent KEYCODE_MOVE_END $(printf 'KEYCODE_DEL %.0s' $(seq 1 24))
   "$A" -s "$1" shell input text "$text"; "$A" -s "$1" shell input keyevent KEYCODE_ENTER; sleep 0.6  # Enter (IME Done) hides the keyboard; Back would leave the screen when it is already hidden
   # On a box with a Next key, Enter only moves on and the keyboard stays up over the next box: then Back closes it.
-  "$A" -s "$1" shell dumpsys input_method | grep -q "mInputShown=true" && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
+  "$A" -s "$1" shell dumpsys input_method | grep -c "mInputShown=true" >/dev/null && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
   return 0
 }
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
 # Waits up to $3 s for text matching $2 on device $1.
-wait_for() { for _ in $(seq 1 "$3"); do texts "$1" | grep -q "$2" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
+wait_for() { for _ in $(seq 1 "$3"); do grep -q "$2" <<< "$(texts "$1")" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
 # A finger's swipe up inside each scrolling panel on device $1 (a wide screen shows two side by side; a swipe between
 # them moves nothing).
 swipe_panels() {
@@ -141,7 +131,7 @@ fill $GUEST 2 "$(echo "$CODE" | tr -d - | tr '[:upper:]' '[:lower:]')"
 tap_text $GUEST "Join"
 wait_for $GUEST "Erin" 20
 wait_for $HOST "Erin" 20
-texts $HOST | grep -q '"[^" ]\+Erin"' && { echo "FAIL: the guest's name came out wrong"; texts $HOST; exit 1; }
+grep -q '"[^" ]\+Erin"' <<< "$(texts $HOST)" && { echo "FAIL: the guest's name came out wrong"; texts $HOST; exit 1; }
 
 # Both ready; the host starts.
 tap_text $HOST "Not ready" 1

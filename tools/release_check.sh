@@ -143,14 +143,17 @@ fi
 {
   echo; echo "Release check, $(git log -1 --format='%h %s' | cut -c1-70)"
   printf '  %s\n' "${REPORT[@]}"
-  [ -n "${SHA:-}" ] && echo "  APK sha256: $SHA"
+  [ -n "${SHA:-}" ] && echo "  local APK sha256: $SHA (no Firebase config: not the one to publish or user-test)"
   cat <<'EOF'
 
 Still to do by hand (AGENTS.md, never by hooks or debug extras):
-  [ ] this exact APK installed fresh, and as an update over the last release
+  [ ] HARD STEP: the exact APK to be published, downloaded from the green per-push run publish_release will take it
+      from (artifact working-german-board-game-debug-apk; never a local build: those have no Firebase config, and
+      the hand-uploaded 0.3.4 had none). Installed fresh, and as an update over the last release.
+  [ ] HARD STEP: with that APK, host and join online against real Firebase (no --es firebase emu), and send a report
   [ ] in through the start screen with real taps; full games to the end, base and Age of Chivalry, 3 and 4 players
   [ ] closed and reopened mid-game
-  [ ] host and join online; every changed feature tried
+  [ ] every changed feature tried
   Afterwards: ANDROID_SERIAL=<lane> tools/emulator_setup.sh user  on a phone a person uses (Play Store back on).
 EOF
 } | tee "$OUT/report.txt"

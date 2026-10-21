@@ -59,7 +59,7 @@ view() { "$ADB" shell am broadcast -a com.mauro.wgbg.FILAMENT_VIEW -p $PKG "$@" 
 
 # Waits (up to $2 s) for player 0's turn with a legal move matching $1; prints the turn line.
 wait_for() { local l; for _ in $(seq 1 $(( ${2:-60} * 2 ))); do l=$(turn)
-  echo "$l" | grep -q 'player=0 ' && echo "$l" | grep -q "legal=.*$1" && { echo "$l"; return 0; }; sleep 0.5; done; return 1; }
+  grep -q 'player=0 ' <<< "$l" && grep -q "legal=.*$1" <<< "$l" && { echo "$l"; return 0; }; sleep 0.5; done; return 1; }
 
 # Dumps the screen and checks it; $1 names the step. The checker reads the camera cutout, in the current rotation,
 # from `dumpsys window`.
@@ -99,7 +99,7 @@ fresh() { local l; "$ADB" logcat -c
   # The scenery still (sea, birds, boats), or uiautomator waits for an idle screen that never comes on a slow emulator.
   view --ef scenery 0
   move ROLL:0
-  for _ in $(seq 1 20); do l=$(wait_for '' 10) || break; echo "$l" | grep -q 'legal=.*END_TURN' && break
+  for _ in $(seq 1 20); do l=$(wait_for '' 10) || break; grep -q 'legal=.*END_TURN' <<< "$l" && break
     move "$(echo "$l" | sed 's/.*legal=//; s/ spots=.*//' | tr ',' '\n' | head -1)"; sleep 0.5; done
   view --es stress full; }
 
@@ -129,8 +129,8 @@ done
     cutout "$OVL.$cut"
     for rot in 1 3; do
       "$ADB" shell settings put system user_rotation $rot
-      for _ in 1 2 3 4 5 6 7 8 9 10; do "$ADB" shell dumpsys window displays | grep -q "mRotation=$rot" && break; sleep 1; done
-      "$ADB" shell dumpsys window displays | grep -q "mRotation=$rot" || { echo "layout: FAILED: the screen won't turn to rotation $rot"; fail=1; continue; }
+      for _ in 1 2 3 4 5 6 7 8 9 10; do "$ADB" shell dumpsys window displays | grep -c "mRotation=$rot" >/dev/null && break; sleep 1; done
+      "$ADB" shell dumpsys window displays | grep -c "mRotation=$rot" >/dev/null || { echo "layout: FAILED: the screen won't turn to rotation $rot"; fail=1; continue; }
       fresh "$mode" || continue
       for size in $CUTOUT_SIZES; do screen "$size"; check "$mode-${size%%:*}-$cut-rot$rot"; done
     done
