@@ -233,4 +233,20 @@ class SeatNamesTest {
             Seat(null, "", "EASY", open = false), Seat(null, "Potter", "GREEDY", open = false)))
         assertEquals(listOf("Anne", "Blue", "Orange", "Potter"), OnlineSeats(room, "h").names)
     }
+
+    @Test
+    fun `online rematch (#72) keeps the bots' theme names and opens the people's seats again`() {
+        val store = MemoryStore()
+        val setup = GameSetup(name = "Mauro").withTheme(NameTheme.FRENCH_QUEENS).withSeat(1, SeatKind.FRIEND).withSeatName(2, "Marguerite")
+        val ht = InMemoryTransport("h", store)
+        LobbySession.host(ht, setup, 5, code = "ROVER-42").join()
+        val erin = joinFirstOpenSeat(InMemoryTransport("e", store), GameSetup(name = "Erin"), "ROVER-42").join()
+        val old = erin.client.view().room!!
+        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Blanche"), old.seats.map { it.name })
+        val again = LobbySession.rematch(ht, setup, old, 6, code = "OTTER-7").join()
+        val room = joinFirstOpenSeat(InMemoryTransport("e", store), GameSetup(name = "Erin"), "OTTER-7").join().client.view().room!!
+        assertEquals("ROVER-42", room.rematchOf)
+        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Blanche"), room.seats.map { it.name }, "Erin back in her seat, the bots as they were")
+        assertEquals(listOf(null, null, "Marguerite", "Blanche"), again.model(room).seats.map { it.botName })
+    }
 }
