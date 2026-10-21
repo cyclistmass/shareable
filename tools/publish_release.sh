@@ -36,14 +36,17 @@ RUN=; ART=
 for r in $RUNS; do
   ART=$(api "https://api.github.com/repos/$REPO/actions/runs/$r/artifacts" | py -c "
 import json,sys
-print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'].endswith('release-apk') or a['name']=='shards-apk']+[''])[0])")
-[ -n "$ART" ] || { echo "run $RUN has no release APK artifact (built before #147?); not publishing"; exit 1; }
+print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'] in ('working-german-board-game-release-apk','publish-release-apk')]+[''])[0])")
+# Only an APK built with the Firebase config: the per-push CI's release APK, or a check run's publish-release-apk.
+# Never shards-apk (built without the config for the shards): the 0.3.4 asset was swapped for having none.
+[ -n "$ART" ] || { echo "run $RUN has no publishable release APK artifact (built before #147?); not publishing"; exit 1; }
 curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://api.github.com/repos/$REPO/actions/artifacts/$ART/zip"
-# The release APK (#147: not debuggable, so no test hooks), never the debug one; the release check's artifact holds both.
+# The release APK (#147: not debuggable, so no test hooks), never the debug one.
 REL=$(cd "$WORK" && unzip -q apk.zip && find . -name app-release.apk | head -1)
 [ -n "$REL" ] || { echo "run $RUN's artifact has no app-release.apk; not publishing a debug build"; exit 1; }
 mv "$WORK/$REL" "$WORK/working-german-board-game.apk"
-# APK=<file>: publish the exact APK that was user-tested (same commit), not CI's rebuild of it. CI must still be green.
+# APK=<file>: publish the exact APK that was user-tested (same commit; it must still pass apk_check --firebase below, so
+# a local build, which has no Firebase config, is refused). CI must still be green.
 if [ -n "${APK:-}" ]; then
   echo "CI's APK:    $(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)"
   echo "Tested APK:  $(sha256sum < "$APK" | cut -c1-64) (publishing this one)"
@@ -52,8 +55,9 @@ if [ -n "${APK:-}" ]; then
   [ "$(cert "$APK")" = "$(cert "$WORK/working-german-board-game.apk")" ] || { echo "Tested APK is signed with a different cert than CI's; not publishing"; exit 1; }
   cp "$APK" "$WORK/working-german-board-game.apk"
 fi
-# Whatever is published: the stable key, and not debuggable (an APK= from a debug build is refused here too).
-bash "$(dirname "$0")/ci/apk_check.sh" "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
+# Whatever is published: the stable key, not debuggable, and the Firebase config (an APK= from a debug or a local
+# build is refused here too: local builds never have the config, and 0.3.4's hand-uploaded one had none).
+bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
 
 # KNOWN=<text> adds a Known issues section (read from the environment, so its quotes and $ stay as written).
 KNOWN="${KNOWN:-}" py -c "
