@@ -1,0 +1,296 @@
+name: working-german-board-game CI
+
+# Main and pull requests only: a branch push used to run the whole suite again for a commit main already tested, and
+# release tags a third time. Docs-only changes (Markdown, docs/) skip CI; art and code still run.
+on:
+  push:
+    branches: [main]
+    paths: ["working-german-board-game/**", "!working-german-board-game/docs/**", "!working-german-board-game/**/*.md",
+            ".github/workflows/wgbg-ci.yml"]
+  pull_request:
+    paths: ["working-german-board-game/**", "!working-german-board-game/docs/**", "!working-german-board-game/**/*.md",
+            ".github/workflows/wgbg-ci.yml"]
+  workflow_dispatch:
+
+# A newer push to the same PR cancels the older run; main always finishes every run.
+concurrency:
+  group: wgbg-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    working-directory: working-german-board-game
+
+jobs:
+  # Pinned to 24.04: ubuntu-latest moves to the next Ubuntu on 2026-10-19 and the emulator jobs need KVM to keep working.
+  unit-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # The runner image ships the Android SDK; add the platform we compile against.
+      - name: Android SDK packages
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Engine, AI, net, CLI and app tests (rules, fuzz, break-it, dice fairness, trading, camera)
+        run: bash ./gradlew --no-daemon :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest
+
+      # Differential test against Catanatron (#12): the engine tests above wrote 200 random base games as traces;
+      # Catanatron replays them and every legal-move list and state must match (allowing for its documented
+      # simplifications, see tools/catanatron/diff.py).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rules cross-check against Catanatron (200 games, every move)
+        run: |
+          python -m pip install --quiet catanatron==3.2.1
+          python tools/catanatron/diff.py engine/build/catanatron-traces
+      # The art-import and layout-check tools' own tests (dice, bandit, ledger cards, brass, the layout checker) and the
+      # frame-stats parser: nothing ran them before.
+      - name: Tool tests
+        run: |
+          python -m pip install --quiet pillow numpy
+          python -m unittest discover -s tools -p 'test_*.py'
+          bash tools/test_perf_framestats.sh
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: working-german-board-game/**/build/reports/tests/
+
+  # The APK on its own, in parallel with the unit tests: the device shards only need this.
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK packages
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The Firebase app config is kept out of git; CI gets it from a repository secret so the APK can play online
+      # and send crash reports. Without the secret the build still works, offline only.
+      - name: Firebase config for the APK
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json; echo "google-services.json written"; else echo "no GOOGLE_SERVICES_JSON secret: offline-only APK"; fi
+      # One signing key for every build (a fresh runner otherwise makes a new debug key each time, and phones
+      # refuse to update an app whose key changed). Same key as local builds.
+      - name: Stable debug signing key
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+            echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
+          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key"; fi
+      - name: Build debug APK (and the instrumented test APK)
+        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      # The APK must carry the stable key (its public certificate fingerprint), or phones can't update to it.
+      - name: Check the APK's signing key
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          got=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -i 'SHA-256 digest' | head -1 | awk '{print $NF}')
+          echo "APK certificate SHA-256: $got"
+          [ "$got" = "90235a5b47da6ee29b077ea7c4ac94d2907c2126267adb5a999afcc4b5fb0093" ] || { echo "wrong signing key: phones could not update"; exit 1; }
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: working-german-board-game-debug-apk
+          path: working-german-board-game/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: working-german-board-game-test-apk
+          path: working-german-board-game/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+  firestore-rules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: working-german-board-game/firebase/rules-test/package-lock.json
+      - name: Install rules-test dependencies and Firebase CLI
+        run: |
+          npm ci --prefix firebase/rules-test
+          npm install --global firebase-tools@15.33.0
+      - name: Rules and push-delivery latency tests (demo project)
+        run: firebase emulators:exec --only firestore --project demo-wgbg "npm --prefix firebase/rules-test test"
+
+  # The real app on an emulator, one script per shard, all side by side (a single job took 14 of CI's 17 min; three
+  # play scripts in one shard still took ~17):
+  # any crash, ANR or failed check fails the build. The emulator is booted once, snapshotted and cached, so later
+  # runs start from the snapshot instead of a cold boot.
+  device:
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [monkey, selfplay, touch-base, touch-chivalry, play-to-end, trade, withdraw, reach, online, friends,
+                layout-base, layout-chivalry, layout-cutout, names, colours]
+    env:
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: working-german-board-game-debug-apk
+          path: working-german-board-game/apk
+
+      - uses: actions/download-artifact@v4
+        if: matrix.shard == 'online'
+        with:
+          name: working-german-board-game-test-apk
+          path: working-german-board-game/apk
+
+      # Firebase emulators on the runner for the online two-client test (#35); the Android emulator reaches them at 10.0.2.2.
+      - uses: actions/setup-java@v4
+        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@v4
+        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        with:
+          node-version: "24"
+      - name: Start Firebase emulators (Firestore + Auth, demo project)
+        if: matrix.shard == 'online' || matrix.shard == 'friends'
+        run: |
+          npm install --global firebase-tools@15.33.0 > /dev/null
+          nohup firebase emulators:start --only firestore,auth --project demo-wgbg > fbemu.log 2>&1 &
+          for i in $(seq 1 60); do curl -s localhost:9099 > /dev/null && curl -s localhost:8080 > /dev/null && { echo "emulators up after $((i*2)) s"; break; }; sleep 2; done
+          tail -5 fbemu.log
+
+      - uses: actions/setup-python@v5
+        if: startsWith(matrix.shard, 'layout-')
+        with:
+          python-version: '3.12'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # A booted emulator snapshot, shared by every shard and run; rebuilt only when the key changes.
+      - name: Emulator snapshot cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-33-aosp_atd-x86_64-v1
+      - name: Boot once and save the snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: aosp_atd
+          cores: 3
+          ram-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "emulator snapshot saved for the cache"
+
+      # Lean Automated Test Device image (no Google services eating the CPU right after boot). The runner's script
+      # runs each line on its own, so every line is one whole command that only acts for its shard.
+      - name: Device tests (${{ matrix.shard }})
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: aosp_atd
+          cores: 3
+          ram-size: 4096M
+          force-avd-creation: false
+          disable-animations: true
+          # friends runs a second copy of this AVD beside it (tools/ci_friends.sh), so both copies boot read-only.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save ${{ matrix.shard == 'friends' && '-read-only' || '' }}
+          working-directory: working-german-board-game
+          script: |
+            # Every shard needs the app; only the monkey and online scripts used to install it (the split left play and trade without it).
+            adb install -r apk/app-debug.apk
+            # Menus and a base game, then straight into an Age of Chivalry game. The snapshot boots settled, so a short wait.
+            [ "$SHARD" != monkey ] || SETTLE=10 bash tools/ci_monkey.sh apk/app-debug.apk 4000
+            [ "$SHARD" != monkey ] || SETTLE=1 START=chivalry bash tools/ci_monkey.sh apk/app-debug.apk 3000
+            # The app plays itself (#46): bots-only games at Max speed in both rulesets; stops once 3 games each finish.
+            [ "$SHARD" != selfplay ] || bash tools/ci_selfplay.sh 120 3
+            # A human seat played by tapping the screen like a finger, with 3 and 4 players; any crash fails.
+            [ "$SHARD" != touch-base ] || bash tools/ci_touchplay.sh 100 10 "base:3 base:4"
+            [ "$SHARD" != touch-chivalry ] || bash tools/ci_touchplay.sh 100 10 "chivalry:3 chivalry:4"
+            # A whole game to the end screen, seat 0 driven by hooks; a stalled game fails within 60 s with the reason.
+            [ "$SHARD" != play-to-end ] || STALL=60 bash tools/play_to_end.sh chivalry 4 900
+            # Then, on that finished game, the game-over panel and the dice histogram can be reached by touch at 640x320.
+            [ "$SHARD" != play-to-end ] || bash tools/ci_reach.sh end
+            # Trades by touch (#122, #135, #114): bank trades, several lots, open offers, withdrawing an offer, in both rulesets.
+            [ "$SHARD" != trade ] || bash tools/ci_trade.sh
+            [ "$SHARD" != trade ] || bash tools/ci_keyboard.sh
+            [ "$SHARD" != withdraw ] || bash tools/ci_withdraw.sh 300 "base chivalry"
+            # Every button outside the board can be reached by touch on this 640x320 screen, scrolling like a player.
+            [ "$SHARD" != reach ] || bash tools/ci_reach.sh
+            # Online play end to end (#35): two clients, one room, a whole game on the Firebase emulators.
+            [ "$SHARD" != online ] || bash tools/ci_online.sh apk/app-debug-androidTest.apk demo-wgbg
+            # Friends, rematch and invites (#72) on two phones: this one hosts, a second copy of the emulator joins.
+            [ "$SHARD" != friends ] || bash tools/ci_friends.sh apk/app-debug.apk base
+            # The player list never overlaps itself, the dice or a camera cutout, at every screen size and font scale.
+            [ "$SHARD" != layout-base ] || MODES=base CUTOUTS="" bash tools/ci_layout.sh
+            [ "$SHARD" != layout-chivalry ] || MODES=chivalry CUTOUTS="" bash tools/ci_layout.sh
+            [ "$SHARD" != layout-cutout ] || FONTS="" bash tools/ci_layout.sh
+            # Bot names and seat colours picked by taps, kept across a restart, and remembered for the next game.
+            [ "$SHARD" != names ] || bash tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine"
+            [ "$SHARD" != colours ] || SMALL=1 bash tools/colours_check.sh
+
+      - name: Upload device logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-log-${{ matrix.shard }}
+          if-no-files-found: ignore
+          path: |
+            working-german-board-game/monkey.txt
+            working-german-board-game/crash.txt
+            working-german-board-game/fbemu.log
+            working-german-board-game/emu2.log
+            working-german-board-game/*.xml
+            working-german-board-game/*.png
