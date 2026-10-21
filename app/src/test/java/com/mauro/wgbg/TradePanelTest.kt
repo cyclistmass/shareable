@@ -416,4 +416,13 @@ class TradePanelTest {
         assertEquals(MIN_CHEST_CARD, chestFit(100.dp, 3, 20.dp).card, "a max below the floor still draws the smallest card")
         for (room in listOf(-50.dp, 0.dp)) assertEquals(MIN_CHEST_CARD, chestFit(room, 4, 42.dp).card, "room $room")
     }
+
+    @Test
+    fun aNarrowCardSaysJustTheCount() {
+        // 0.3.4, 320x640 dp at font 1.3: "have 4 have 4 have 4" ran together in tiny type; a narrow card says "×4".
+        assertEquals("×4", shortUnder("have 4"))
+        assertEquals("×12", shortUnder("has 12"))
+        assertEquals("×3\n4:1", shortUnder("have 3\n4:1"), "the bank rate stays")
+        for (same in listOf("4:1", "Choose", "have", "have four", "")) assertEquals(same, shortUnder(same))
+    }
 }

@@ -406,7 +406,7 @@ internal fun cardPick(s: GameState, legal: List<Action>, names: List<String>): C
     fun of(t: wgbg.engine.ActionKind) = legal.filter { it.type == t }
     return when {
         wgbg.engine.ChivalryActionType.TAKE_PROGRESS in kinds ->
-            CardPick("Spy: take one of ${names.getOrElse(chivalry.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.ChivalryActionType.TAKE_PROGRESS))
+            CardPick("Informer: take one of ${names.getOrElse(chivalry.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.ChivalryActionType.TAKE_PROGRESS))
         wgbg.engine.ChivalryActionType.DISCARD_PROGRESS in kinds ->
             CardPick("Too many progress cards: discard one", of(wgbg.engine.ChivalryActionType.DISCARD_PROGRESS))
         wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK in kinds ->

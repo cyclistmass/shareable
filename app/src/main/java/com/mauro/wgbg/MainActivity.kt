@@ -219,6 +219,12 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Painted tile faces (Mauro's ChatGPT art) by resource; the desert last. */
+/**
+ * Room kept free at the top for the Menu button (8 dp in, 40 dp tall, 8 dp under it): the trade chest and every card
+ * sheet stop below it (0.3.4: Windfall's picker at 320x640 dp ran its title under Menu).
+ */
+internal val MENU_CLEAR = 56.dp
+
 internal val TILE_FACES = listOf(R.drawable.tile_timber, R.drawable.tile_clay, R.drawable.tile_fleece, R.drawable.tile_grain, R.drawable.tile_stone)
 internal val TILE_DESERT = R.drawable.tile_desert
 /** The original painted faces with their coloured frame (Tile edges: Classic frame). */
@@ -1514,7 +1520,7 @@ fun WatchGameScreen(
               val panelEdge = with(LocalDensity.current) { stripWidth.toDp() } + 16.dp
               // On a narrow screen (640 dp across, CI's emulator and small phones) the Age of Chivalry chest's 8 cards and its
               // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
-              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, bottom = 8.dp, end = 8.dp)) {
+              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, top = MENU_CLEAR, bottom = 8.dp, end = 8.dp)) {
                   val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
                   TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
                       room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
@@ -1531,7 +1537,7 @@ fun WatchGameScreen(
                       color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold)
                   ColorButton("Cancel", Color(0xFFC0392B), "card-pick-cancel") { cardPick = emptyList(); cardSecond = false }
               }
-              else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
+              else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, top = MENU_CLEAR, end = 8.dp, bottom = 8.dp),
                   onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
                   fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
                   discardCause = tick.let {

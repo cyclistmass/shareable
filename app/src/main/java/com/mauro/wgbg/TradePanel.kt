@@ -467,15 +467,29 @@ internal fun ChestCardRow(cards: Int, max: Dp, modifier: Modifier = Modifier, co
     }
 }
 
+/** The smallest a chest card's label is drawn; past that it says less instead ([shortUnder]). */
+private val UNDER_MIN = 9.sp
+
+/** "have 4" (or "has 4") as just "×4", line by line; anything else (a bank rate, "4:1") as it is. */
+internal fun shortUnder(text: String): String = text.lines().joinToString("\n") { it.replace(Regex("^(have|has) (\\d+)$"), "×$2") }
+
 /**
  * What a chest card says under it ("have 4"), kept to the card's [width] less the slice the next card may overlap
- * ([CHEST_OVERLAP]), so two labels never run into each other: it shrinks rather than widen the row.
+ * ([CHEST_OVERLAP]): it shrinks rather than widen the row, and when even [UNDER_MIN] won't fit (0.3.4: 8 cards at
+ * 320x640 dp, font 1.3, read "have 4 have 4 have 4…" in tiny type) it shows just the count, "×4", under each card.
  */
 @Composable
-internal fun UnderCard(text: String, width: Dp, color: Color = INK, lines: Int = 1) =
-    Text(text, Modifier.width(width).padding(horizontal = width * (CHEST_OVERLAP / 2)), color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false,
-        lineHeight = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
+internal fun UnderCard(text: String, width: Dp, color: Color = INK, lines: Int = 1) {
+    val room = width * (1 - CHEST_OVERLAP)
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val widest = with(androidx.compose.ui.platform.LocalDensity.current) {
+        text.lines().maxOf { measurer.measure(it, androidx.compose.ui.text.TextStyle(fontSize = UNDER_MIN, fontWeight = FontWeight.Bold), softWrap = false, maxLines = 1).size.width.toDp() }
+    }
+    Text(if (widest > room) shortUnder(text) else text, Modifier.width(width).padding(horizontal = width * (CHEST_OVERLAP / 2)), color = color,
+        fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false, lineHeight = 13.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = UNDER_MIN, maxFontSize = 12.sp))
+}
 
 /**
  * One row of cards for a trade: green "+N" on a card's top edge is asked for, red "−N" on its bottom edge is

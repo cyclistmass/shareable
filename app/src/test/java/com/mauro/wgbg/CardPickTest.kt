@@ -18,7 +18,7 @@ class CardPickTest {
     private fun chivalry() = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 5)
 
     @Test
-    fun `the Spy's take is a card pick naming whose cards they are`() {
+    fun `the Informer's take is a card pick naming whose cards they are`() {
         val s = chivalry().also { it.chivalry!!.pendingTarget = 1 }
         val legal = listOf(Action.takeProgress(Progress.SPY), Action.takeProgress(Progress.WEDDING))
         val pick = cardPick(s, legal, names)!!
@@ -41,7 +41,7 @@ class CardPickTest {
     @Test
     fun `the prompt says what the pick is, not "Trade, improve your towns, or end your turn"`() {
         val s = chivalry().also { it.chivalry!!.pendingTarget = 2; it.phase = Phase.SPY }
-        assertEquals("Spy: take one of Orange's progress cards", chivalryPrompt(s, listOf(Action.takeProgress(Progress.SPY)), names))
+        assertEquals("Informer: take one of Orange's progress cards", chivalryPrompt(s, listOf(Action.takeProgress(Progress.SPY)), names))
         s.phase = Phase.COMMERCIAL_HARBOR
         assertTrue(chivalryPrompt(s, listOf(Action.CHIVALRY_DONE), names)!!.startsWith("Harbour Charter"))
     }
