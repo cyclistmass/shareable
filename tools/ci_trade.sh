@@ -9,10 +9,14 @@
 #   D. an open ask by taps on the Players tab (#135: ask a card, offer nothing); the bots counter it; a taker's
 #      button shows their terms and Trade takes them (Cancel withdraws when nobody answered).
 # Fails on a crash, a step that doesn't take, or no turn with two lots within the time.
-# Usage: tools/ci_trade.sh [seconds per ruleset] [rulesets, default "base chivalry"]
+# Usage: [DICE="3,3 4,4 ..."] tools/ci_trade.sh [seconds per ruleset] [rulesets, default "base chivalry"]
 set -uo pipefail
 SECS="${1:-420}"
 RULESETS="${2:-base chivalry}"
+# The dice, in order and over again (debug --es dice, 0.3.5): every number but 7 once a round, so every hex you touch
+# pays each round and no 7 ever halves your hand. Two lots then always come (random dice missed them within 420 s on
+# CI, run 39656897375). DICE="" plays real dice; a build before 0.3.5 ignores the extra and plays real dice too.
+DICE="${DICE-3,3 4,4 2,3 4,5 1,3 4,6 1,2 5,6 1,1 6,6}"
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
@@ -58,7 +62,7 @@ for ruleset in $RULESETS; do
   "$ADB" shell am force-stop $PKG
   "$ADB" shell pm clear $PKG >/dev/null
   ts_open; "$ADB" logcat -b crash -c 2>/dev/null || true
-  timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
+  timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true ${DICE:+--es dice "'$DICE'"} >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
   sleep 4
   # Bots at full speed (Menu › Settings › This game, the speed button cycles 2× 4× 8× Max, by touch), so a turn with two lots comes up sooner.
   tap_text "Menu" && tap_text "Settings" && panel_tap "This game" && panel_tap "2×" && panel_tap "4×" && panel_tap "8×" ||
