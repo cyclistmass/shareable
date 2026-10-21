@@ -27,8 +27,12 @@ android {
     }
 
     buildTypes {
+        // What players install (#147): the same code as debug, but not debuggable, so the test hooks are off (no MOVE
+        // or FILAMENT_VIEW broadcasts, no WGBG-TURN lines, no run-as). Signed with the same stable key, so it installs
+        // as an update over every earlier (debug) release. No R8: shrinking was never played online.
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
         create("perf") {
             initWith(getByName("release"))
