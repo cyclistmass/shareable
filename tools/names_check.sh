@@ -21,15 +21,7 @@ TAG=$(echo "$THEME" | tr ' ' '-' | tr 'A-Z' 'a-z')
 trap '"$ADB" shell wm size reset; "$ADB" shell wm density reset' EXIT
 read -r W H < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$W" -lt "$H" ] && { t=$W; W=$H; H=$t; }
 
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
-    "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
-  done
-  echo "uiautomator dump failed 6 times (busy device?)" >&2
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
 # Centre of the first element whose text matches the regex $1 (whole text), in dump $2 or a fresh one.
 find_re() {
   local d="${2:-$(dump)}"

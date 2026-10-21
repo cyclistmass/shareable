@@ -24,19 +24,9 @@ A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
 export MSYS_NO_PATHCONV=1
 LABEL="Base game"; [ "$RULESET" = chivalry ] && LABEL="Age of Chivalry"
 
-# The screen of device $1 as one element per line. A busy host makes uiautomator answer "null root node" now and then:
-# up to 6 tries, then a note on stderr and empty output (status 0, as before, so callers under pipefail are unchanged).
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$A" -s "$1" shell rm -f /sdcard/ui.xml; "$A" -s "$1" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$A" -s "$1" shell cat /sdcard/ui.xml 2>/dev/null) || true
-    case "$x" in *hierarchy*) printf '%s\n' "$x" | tr '>' '\n'; return 0;; esac
-    sleep 1
-  done
-  echo "[$1] uiautomator dump failed 6 times (busy device?)" >&2
-  return 0
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
+# The screen of device $1 (and the same uiautomator fallback, retried, for a busy host's "null root node").
+dump() { UI_SERIAL=$1 ADB=$A ui_dump; }
 centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' '; }
 tap_text() {
   local b; b=$(dump "$1" | grep "\(text\|content-desc\)=\"$2\"" | sed -n "${3:-1}p" | centre) || true

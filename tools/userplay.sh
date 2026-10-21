@@ -33,16 +33,7 @@ echo $$ > "$OUT/run.pid"; trap 'rm -f "$OUT/run.pid"' EXIT
 PARENT=$PPID
 orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (the shell that started it is gone)"; exit 1; }; }
 
-# The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
-    "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
-  done
-  echo "uiautomator dump failed 6 times (busy device?)" >&2
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
 # Centre of the first on-screen text exactly $1 (optionally in $2 = a dump already taken).
 find_text() {
   local d="${2:-$(dump)}"
