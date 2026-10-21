@@ -111,7 +111,7 @@ class CameosTest {
     @Test
     fun `an unknown cameo, an empty seat or a seat that doesn't exist changes nothing`() {
         val s = fq.withSeat(2, SeatKind.EMPTY)
-        for (bad in listOf(s.withSeatCameo(1, "nope"), s.withSeatCameo(1, "eq_victoria"), s.withSeatCameo(2, "fox"),
+        for (bad in listOf(s.withSeatCameo(1, "nope"), s.withSeatCameo(1, "fq_victoria"), s.withSeatCameo(2, "fox"),
             s.withSeatCameo(-1, "fox"), s.withSeatCameo(GameSetup.MAX_SEATS, "fox"))) assertSame(s, bad)
     }
 
