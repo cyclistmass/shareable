@@ -77,12 +77,14 @@ swipe_panels() {
   { dump "$1" | grep 'scrollable="true"' | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]\+' | paste -d' ' - - - - || true; } |
     while read -r l t r b; do "$A" -s "$1" shell input swipe $(((l + r) / 2)) $((t + (b - t) * 7 / 10)) $(((l + r) / 2)) $((t + (b - t) * 3 / 10)) 400 </dev/null; done
 }
-# Like wait_for, but scrolls to it as a person would, a swipe every third second it's missing: on CI's 640x320 screen
-# Host and Join sit below Play in New game's right panel, which uiautomator doesn't list until it's scrolled to.
+# Waits for the button or label whose whole text is $2 (what tap_text taps), scrolling to it as a person would, a swipe
+# every third second it's missing: on CI's 640x320 screen Host and Join sit below Play in New game's right panel, which
+# uiautomator doesn't list until it's scrolled to. Whole text: a substring match took the Friend seat's hint ("Kept open
+# for a friend when you Host a room...") for the button and never scrolled (release check run 39657882276).
 wait_scroll() {
   local i
   for i in $(seq 1 "$3"); do
-    texts "$1" | grep -q "$2" && return 0
+    [ "$(dump "$1" | grep -cF "text=\"$2\"")" != 0 ] && return 0
     [ $((i % 3)) != 0 ] || swipe_panels "$1"
     sleep 1
   done
@@ -103,7 +105,7 @@ sleep 5
 for d in $HOST $GUEST; do tap_text $d "Got it" 2>/dev/null || true; done
 
 # The splash (#132) first: New game opens the game-start screen with Host and Join.
-for d in $HOST $GUEST; do wait_for $d "New game" 30 && tap_text $d "New game"; done
+for d in $HOST $GUEST; do wait_scroll $d "New game" 30 && tap_text $d "New game"; done
 
 # Host: name, a Friend seat for the guest, the ruleset, then open the room.
 wait_for $HOST "Your name" 20
@@ -132,7 +134,7 @@ texts $HOST | grep -q '"[^" ]\+Erin"' && { echo "FAIL: the guest's name came out
 tap_text $HOST "Not ready" 1
 sleep 2
 tap_text $GUEST "Not ready" 1
-wait_for $HOST "Start game" 20
+wait_scroll $HOST "Start game" 20
 sleep 2
 tap_text $HOST "Start game"
 

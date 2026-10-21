@@ -210,6 +210,10 @@ class MainActivity : ComponentActivity() {
                 val quickBots = debug && intent.getBooleanExtra("quickbots", false)
                 // Debug builds: `--ei players 3` starts with that many players (you plus bots), like a 3-player setup.
                 val players = if (debug) intent.getIntExtra("players", 0) else 0
+                // Debug builds: `--es dice "3,3 4,4"` throws these dice in local games, in order and over again (TestDice).
+                TestDice.use(if (debug) intent.getStringExtra("dice") else null)
+                // ci_trade reads this to know the build took them (0.3.4 ignores the extra and plays real dice).
+                TestDice.rolls?.let { android.util.Log.i("WGBG-DICE", "fixed dice: ${it.size} rolls, over and over") }
                 // An invite link (wgbg://join/ROOM-42) opens the Join screen with that code filled in.
                 val inviteCode = joinCodeFrom(intent.dataString)
                 AppRoot(debugCamera(), start, autoplay, autoSetup, watch, crashTest, players, inviteCode, quickBots)
@@ -711,7 +715,7 @@ fun WatchGameScreen(
     var pendingAt by remember { mutableStateOf<Offset?>(null) }
     val responses = remember(seed, seats) { mutableStateMapOf<Int, String>() }
     // Dice setting cycles: random, then deck stacks of 1-4 x 36 cards (asked per game once the new-game screen exists).
-    val dice = remember { if (setup.decks == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, setup.decks) }
+    val dice = remember { TestDice.source() ?: if (setup.decks == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, setup.decks) }
     var tick by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(true) }
     var speed by remember { mutableIntStateOf(if (human) 2 else MAX_SPEED) }
