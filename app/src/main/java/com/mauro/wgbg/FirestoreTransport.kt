@@ -5,6 +5,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.MetadataChanges
@@ -93,7 +94,20 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
             .thenApply { CompletableFuture.completedFuture(saved.uid) }
             .exceptionally { auth.signOut(); fresh() }
             .thenCompose { it }
+            .thenCompose { uid -> if (fakeGoogle) linkFakeGoogle(uid) else CompletableFuture.completedFuture(uid) }
         return result.also { signingIn = it }
+    }
+    /**
+     * Debug sims against the emulators only ([fakeGoogle]): link this guest to a made-up Google account, which only the
+     * Auth emulator accepts (as a plain JSON token). The rules let a seat say "Google" only for a real Google sign-in,
+     * so a guest merely counted as one would be refused.
+     */
+    private fun linkFakeGoogle(uid: String): CompletableFuture<String> {
+        val user = auth.currentUser ?: return CompletableFuture.completedFuture(uid)
+        if (user.providerData.any { it.providerId == GoogleAuthProvider.PROVIDER_ID }) return CompletableFuture.completedFuture(uid)
+        val token = """{"sub":"fake-$uid","email":"${uid.lowercase()}@example.com","email_verified":true}"""
+        return user.linkWithCredential(GoogleAuthProvider.getCredential(token, null)).future()
+            .thenCompose { user.getIdToken(true).future() }.thenApply { uid }
     }
     override fun create(room: Room): CompletableFuture<Room> {
         require(room.host == uid)
