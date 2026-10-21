@@ -7,8 +7,10 @@ ledger with a large rectangular picture, made by C:/Users/mauro/wgbg-art/cards-l
   card_fortune_sentinel, card_fortune_windfall, card_fortune_corner, card_fortune_trailblazers, card_fortune_landmark
       the Fortune cards (the Pirate theme keeps its own knight card for the Sentinel).
 
-The painted commodity still lifes stay as card_paint_parchment / _weave / _silver: Age of Chivalry progress cards use
-them as the picture inside their own named face.
+The commodity paintings card_paint_parchment / _weave / _silver are the picture inside the Age of Chivalry progress
+cards' own named face and the deck piles. Parchment and Fabric have new ChatGPT paintings (Mauro's picks, 2026-10-21:
+narrow scrolls and cut sheets; dyed cloth over a drying pole), imported here from paint_<key>.png; Silver keeps its
+painted card.
 
 Usage: py tools/import_ledger_cards.py            import
        py tools/import_ledger_cards.py --check    check the shipped cards
@@ -29,6 +31,8 @@ CARDS = {
     "card_fortune_trailblazers": "trailblazers", "card_fortune_landmark": "landmark",
 }
 PAINTINGS = ["card_paint_parchment", "card_paint_weave", "card_paint_silver"]
+# Shipped painting: Ledger key, for the paintings the Ledger maker writes (paint_<key>.png).
+PAINTED = {"card_paint_parchment": "parchment", "card_paint_weave": "fabric"}
 
 
 def problems():
@@ -39,7 +43,7 @@ def problems():
         if not p.is_file():
             out.append(f"{p.name}: missing"); continue
         im = Image.open(p)
-        if name in CARDS and im.size != SIZE:
+        if im.size != SIZE:
             out.append(f"{p.name}: {im.size}, want {SIZE[0]}x{SIZE[1]}"); continue
         a = im.convert("RGBA").getchannel("A")
         w, h = im.size
@@ -54,6 +58,8 @@ def main():
         for name, key in CARDS.items():
             Image.open(SRC / f"ledger_rect_{key}.png").convert("RGBA").resize(SIZE, Image.LANCZOS) \
                 .save(OUT / f"{name}.webp", quality=88, method=6)
+        for name, key in PAINTED.items():
+            Image.open(SRC / f"paint_{key}.png").convert("RGBA").resize(SIZE, Image.LANCZOS)                 .save(OUT / f"{name}.webp", quality=88, method=6)
     bad = problems()
     for b in bad: print(b)
     print("ledger cards:", "FAIL" if bad else f"OK ({len(CARDS)} cards, {len(PAINTINGS)} paintings)")

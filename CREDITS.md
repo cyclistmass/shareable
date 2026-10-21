@@ -22,6 +22,10 @@ unless another path is given.
 - Painted hex tiles (`tile_*.webp`, framed and unframed), normalised to a standard pointy-top hex.
 - Settings gear and reset arrow icons (`settings_gear*`, `reset_arrow*`).
 - Knight tokens, Pirate themed (`knight_pirate_*`).
+- Parchment and Fabric paintings (`card_paint_parchment`, `card_paint_weave`, and the pictures in the Parchment and
+  Fabric Ledger cards, 0.3.4, #86): short narrow scrolls with cut sheets on a scrivener's desk, and dyed red and indigo
+  cloth over a drying pole above the dye vats, painted in the cards' style so the two no longer look alike in the hand
+  (Mauro's picks "Narrow A" and "Option 2", 2026-10-21).
 
 ## Art: generated with OpenAI Codex for Mauro DiBenedetto
 
@@ -52,7 +56,7 @@ unless another path is given.
 ## Art: made with Claude Code for Mauro DiBenedetto
 
 - Bandit V3 "Raccoon Thief" (`bandit_tilt_0..7`, the 3D board's `bandit.glb`): our own model, a masked raccoon with a red neckerchief, a spotted bundle on a stick and a gold coin, rendered in Blender on Mauro's PC by `wgbg-art/bandit-v3/render_bandit_v3.py`, 8 tilt steps, imported by `tools/import_bandit.py` (#86, Mauro's pick, 2026-10-20). It replaces the V2 skeleton corsair.
-- Ledger cards (`card_timber` … `card_stone`, `card_parchment`, `card_weave`, `card_silver`, `card_fortune_*`): each card a page from an old ledger with a large rectangular picture, its name, its entry on ruled lines and a wax seal stamped with its icon; the pictures are cropped from our own painted cards above (kept as `card_paint_*` for the progress cards), set in Alegreya, by `wgbg-art/cards-ledger/make_ledger_cards.py`, imported by `tools/import_ledger_cards.py` (#86, Mauro's pick "Make a larger rectangle picture", 2026-10-20).
+- Ledger cards (`card_timber` … `card_stone`, `card_parchment`, `card_weave`, `card_silver`, `card_fortune_*`): each card a page from an old ledger with a large rectangular picture, its name, its entry on ruled lines and a wax seal stamped with its icon; the pictures are cropped from our own painted cards above (kept as `card_paint_*` for the progress cards), except Parchment and Fabric, which use their new paintings above, set in Alegreya, by `wgbg-art/cards-ledger/make_ledger_cards.py`, imported by `tools/import_ledger_cards.py` (#86, Mauro's pick "Make a larger rectangle picture", 2026-10-20).
 
 ## Fonts
 

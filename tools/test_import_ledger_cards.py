@@ -52,6 +52,10 @@ class BreakIt(unittest.TestCase):
         (il.OUT / "card_paint_weave.webp").unlink()
         self.assertTrue(any("card_paint_weave.webp: missing" in b for b in il.problems()))
 
+    def test_a_wrong_size_progress_painting_is_caught(self):
+        Image.open(il.OUT / "card_paint_parchment.webp").resize((390, 280)).save(il.OUT / "card_paint_parchment.webp", lossless=True)
+        self.assertTrue(any("card_paint_parchment.webp" in b and "want 280x390" in b for b in il.problems()))
+
     def test_a_see_through_card_is_caught(self):
         p = il.OUT / "card_timber.webp"; im = Image.open(p).convert("RGBA")
         ImageDraw.Draw(im).rectangle((120, 180, 160, 220), fill=(0, 0, 0, 0)); im.save(p, lossless=True)
