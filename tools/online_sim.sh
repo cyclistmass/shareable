@@ -37,7 +37,8 @@ fill() {
   [ -n "$b" ] || { echo "[$1] no text box $2"; return 1; }
   local text="$3"; set -- "$1" $b
   "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.6
-  "$A" -s "$1" shell input keycombination 113 29; "$A" -s "$1" shell input keyevent KEYCODE_DEL
+  # End, then Delete well past the box's length: Ctrl+A doesn't always select on these images ("You" came out "YoErin").
+  "$A" -s "$1" shell input keyevent KEYCODE_MOVE_END $(printf 'KEYCODE_DEL %.0s' $(seq 1 24))
   "$A" -s "$1" shell input text "$text"; "$A" -s "$1" shell input keyevent KEYCODE_ENTER; sleep 0.6  # Enter (IME Done) hides the keyboard; Back would leave the screen when it is already hidden
   # On a box with a Next key, Enter only moves on and the keyboard stays up over the next box: then Back closes it.
   "$A" -s "$1" shell dumpsys input_method | grep -q "mInputShown=true" && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
@@ -81,6 +82,7 @@ fill $GUEST 2 "$(echo "$CODE" | tr -d - | tr '[:upper:]' '[:lower:]')"
 tap_text $GUEST "Join"
 wait_for $GUEST "Erin" 20
 wait_for $HOST "Erin" 20
+texts $HOST | grep -q '"[^" ]\+Erin"' && { echo "FAIL: the guest's name came out wrong"; texts $HOST; exit 1; }
 
 # Both ready; the host starts.
 tap_text $HOST "Not ready" 1

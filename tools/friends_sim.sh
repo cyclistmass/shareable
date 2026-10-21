@@ -64,13 +64,19 @@ texts $HOST | grep -q "$LABEL" || { echo "FAIL: the rematch isn't $LABEL"; texts
 crashed || { echo "FAIL: the app crashed"; exit 1; }
 echo "PASS: rematch $R2 (after ${FIRST:-the first room})"
 
-# 3. Close both apps and open them again: the start screens.
+# 3. Close both apps and open them again: each goes back into the rematch room, as after a crash; leave it from there.
 for d in $HOST $GUEST; do
   "$A" -s $d logcat -c
   "$A" -s $d shell am force-stop com.mauro.wgbg
   "$A" -s $d shell am start --activity-clear-task -n com.mauro.wgbg/.MainActivity $EXTRAS >/dev/null
 done
 sleep 5
+wait_for $GUEST "Room $R2" 30
+"$A" -s $GUEST shell input keyevent KEYCODE_BACK   # a guest's lobby has no Leave button: Back leaves, to the start screen
+wait_for $HOST "Room $R2" 30
+tap_text $HOST "Leave room"
+tap_text $HOST "Leave room" 2             # the confirm box's button, over the lobby's own
+"$A" -s $HOST shell input keyevent KEYCODE_BACK    # Leave room opens the setup screen; Back to the start
 wait_for $HOST "Quick game with friends" 30
 tap_text $HOST "Quick game with friends"
 wait_for $HOST "Erin" 15
@@ -78,9 +84,9 @@ tap_text $HOST "☆" 1                    # star the guest: the star must stick
 wait_for $HOST "★" 10
 tap_text $HOST "Erin"                   # pick them
 tap_text $HOST "Start"
-wait_for $HOST "Room [A-Z]*-[0-9]*" 30
-"$A" -s $HOST shell input keyevent KEYCODE_BACK   # the share sheet for the invite link
-sleep 1
+wait_for $HOST "join my game: room [A-Z]*-[0-9]*" 30   # the invite link's share sheet opens over the new room
+"$A" -s $HOST shell input keyevent KEYCODE_BACK
+wait_for $HOST "Room [A-Z]*-[0-9]*" 15
 R3=$(room_code $HOST)
 [ -n "$R3" ] && [ "$R3" != "$R2" ] || { echo "FAIL: no new room for the quick game ('$R3')"; texts $HOST; exit 1; }
 echo "quick game room $R3"
