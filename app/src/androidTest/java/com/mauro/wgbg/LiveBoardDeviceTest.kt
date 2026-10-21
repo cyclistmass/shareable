@@ -80,9 +80,11 @@ class LiveBoardDeviceTest {
 
     /**
      * Taps a [type] spot twice (pick, confirm) until [placed]; each try re-reads settled spots and moves to the next one.
-     * [check] runs while it waits for spots, to fail at once on a state no tap can fix.
+     * [check] runs while it waits for spots, to fail at once on a state no tap can fix. [settle]: how long a placement
+     * may take to show (the road's shows only at the next prompt, after every bot's setup turn: about 10 s on CI).
      */
-    private fun placeByTaps(type: String, label: String, inView: (Float, Float) -> Boolean = { _, _ -> true }, check: () -> Unit = {}, placed: () -> Boolean) {
+    private fun placeByTaps(type: String, label: String, inView: (Float, Float) -> Boolean = { _, _ -> true }, check: () -> Unit = {},
+                            settle: Long = 5_000, placed: () -> Boolean) {
         repeat(4) { attempt ->
             // Right after the previous placement the settled line can still be the old one (no $type yet) on a slow
             // CI emulator: wait for the new moment's spots instead of failing at once.
@@ -114,8 +116,8 @@ class LiveBoardDeviceTest {
             assertTrue("no $type spot on screen: ${line.take(400)} | history: ${history().takeLast(1500)}", spots.isNotEmpty())
             val (x, y) = spots[attempt % spots.size]
             tap(x, y); tap(x, y)
-            val deadline = SystemClock.uptimeMillis() + 5_000
-            while (SystemClock.uptimeMillis() < deadline) { if (placed()) return; Thread.sleep(100) }
+            val deadline = SystemClock.uptimeMillis() + settle
+            while (SystemClock.uptimeMillis() < deadline) { check(); if (placed()) return; Thread.sleep(100) }
         }
         fail("Timed out: $label")
     }
@@ -144,16 +146,19 @@ class LiveBoardDeviceTest {
         gesture(false, { cx to cy }, { cx - 60f to cy + 20f })
         Thread.sleep(800)
         // AgentHooks supplies screen positions only; placement and confirmation use real pointer events.
+        fun legal(line: String) = line.substringAfter(" legal=").substringBefore(" ")
+        val emptyBoard = legal(phaseLine())
         placeByTaps("BUILD_SETTLEMENT", "Homestead placed with taps", { x, y ->
             x in display.widthPixels * .4f..display.widthPixels * .90f && y in display.heightPixels * .15f..display.heightPixels * .85f
         }) { phaseLine().contains("phase=BUILD_INITIAL_ROAD") }
         val roadLine = phaseLine()
-        // Release check run 39675784727: after the homestead was placed, the game came back at turn 0 asking for a
-        // homestead: the game screen was rebuilt (a new seed), which no tap can fix and a player would see too. Say so.
-        placeByTaps("BUILD_ROAD", "road placed with taps", check = {
+        // Once the road is in, the bots place theirs and the next prompt is this seat's second homestead (turn 0 still):
+        // it offers fewer corners than the empty board did. The same corners again would be a new game (the screen
+        // rebuilt, which no tap can fix and a player would see too: its WGBG-START line names the cause).
+        placeByTaps("BUILD_ROAD", "road placed with taps", settle = 30_000, check = {
             val now = phaseLine()
-            if (now != roadLine && now.contains("phase=BUILD_INITIAL_SETTLEMENT"))
-                fail("the game started over after its homestead was placed (game screen rebuilt?): ${history().takeLast(1500)}")
+            if (now != roadLine && now.contains("phase=BUILD_INITIAL_SETTLEMENT") && legal(now) == emptyBoard)
+                fail("the game started over after its homestead was placed: ${log("WGBG-START").trim().takeLast(600)} | ${history().takeLast(1200)}")
         }) { phaseLine() != roadLine }
         val bitmap = instrument.uiAutomation.takeScreenshot()
         context.cacheDir.resolve("live-device-after-twist.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
