@@ -180,3 +180,38 @@ test('the people you played with are yours alone',async()=>{
   await assertFails(deleteDoc(met('erin','host','erin')));
   await assertSucceeds(deleteDoc(met('host','host','erin')));
   await assertFails(setDoc(met(null,'host','x'),f));});
+
+// #72 without TTL (billing is off): the host's app deletes its own expired rooms, moves first.
+async function seedExpiring(id, host, expireAt, moves=2, status='done') { await env.withSecurityRulesDisabled(async c => {
+  const r={...room(status), host, version:3, invited:[], ...(expireAt===undefined?{}:{expireAt})};
+  r.seats['0']=seat(host,'Host',null,false,true); r.seats['1']=seat('guest','Guest',null,false,true);
+  await setDoc(doc(c.firestore(),`games/${id}`),r);
+  for(let i=0;i<moves;i++) await setDoc(doc(c.firestore(),`games/${id}/moves/${String(i).padStart(10,'0')}`),{seq:i,seat:'0',uid:host,action:'1:ROLL:0',prev:i?String(i-1).padStart(10,'0'):''});
+}); }
+const mv = (uid,id,i) => doc(db(uid),`games/${id}/moves/${String(i).padStart(10,'0')}`);
+test('the host deletes an expired room of theirs, moves first, in any state',async()=>{
+  for(const status of ['lobby','playing','done']){ await seedExpiring('old','host',inDays(-1),2,status);
+    await assertSucceeds(deleteDoc(mv('host','old',0))); await assertSucceeds(deleteDoc(mv('host','old',1)));
+    await assertSucceeds(deleteDoc(doc(db('host'),'games/old')));
+    await env.withSecurityRulesDisabled(async c => { if((await getDoc(doc(c.firestore(),'games/old'))).exists()) throw new Error('room left'); }); }});
+test('the host lists their own rooms by host, in any state; the query names only them',async()=>{
+  await seedExpiring('a','host',inDays(-1),0,'done'); await seedExpiring('b','host',inDays(5),0,'playing'); await seedExpiring('c','bo',inDays(-1),0,'done');
+  const q=await assertSucceeds(getDocs(query(collection(db('host'),'games'),where('host','==','host'))));
+  if(q.docs.map(d=>d.id).sort().join()!=='a,b') throw new Error(q.docs.map(d=>d.id).join());
+  await assertFails(getDocs(query(collection(db('erin'),'games'),where('host','==','host'))));});
+test('break-it: nobody else deletes an expired room or its moves, not even its seated guest',async()=>{
+  await seedExpiring('old','host',inDays(-1));
+  for(const uid of ['guest','erin',null]){ await assertFails(deleteDoc(doc(db(uid),'games/old'))); await assertFails(deleteDoc(mv(uid,'old',0))); }
+  await assertSucceeds(getDoc(doc(db('host'),'games/old')));});
+test('break-it: nobody deletes before expiry, nor a room without one (made before #72), nor with a garbage expiry',async()=>{
+  for(const [id,at] of [['soon',inDays(1)],['none',undefined],['text','yesterday'],['num',5]]){
+    await env.withSecurityRulesDisabled(async c => { await seedExpiring(id,'host',at); });
+    await assertFails(deleteDoc(mv('host',id,0))); await assertFails(deleteDoc(doc(db('host'),`games/${id}`)));
+    await assertFails(deleteDoc(mv('guest',id,0))); }});
+test('break-it: an expired room still refuses new moves, edits and a forged expiry to get it deleted',async()=>{
+  await seedExpiring('live','host',inDays(5),1,'playing');
+  await assertFails(updateDoc(doc(db('host'),'games/live'),{expireAt:inDays(-1)}));
+  await assertFails(deleteDoc(doc(db('host'),'games/live')));
+  await seedExpiring('old','host',inDays(-1),1,'done');
+  await assertFails(setDoc(mv('host','old',1),{seq:1,seat:'0',uid:'host',action:'1:ROLL:0',prev:'0000000000'}));
+  await assertFails(updateDoc(doc(db('host'),'games/old'),{expireAt:inDays(30)}));});

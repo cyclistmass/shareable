@@ -59,6 +59,8 @@ interface GameTransport {
     fun friends(): CompletableFuture<List<Friend>> = unsupported()
     fun putFriend(f: Friend): CompletableFuture<Unit> = unsupported()
     fun forgetFriend(uid: String): CompletableFuture<Unit> = unsupported()
+    /** Deletes up to [max] of this player's own hosted rooms that are past their expiry, with their moves ([Expired]); the ids done. */
+    fun cleanExpired(max: Int = Expired.PER_LAUNCH): CompletableFuture<List<String>> = CompletableFuture.completedFuture(emptyList())
     fun observeMoves(id: String, afterSeq: Long, onUpdate: (MoveUpdate) -> Unit, onError: (Throwable) -> Unit): Subscription {
         var last = afterSeq
         return observe(id, { s ->
@@ -107,6 +109,23 @@ object Friends {
             }
         }, decks = old.decks, invited = people, rematchOf = old.id)
     }
+}
+
+/**
+ * Rooms past their expiry (#72). Firestore's TTL policies need billing, so the app clears them itself: when a signed-in
+ * player opens the start screen, their own hosted rooms whose expireAt has passed go, oldest first, a few per launch.
+ * The rules let only the host delete a room or its moves, and only once expireAt is past.
+ */
+object Expired {
+    const val PER_LAUNCH = 3
+    /** The rooms to delete now, from (id, expireAt in ms or null for a room made before #72). */
+    fun pick(rooms: List<Pair<String, Long?>>, now: Long, max: Int = PER_LAUNCH): List<String> =
+        rooms.filter { (_, at) -> at != null && at < now }.sortedBy { it.second }.take(max.coerceAtLeast(0)).map { it.first }
+    /**
+     * When a game still being played really expires: the room's expireAt is set once, at the start, while each move
+     * carries its own, so a game played for more than 30 days lives as long as its last move ([lastMove], null when none).
+     */
+    fun latest(room: Long?, lastMove: Long?): Long? = listOfNotNull(room, lastMove).maxOrNull()
 }
 
 /** v1 deliberately uses type names, not enum ordinals, on the wire. */

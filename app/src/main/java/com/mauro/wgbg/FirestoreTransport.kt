@@ -42,6 +42,16 @@ object LobbyRepository {
     internal val emulatorOptions: FirebaseOptions get() = FirebaseOptions.Builder().setProjectId(EMULATOR_PROJECT)
         .setApplicationId("1:000000000000:android:0000000000000000").setApiKey("demo-api-key-for-the-emulators").build()
 
+    @Volatile private var cleaned = false
+    /** Once per launch, off the main thread: this player's expired rooms ([Expired]). Failures only log. */
+    fun cleanExpiredOnce(context: Context) {
+        if (cleaned) return
+        cleaned = true
+        runCatching { create(context).cleanExpired() }.getOrNull()?.whenComplete { ids, e ->
+            runCatching { if (e != null) android.util.Log.w("WGBG-ONLINE", "expired rooms not cleared", e)
+                else if (ids.isNotEmpty()) android.util.Log.i("WGBG-ONLINE", "expired rooms cleared: ${ids.joinToString()}") }
+        }
+    }
     @Synchronized fun create(context: Context): GameTransport {
         transport?.let { return it }
         val emulatorHost = emulatorHost
@@ -187,6 +197,36 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
             "games" to f.games.toLong(), "starred" to f.starred)).future()
     }.thenApply { }
     override fun forgetFriend(uid: String): CompletableFuture<Unit> = signIn().thenCompose { met().document(uid).delete().future() }.thenApply { }
+    /**
+     * Only for a player already signed in: it never signs anyone in. The phone's clock picks the rooms; a clock that runs
+     * ahead only gets a refusal from the rules (request.time), logged and tried again next launch.
+     */
+    override fun cleanExpired(max: Int): CompletableFuture<List<String>> {
+        val me = auth.currentUser?.uid ?: return CompletableFuture.completedFuture(emptyList())
+        return games.whereEqualTo("host", me).get().future().thenCompose { q ->
+            val now = System.currentTimeMillis()
+            val due = q.documents.mapNotNull { d -> d.getTimestamp("expireAt")?.toDate()?.time?.takeIf { it < now }?.let { d to it } }
+            // A game still being played lives as long as its last move (Expired.latest): look that move up before deleting.
+            val checked = due.map { (d, at) ->
+                if (d.getString("status") != Status.playing.name) CompletableFuture.completedFuture<Pair<String, Long?>>(d.id to at)
+                else d.reference.collection("moves").orderBy("seq", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(1)
+                    .get().future().thenApply { m -> d.id to Expired.latest(at, m.documents.firstOrNull()?.getTimestamp("expireAt")?.toDate()?.time) }
+            }
+            CompletableFuture.allOf(*checked.toTypedArray()).thenCompose {
+                val ids = Expired.pick(checked.map { it.join() }, now, max)
+                ids.fold(CompletableFuture.completedFuture(Unit)) { done, id -> done.thenCompose { deleteRoom(id) } }.thenApply { ids }
+            }
+        }
+    }
+    /** Moves first, a page at a time, then the room: a move's delete rule reads its room, and a cleanup cut short resumes. */
+    private fun deleteRoom(id: String): CompletableFuture<Unit> {
+        val ref = games.document(id)
+        fun page(): CompletableFuture<Unit> = ref.collection("moves").limit(100).get().future().thenCompose { q ->
+            if (q.isEmpty) ref.delete().future().thenApply { }
+            else CompletableFuture.allOf(*q.documents.map { it.reference.delete().future() }.toTypedArray()).thenCompose { page() }
+        }
+        return page()
+    }
     override fun observe(id: String, onSnapshot: (Snapshot) -> Unit, onError: (Throwable) -> Unit): Subscription {
         val log = java.util.TreeMap<Long, Move>()
         return observeMoves(id, -1, { update ->
@@ -235,8 +275,8 @@ class FirestoreTransport(private val auth: FirebaseAuth, private val db: Firebas
     }
 }
 
-/** Rooms and moves delete themselves this many days on (a Firestore TTL policy on `expireAt`, #72): a lobby nobody
- *  started, a game since its last move, a finished game. */
+/** Rooms and moves expire this many days on (`expireAt`; their host's app deletes them, [Expired], #72): a lobby nobody
+ *  started, a game since its start (its moves each since themselves: [Expired.latest]), a finished game. */
 internal const val LOBBY_DAYS = 1
 internal const val GAME_DAYS = 30
 internal const val DONE_DAYS = 7

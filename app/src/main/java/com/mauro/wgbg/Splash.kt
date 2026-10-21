@@ -140,6 +140,8 @@ fun SplashScreen(
             runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }
         }
     }
+    // Rooms you hosted that are past their expiry go now (#72): in the background, never in the menu's way.
+    androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { LobbyRepository.cleanExpiredOnce(context) } }
     var panel by remember { mutableStateOf<Splash.Action?>(null) }
     var about by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }

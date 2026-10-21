@@ -85,4 +85,18 @@ class FirebaseEmuTest {
         assertTrue("firebase emulators:start --only firestore,auth --project demo-wgbg" in docs)
         assertFalse("emulators:start --only firestore,auth --project workinggermangame" in docs)
     }
+
+    @Test
+    fun `expired rooms (#72, no TTL) clear once per launch, off the main thread, for a player already signed in, moves first`() {
+        val splash = File("src/main/java/com/mauro/wgbg/Splash.kt").readText()
+        assertTrue("withContext(kotlinx.coroutines.Dispatchers.IO) { LobbyRepository.cleanExpiredOnce(context) }" in splash, "background, from the start screen")
+        assertTrue("if (cleaned) return\n        cleaned = true" in repo, "once per launch")
+        val clean = repo.substringAfter("override fun cleanExpired(").substringBefore("private fun deleteRoom")
+        assertTrue("auth.currentUser?.uid ?: return CompletableFuture.completedFuture(emptyList())" in clean, "never signs anyone in")
+        assertFalse("signIn()" in clean, "never signs anyone in")
+        assertTrue("whereEqualTo(\"host\", me)" in clean && "Expired.pick(" in clean, "only their own rooms, by the shared rule")
+        assertTrue("Status.playing.name" in clean && "Expired.latest(at, " in clean, "a game still being played lives as long as its last move")
+        val delete = repo.substringAfter("private fun deleteRoom").substringBefore("\n    }\n")
+        assertTrue(delete.indexOf("collection(\"moves\")") in 0 until delete.indexOf("ref.delete()"), "moves before the room")
+    }
 }
