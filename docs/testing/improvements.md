@@ -61,3 +61,12 @@ move it to **Done** with the commit when it lands.
   win before seat 0 has an active knight with a free corner to move to). A debug-only launch extra that loads a stored
   position (a seed plus a move list, as the save store already records) would reach any mid-game state in seconds for
   on-device checks of knights, Raiders, cards and ports.
+- 2026-10-21, bugs: tools/ci_layout.sh's full matrix (68 screens) takes about 12 min on a fresh Pixel 8 emulator, not
+  the 5 aimed for; the cutout pass (32 screens, a fresh stress game per cutout and turn) is two thirds of it. Starting
+  the stress game once per cutout with both turns read from one launch, or a smaller CUTOUT_SIZES on CI, would halve it.
+- 2026-10-21, bugs: the local API 36 guest hangs (system_server dies, uiautomator "null root node") about 15 min into
+  repeated wm size changes up to 1440x3200 at 560 dpi, sooner with a second emulator on the same integrated GPU. A cold
+  restart fixes it. Chunk long device runs, or give the AVD more than 2.5 GB.
+- 2026-10-21, bugs: unit tests can't see a VerifyError in the huge WatchGameScreen lambda (ART rejected it after three
+  more inline LocalDensity reads); only a launch on a device does. Splitting that lambda into smaller composables would
+  remove the risk; until then every HUD change needs one on-device launch before it is called done.

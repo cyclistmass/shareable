@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -105,7 +106,7 @@ fun NewGameScreen(
     }
 
     Row(
-        modifier.fillMaxSize().tableTop().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
+        modifier.fillMaxSize().tableTop().displayCutoutPadding().padding(14.dp).testTag("new-game"),   // wood under the panels, like the Lobby (Fable T6)
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // Scrolls too: at 320 dp tall (CI's screen) Points, Report and Intro were cut off the bottom.

@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
@@ -151,7 +152,7 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
     var typed by remember { mutableStateOf(initialCode) }
     var me by remember { mutableStateOf(if (onlineName(name)) name else "") }
     val code = Lobby.normalizeCode(typed)
-    androidx.compose.foundation.layout.Box(modifier.fillMaxSize().tableTop().testTag("join"), contentAlignment = androidx.compose.ui.Alignment.Center) {
+    androidx.compose.foundation.layout.Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("join"), contentAlignment = androidx.compose.ui.Alignment.Center) {
         androidx.compose.foundation.layout.Column(
             Modifier.width(380.dp).brassEdgedWood().padding(18.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),

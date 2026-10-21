@@ -36,7 +36,15 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,11 +71,17 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 /** False inside the one left side panel (#73), which draws the frame for both halves. */
                 framed: Boolean = true) {
     version // the state object is mutated in place; this changing value makes the strip redraw after each move
-    Column((if (framed) modifier.brassEdgedWood() else modifier).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp).testTag("player-strip"), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+    // Taller than the height it's given (the room above the dice: a short screen, a large font, the Raiders warning, six
+    // seats), the whole list shrinks to fit, so every row stays in sight; it never scrolls White away (0.3.4, Mauro).
+    ShrinkToFit(modifier) {
+    Column((if (framed) Modifier.brassEdgedWood() else Modifier).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp).testTag("player-strip")
+        // Named for screen readers and for tools/ci_reach.sh, which checks the dice row never overlaps it.
+        .semantics { contentDescription = "Players"; testTagsAsResourceId = true }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
         // Age of Chivalry: how near the Raiders are (a ship marker on a 7-step track).
         s.ck?.let { ck ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.testTag("raiders-track")) {
-                Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp))
+                Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp),
+                    maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
                 for (i in 0 until wgbg.engine.CkPiece.BARBARIAN_TRACK) Box(
                     Modifier.size(width = 11.dp, height = 8.dp)
                         .background(if (i < ck.barbarianPos) Color(0xFFC0392B) else Color(0x73000000), RoundedCornerShape(2.dp)),
@@ -75,7 +89,7 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 // Raiders' strength vs every active knight, on the track's own line (Mauro): green while the knights would hold.
                 val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
                 val knights = (0 until s.numPlayers).sumOf { wgbg.engine.CitiesAndKnights.activeKnightStrength(s, it) }
-                Text("$raiders vs $knights", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp).testTag("raiders-vs-knights"),
+                Text("$raiders vs $knights", fontSize = 13.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp).testTag("raiders-vs-knights"),
                     color = if (knights >= raiders) Color(0xFF8BD18B) else Color(0xFFFF6B5E))
             }
             // On your turn, 3 steps or fewer out: say so, and what's at stake (#92).
@@ -91,11 +105,18 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 // The score sits in the player's colour dot, so the strip needs no score column (Mauro).
                 Box(Modifier.size(26.dp).background(PLAYER_COLORS[p], CircleShape).border(1.dp, Color(0xFFF1D58A), CircleShape).testTag("score-$p"),
                     contentAlignment = Alignment.Center) {
-                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    // The dot is a fixed 26 dp, so its number is sized to the dot, not the font scale (at 1.3 it shrank to a
+                    // speck); 10 and more shrink a step rather than wrap (0.3.4).
+                    val fs = LocalDensity.current.fontScale
+                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = (14 / fs).sp, fontWeight = FontWeight.Bold,
+                        lineHeight = (16 / fs).sp, maxLines = 1, softWrap = false,
+                        autoSize = TextAutoSize.StepBased(minFontSize = (9 / fs).sp, maxFontSize = (14 / fs).sp), modifier = Modifier.padding(horizontal = 2.dp),
                         color = if (PLAYER_COLORS[p].luminance() > 0.35f) Color(0xFF2B2118) else Color.White)
                 }
                 Column(Modifier.width(74.dp)) {
-                    Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    // A long name (16 letters online) or a large font shrinks, then ends in "…", on one line (0.3.4).
+                    Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("name-$p"))
                     val ck = s.ck
                     if (ck != null) for ((track, color) in IMPROVEMENT_BARS) Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
                         val filled = barSegments(ck.level(p, track))
@@ -112,7 +133,7 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                     Spacer(Modifier.width(4.dp))
                     // Red when a rolled 7 would make them discard half (Mauro).
                     Text(cardsLabel(s, p), color = if (overCardLimit(s, p)) Color(0xFFFF6B5E) else Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.testTag("cards-$p"))
+                        maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("cards-$p"))
                 }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         StatBadge(StatIcon.ROAD, s.roadLength[p], s.longestRoadOwner == p, "road-$p")
@@ -128,7 +149,26 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
             }
         }
     }
+    }
 }
+
+/**
+ * Lays out [content] at its natural height; when that is more than the height allowed, scales it down evenly (from the
+ * top left) to fit, and takes up only the scaled size.
+ */
+@Composable
+internal fun ShrinkToFit(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    androidx.compose.ui.layout.Layout(content, modifier) { measurables, c ->
+        val child = measurables.first().measure(c.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
+        val k = fitScale(child.height, if (c.hasBoundedHeight) c.maxHeight else Int.MAX_VALUE)
+        layout((child.width * k).toInt().coerceIn(c.minWidth, c.maxWidth), (child.height * k).toInt().coerceIn(c.minHeight, c.maxHeight)) {
+            child.placeWithLayer(0, 0) { scaleX = k; scaleY = k; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) }
+        }
+    }
+}
+
+/** How much [ShrinkToFit] scales content [height] px tall into [max] px: 1 when it fits. */
+internal fun fitScale(height: Int, max: Int): Float = if (height <= max || height <= 0) 1f else max.toFloat() / height
 
 
 /** The knights number on a player's shield: Sentinels played (base game), active knight strength (Age of Chivalry). */
@@ -140,7 +180,8 @@ enum class StatIcon { ROAD, SHIELD }
 @Composable
 fun StatBadge(icon: StatIcon, value: Int, held: Boolean, tag: String) {
     val ink = if (held) Color(0xFFF1D58A) else Color(0xFFCDBFA6)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.testTag(tag)) {
+    // Each badge has half of its 64 dp column, so two two-digit numbers at a large font shrink instead of wrapping (0.3.4).
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.width(STAT_BADGE_W).testTag(tag)) {
         androidx.compose.foundation.Canvas(Modifier.size(12.dp)) {
             val w = size.width; val h = size.height
             val stroke = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.16f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
@@ -152,7 +193,8 @@ fun StatBadge(icon: StatIcon, value: Int, held: Boolean, tag: String) {
                     quadraticTo(0.85f * w, 0.85f * h, 0.5f * w, 0.98f * h); quadraticTo(0.15f * w, 0.85f * h, 0.12f * w, 0.5f * h); close() }, ink, style = stroke)
             }
         }
-        Text("$value", color = ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("$value", color = ink, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = 11.sp))
     }
 }
 
@@ -278,7 +320,11 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     }
     hint?.let { Text(it, color = Color(0xFFEDE6D8), fontSize = 13.sp,
         modifier = Modifier.padding(bottom = 4.dp).brassEdgedWood(2.dp).padding(horizontal = 10.dp, vertical = 6.dp).testTag("card-hint")) }
-    Row(Modifier.testTag("hand-row").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy((-5).dp), verticalAlignment = Alignment.Bottom) {   // #127: cards overlap 10% (5 of 50 dp), scroll only past the window
+    val cards = handCardCount(s, me)
+    androidx.compose.foundation.layout.BoxWithConstraints {
+    // #127: cards overlap 10% (5 of 50 dp); on a small screen they fan closer so 2-3 or more still show, each keeping a
+    // tappable slice with its count, and the row scrolls only past that (Mauro, 0.3.4: one card wide at 640x320).
+    Row(Modifier.testTag("hand-row").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(handOverlap(maxWidth.value, cards).dp), verticalAlignment = Alignment.Bottom) {
         // Each card sits over the next, so the count in its top-right corner stays in view (#127).
         var z = 0
         for (r in 0 until CARD_TYPES) {
@@ -332,6 +378,33 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         }
     }
     }
+    }
+}
+
+/** Hand cards are 50 dp wide; each keeps at least this much showing (with its count) when the row fans closer. */
+internal const val HAND_CARD_W = 50f
+internal const val HAND_MIN_SLICE = 24f
+
+/** How many cards [HandRow] shows for [me]: one per kind held (resources, Fortune cards, commodities, progress cards). */
+internal fun handCardCount(s: GameState, me: Int): Int {
+    var n = (0 until CARD_TYPES).count { s.hand(me, it) > 0 }
+    val ck = s.ck
+    if (ck == null) n += (0 until wgbg.engine.DevCard.COUNT).count { s.devHand[me * wgbg.engine.DevCard.COUNT + it] > 0 }
+    else {
+        n += (0 until wgbg.engine.Commodity.COUNT).count { s.card(me, CARD_TYPES + it) > 0 }
+        n += (0 until wgbg.engine.Progress.COUNT).count { ck.progressHand[me * wgbg.engine.Progress.COUNT + it] > 0 }
+    }
+    return n
+}
+
+/**
+ * The spacing (dp, negative: overlap) between [cards] hand cards in [room] dp: the usual 5 dp overlap when they fit,
+ * else as close as needed to fit, but never closer than [HAND_MIN_SLICE] showing per card (then the row scrolls).
+ */
+internal fun handOverlap(room: Float, cards: Int): Float {
+    if (cards <= 1 || !room.isFinite()) return -5f
+    val fit = (room - HAND_CARD_W) / (cards - 1) - HAND_CARD_W
+    return fit.coerceIn(HAND_MIN_SLICE - HAND_CARD_W, -5f)
 }
 
 /**
@@ -406,9 +479,21 @@ internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
 /** A slim prompt across the top saying what to do now. */
 @Composable
 fun TurnPrompt(text: String, modifier: Modifier = Modifier) {
-    Text(text, color = Color(0xFFEDE6D8), fontSize = 15.sp, fontWeight = FontWeight.Bold,
-        modifier = modifier.brassEdgedWood().padding(horizontal = 16.dp, vertical = 6.dp).testTag("turn-prompt"))
+    // Two lines at most in the room it is given, smaller before it is cut.
+    Text(text, color = Color(0xFFEDE6D8), fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+        maxLines = 2, overflow = TextOverflow.Ellipsis, autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 15.sp),
+        modifier = modifier.brassEdgedWood().padding(horizontal = 16.dp, vertical = 6.dp).testTag("turn-prompt")
+            .semantics { testTagsAsResourceId = true })
 }
+
+/**
+ * The top band for the turn prompt and the notices over the board: right of the side panel ([panel] wide, 8 dp in) and
+ * left of the Menu button. With the box's TopCenter, the uneven padding centres them in the band and keeps them inside it.
+ * Centred on the whole screen, a long prompt ran over the first player's name on a 640 dp screen (0.3.4).
+ */
+internal fun Modifier.rightOfPanel(panel: androidx.compose.ui.unit.Dp) = padding(start = promptStart(panel), end = PROMPT_END)
+internal fun promptStart(panel: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (panel <= 0.dp) 376.dp else panel + 16.dp
+internal val PROMPT_END = 112.dp
 
 /** Ship steps left before the Raiders land (attack) for track position [pos]. */
 /**
@@ -459,7 +544,9 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
 
 @Composable
 private fun MiniRollCard(m: RollMini) {
-    Box(Modifier.size(width = 21.dp, height = 30.dp), contentAlignment = Alignment.Center) {
+    // One node for screen readers and the layout check: the card and the count on it ("Timber, +1").
+    val said = "${ALL_CARD_NAMES.getOrElse(m.card) { "Card" }} ${if (m.n > 0) "+${m.n}" else "${m.n}"}"
+    Box(Modifier.size(width = 21.dp, height = 30.dp).clearAndSetSemantics { contentDescription = said }, contentAlignment = Alignment.Center) {
         if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(artPainter(ALL_CARD_ART[m.card]),
             ALL_CARD_NAMES[m.card], Modifier.fillMaxSize())
         else Box(Modifier.fillMaxSize().background(Color(0xFF5A4030), RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(2.dp)),
@@ -470,3 +557,31 @@ private fun MiniRollCard(m: RollMini) {
                 .padding(horizontal = 2.dp))
     }
 }
+
+/**
+ * Where the hand row starts: just right of the side panel ([panel] wide, 8 dp in from the edge), and never further in
+ * than the 384 dp it always had on a big screen. Before the panel is measured ([panel] 0) it keeps 384 dp.
+ */
+internal fun handStart(panel: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (panel <= 0.dp) 384.dp else minOf(384.dp, panel + 16.dp)
+
+/** The turn panel's least height: the dice row and one line of news, with the panel's padding. */
+internal val TURN_HUD_MIN = (DIE_DP + 30).dp
+
+/**
+ * The turn panel's height: the room under the player list ([stripBottom]), so the dice sit right under it. It used to
+ * be at least 110 dp, which on a 320 dp tall screen pushed the dice up over the last player's row (0.3.4).
+ */
+/** One road or knights badge: (64 dp column - 6 dp gap) / 2. */
+internal val STAT_BADGE_W = 29.dp
+
+/**
+ * The player list's greatest height on a [screen] that tall: what leaves the turn panel its least height under it
+ * (the list sits 8 dp down; the panel keeps a 10 dp gap). Past it the list shrinks to fit ([ShrinkToFit]; 0.3.4: six
+ * seats in v3, the Raiders warning, a large font). Unmeasured ([screen] 0), no limit.
+ */
+internal fun stripMaxHeight(screen: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (screen <= 0.dp) androidx.compose.ui.unit.Dp.Infinity else (screen - 18.dp - TURN_HUD_MIN).coerceAtLeast(0.dp)
+
+internal fun turnHudHeight(screen: androidx.compose.ui.unit.Dp, stripBottom: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (screen <= 0.dp) 210.dp else (screen - stripBottom - 10.dp).coerceAtLeast(TURN_HUD_MIN)

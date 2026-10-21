@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -578,7 +581,9 @@ fun WatchGameScreen(
     // Play mode: you are seat 0 ("You"); Watch mode: bots in every seat at full speed. Online: your seat.
     var human by remember { mutableStateOf(!startWatching) }
     val me = net?.me ?: if (human) 0 else -1
-    val names = net?.names ?: if (human) listOf(setup.name.ifBlank { "You" }) + PLAYER_NAMES.drop(1) else PLAYER_NAMES
+    // Debug builds: the FILAMENT_VIEW broadcast's `stress` extra swaps in the longest names (tools/ci_layout.sh).
+    var stressNames by remember { mutableStateOf<List<String>?>(null) }
+    val names = stressNames ?: net?.names ?: if (human) listOf(setup.name.ifBlank { "You" }) + PLAYER_NAMES.drop(1) else PLAYER_NAMES
     val seats = net?.players?.size ?: setup.players.size
     // Online, a rejected move rolls the room back: the screen then rebuilds its game from the room's moves.
     var epoch by remember { mutableIntStateOf(0) }
@@ -950,7 +955,7 @@ fun WatchGameScreen(
     var screenHeight by remember { mutableStateOf(0f) }
     val turnHudHeight = with(LocalDensity.current) {
         // The dice sit right under the player list and the history takes the rest of the side (Mauro: "raise it up").
-        if (screenHeight <= 0f) 210.dp else ((screenHeight - stripBottom).toDp() - 10.dp).coerceAtLeast(110.dp)
+        turnHudHeight(screenHeight.toDp(), stripBottom.toDp())
     }
     // Back closes whatever is open on top first (Settings, the menu, the Inventory), then asks about leaving.
     BackHandler {
@@ -999,6 +1004,14 @@ fun WatchGameScreen(
                     if (intent.hasExtra("rotation")) boardRotation = intent.getFloatExtra("rotation", 0f).takeIf { it.isFinite() } ?: 0f
                     if (intent.hasExtra("freezeTurn")) liveFreezeTurn = intent.getIntExtra("freezeTurn", 0).coerceAtLeast(0)
                     if (intent.hasExtra("playing")) playing = intent.getBooleanExtra("playing", false)
+                    // tools/ci_layout.sh: the scenery still (0) so uiautomator finds the screen idle; below 0 puts the default back.
+                    if (intent.hasExtra("scenery")) env.density = intent.getFloatExtra("scenery", EnvSettings.DEFAULT).let { if (it < 0f) EnvSettings.DEFAULT else it }
+                    // tools/ci_layout.sh: the player list at its fullest ("full"), or with a discard owed ("discard").
+                    intent.getStringExtra("stress")?.let { mode ->
+                        stressNames = STRESS_NAMES.take(stateNow.numPlayers)
+                        layoutStress(stateNow, discard = mode == "discard"); tick++
+                        android.util.Log.i("WGBG-LAYOUT", "stress=$mode players=${stateNow.numPlayers} phase=${stateNow.phase}")
+                    }
                     android.util.Log.i("WGBG-3D-VIEW", "live=${env.liveBoard} lod=${env.liveLod} pirate=${env.pirateTheme} tilt=${camera.tilt} rotation=$boardRotation turn=${stateNow.turn} hash=${stateNow.stateHash()}")
                 }
             }
@@ -1081,11 +1094,13 @@ fun WatchGameScreen(
         (tradeOpen && tradeButtonVisible(state)) || tradeNeedsMe(state, me) || (tradeMode(state, me) == TradeMode.WAITING && state.currentPlayer == me)
     }
     CompositionLocalProvider(LocalArtChoice provides env.art) {
-    Box(modifier.onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
+    Box(modifier) {
       Box(Modifier.fillMaxSize()) { // the menu floats over the board, so the ocean always fills the screen
       Box(Modifier.fillMaxSize()) {
         // The board sits beside the player strip and turn panel (TurnHud is 360 dp wide, plus its 8 dp margins).
-        Layout.leftInset = if (inventory) 0f else with(LocalDensity.current) { 376.dp.toPx() }
+        // A camera cutout on the left pushes the panel in by its width (0.3.4).
+        val cutoutLeft = WindowInsets.displayCutout.getLeft(LocalDensity.current, androidx.compose.ui.platform.LocalLayoutDirection.current)
+        Layout.leftInset = if (inventory) 0f else with(LocalDensity.current) { 376.dp.toPx() } + cutoutLeft
         val measurer = rememberTextMeasurer()
         val resources = LocalContext.current.resources
         val wood = remember { WoodPieces(resources, PLAYER_COLORS + TOKEN_WOOD) }
@@ -1307,183 +1322,198 @@ fun WatchGameScreen(
                 if (!chosenTargets.isEmpty) drawTargets(state.board, chosenTargets, camera, 1f, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             }
         }
-        if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
-        }
-        // Inventory: a sample panel in its hammered-brass frame (0.3.4), so the frame is checked with the rest of the art.
-        if (inventory) Box(Modifier.align(Alignment.CenterEnd).padding(12.dp).size(width = 130.dp, height = 84.dp).brassEdgedWood()
-            .testTag("inventory-panel"), contentAlignment = Alignment.Center) {
-            Text("Panel", style = Wood.sans(17.sp, FontWeight.Bold, Color(0xFFFFF4D8)))
-        }
-        // Inventory: the illustrated resource cards along the bottom, then the dice faces.
-        // Look & art page (#71): Done goes back to the start screen. The Tiles: compare page is gone (Mauro, #136).
-        if (lookAndArt) Row(Modifier.align(Alignment.TopStart).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            GoButton("Done", "look-done", true, Modifier.width(120.dp).height(44.dp)) { onExit() }
-            BrassButton("Card guide", "look-guide", Modifier.height(44.dp)) { guideOpen = true; settingsOpen = false }
-        }
-        // Every card (#86 Ledger: resources, commodities and the Fortune cards) is more than a screen wide: the row scrolls.
-        if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp).horizontalScroll(rememberScrollState()).testTag("inventory-cards"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for ((c, art) in ALL_CARD_ART.withIndex()) androidx.compose.foundation.Image(
-                artPainter(art), ALL_CARD_NAMES[c], Modifier.size(width = 76.dp, height = 110.dp))
-            for (c in FORTUNE.indices) androidx.compose.foundation.Image(
-                artPainter(ThemeArt.fortune(env.art, c)), FORTUNE[c], Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-fortune-$c"))
-            // Knight cards in the chosen theme (Normal / Pirate themed).
-            // Tap a knight card or a die to swap that set on its own.
-            for (lv in 1..3) androidx.compose.foundation.Image(
-                artPainter(GuideArt.knightCard(lv, env.art.pirate(ArtObject.KNIGHTS))),
-                "Knight level $lv", Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-knight-$lv")
-                    .clickable { env.art = env.art.cycle(ArtObject.KNIGHTS) })
-            // Dice in the chosen theme: yellow 1-6, red 1-6, the event die's six faces.
-            Column(Modifier.testTag("inventory-dice").clickable { env.art = env.art.cycle(ArtObject.DICE) }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val rows = listOf((1..6).map { ThemeArt.dice(env.art, false, it) }, (1..6).map { ThemeArt.dice(env.art, true, it) },
-                    (0..5).map { ThemeArt.event(env.art, it, env.eventDieStyle) })
-                for (row in rows) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    for (id in row) androidx.compose.foundation.Image(artPainter(id), null, Modifier.size(32.dp))
-                }
-            }
-        }
-        if (!inventory) {
-            val report = tick.let { if (speed == MAX_SPEED) tracker.last else turnHeader(tracker, state) }
-            val previous = tick.let { if (speed == MAX_SPEED) null else (if (report === tracker.current) tracker.last else tracker.current ?: tracker.last).takeIf { it !== report } }
-            // The roll's dice roll across the turn HUD and rest on its top-right corner until the next roll.
-            val rolled = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }
-            // While the trade chest is open it docks here, over the turn panel, so the board stays in view.
-            // One left side panel (#73): a single brass-edged frame behind the player list and the turn news, as narrow
-            // as the list needs; the news below takes that width and wraps. See-through is a setting.
-            val sideWidth = with(LocalDensity.current) { stripWidth.toDp() }
-            if (stripWidth > 0f) Box(Modifier.align(Alignment.TopStart).padding(8.dp).width(sideWidth).fillMaxHeight()
-                .brassEdgedWood(woodAlpha = if (env.seeThrough) 0.4f else 1f))
-            if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
-                TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
-                    eventDie = state.ck != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
-                    width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false })
-            }
-            if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
-                modifier = Modifier.fillMaxSize())
-        }
-        // Board A: players top-left; in Play mode the prompt across the top and your hand along the bottom.
-        // The game state is mutated in place, so these get `tick` to redraw after every move.
-        if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
-            .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
-            roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false)
-        if (net != null && !inventory) onlineView?.let { v ->
-            Column(Modifier.align(Alignment.TopCenter).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                OnlineConnectionStatus(v)
-            }
-        }
-        if (me >= 0 && !inventory && !state.isOver && pending.isEmpty()) tick.let {
-            // Another player's card or bandit cost you something: say who, with what card and why, until OK.
-            tracker.hits.lastOrNull { it.victim == me && it.seq > seenHit }?.let { hit ->
-                Column(Modifier.align(Alignment.TopCenter).padding(top = 64.dp).widthIn(max = 460.dp).chest().testTag("hit-notice"),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("${names[hit.by]} ${hit.cause}", color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    hit.why?.let { Text(it, color = Color(0xFFEDE6D8), fontSize = 12.sp) }
-                    Text("You lost ${hit.lost}", color = Color(0xFFFFB4A0), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    ColorButton("OK", Color(0xFF3E9B4F), "hit-ok") { seenHit = hit.seq }
-                }
-            }
-            if (!state.isOver) TurnPrompt(tapHint ?: prompt(state, legal, names), Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
-            // The hand row steps aside while a card sheet (a 7's discard, a card to pick) covers the bottom centre.
-            val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.CkActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
-            if (!tradeOpen && !tradeNeedsMe(state, me) && !cardSheet) HandRow(state, me, tick,
-                // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 384.dp, end = 196.dp, bottom = 6.dp),
-                fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { fortuneAsk = it },
-                fortuneArt = { GuideArt.fortuneArt(it, env.art.pirate(ArtObject.KNIGHTS)) })
-        }
-        if (me >= 0 && !inventory) {
-            val send: (Action) -> Unit = { a -> pending = emptyList(); humanMoves.trySend(a) }
-            val needsMe = tradeNeedsMe(state, me)
-            // The trade chest floats over the board (0.2.6), centred right of the side panel so the turn history stays in view.
-            val panelEdge = with(LocalDensity.current) { stripWidth.toDp() } + 16.dp
-            // On a narrow screen (640 dp across, CI's emulator and small phones) the Age of Chivalry chest's 8 cards and its
-            // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
-            if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, bottom = 8.dp, end = 8.dp)) {
-                val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
-                TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
-                    room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
-            }
-            else if (cardPick.isNotEmpty() && chosen.isEmpty()) Column(
-                // Aiming a board card: say what to tap, with a way out.
-                Modifier.align(Alignment.BottomEnd).padding(8.dp).width(260.dp).brassEdgedWood().padding(12.dp).testTag("card-pick"),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                val card = cardPick[0].a
-                Text("${PROGRESS_NAMES.getOrElse(card) { "Card" }}: ${progressHint(card)}", color = Color(0xFFEDE6D8), fontSize = 12.sp)
-                Text(if (card == wgbg.engine.Progress.INVENTOR) (if (cardSecond) "Now tap the other tile" else "Tap the first tile")
-                    else "Tap a glowing ${when (cardSpotKind(card)) { CardSpot.EDGE -> "road"; CardSpot.HEX -> "tile"; else -> "corner" }}",
-                    color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold)
-                ColorButton("Cancel", Color(0xFFC0392B), "card-pick-cancel") { cardPick = emptyList(); cardSecond = false }
-            }
-            else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
-                onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
-                fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
-                discardCause = tick.let {
-                    if (tracker.turnCard == wgbg.engine.Progress.SABOTEUR && state.currentPlayer != me) "${names[state.currentPlayer]} played Wrecker against you" else null
-                },
-                tradeButton = if (tick.let { tradeButtonVisible(state) }) ({
-                    IconPlateButton(MoveIcon.TRADE, "Trade", "trade-toggle", lit = tradeOpen || tradeNeedsMe(state, me)) { tradeOpen = !tradeOpen }
-                }) else null)
-            // The confirm box keeps clear of the spot it asks about: at the bottom when the spot is high on the board.
-            val confirmLow = chosen.isNotEmpty() && boardSize.minDimension > 0f && confirmBelow((spotOf(state.board, chosen[0]) ?: pendingAt)
-                ?.let { Layout.fit(state.board, boardSize.width, boardSize.height, camera).project(it.x, it.y).y }, boardSize.height)
-            if (chosen.isNotEmpty()) Column(
-                (if (confirmLow) Modifier.align(Alignment.BottomCenter).padding(bottom = 130.dp) else Modifier.align(Alignment.TopCenter).padding(top = 8.dp)).zIndex(2f).chest(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                // A spot that takes more than one thing: a vertical list, icon + name + cost per row (#124).
-                val spotList = if (chosen.size > 1) spotChoices(state, chosen, names).takeIf { l -> l.any { it.icon != null } } else null
-                Text(if (spotList != null) "What goes here?" else confirmTitle(state, chosen[0]), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold)
-                confirmWarning(state, me, chosen[0])?.let { Text(it, color = Color(0xFFFFB4A0), fontSize = 13.sp) }
-                if (spotList != null) SpotPicker(spotList) { send(it) }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Compact: a check to place it, a cross to cancel (Mauro: "just an x or check, save space, look cleaner");
-                    // a choice that needs words (who to rob) keeps them after the check.
-                    if (spotList == null) for (a in chosen) ColorButton(confirmLabel(state, a, names).let { if (it == "Confirm") "✓" else "✓ $it" }, Color(0xFF3E9B4F), "confirm",
-                        androidx.compose.ui.Modifier.confirmA11y("Confirm")) { send(a) }
-                    ColorButton("✗", Color(0xFFC0392B), "cancel", androidx.compose.ui.Modifier.confirmA11y("Cancel")) {
-                        pending = emptyList(); if (cardSecond) { cardPick = emptyList(); cardSecond = false } }
-                }
-            }
-            if (tick.let { state.isOver }) {
-                var folded by remember(seed) { mutableStateOf(false) }
-                CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it },
-                    if (online == null) ({ seed++; playing = true; panelOpen = false }) else null, onExit)
-            }
-        }
-      }
-        if (panelOpen) CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) {
-            Column(
-                Modifier.align(Alignment.TopEnd)
-                    .padding(top = 60.dp, end = 8.dp, bottom = 8.dp)
-                    .width(340.dp)
-                    .brassEdgedWood()
-                    .verticalScroll(rememberScrollState())
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    GearButton(settingsOpen, { settingsOpen = true; panelOpen = false }, Modifier.size(44.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Turn ${players.first().turn}  ·  v${appVersion()}", style = Wood.title(16.sp), modifier = Modifier.weight(1f))
-                    // A real red plate, not a small word; it still asks before leaving (Fable review T10, Mauro: "i cant exit the game").
-                    StopButton("Leave game", "menu-exit") { confirmExit = true; panelOpen = false }
-                }
-                // Actions only (Fable review W7); every setting, and this game's own controls, are behind Settings.
-                // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
-                WoodButton("Card guide", "menu-guide") { guideOpen = true; panelOpen = false; settingsOpen = false }
-                WoodButton("Fit the board", "menu-fit") { camera = Camera.FIT; panelOpen = false }
-                WoodButton("Dice stats", "menu-dice-stats") { histogramOpen = true; panelOpen = false; settingsOpen = false }
-                WoodButton("Settings", "menu-settings") { settingsOpen = true; panelOpen = false }
-                // A bug or an idea, typed or spoken, with this whole game attached (Mauro, 2026-10-12).
-                WoodButton("Report a bug or idea", "menu-feedback") { panelOpen = false; settingsOpen = false; reportCapture = true }
-                if (online != null) Text("Online · room ${online.id}", fontWeight = FontWeight.Bold, modifier = Modifier.testTag("menu-room"))
-            }
+        // The HUD keeps clear of the camera cutout (0.3.4: the lens sat on the dice); the board runs under it.
+        // Every HUD size is measured in here, on the screen left beside the cutout.
+        Box(Modifier.fillMaxSize().displayCutoutPadding().onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
+          if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+              for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
+          }
+          // Inventory: a sample panel in its hammered-brass frame (0.3.4), so the frame is checked with the rest of the art.
+          if (inventory) Box(Modifier.align(Alignment.CenterEnd).padding(12.dp).size(width = 130.dp, height = 84.dp).brassEdgedWood()
+              .testTag("inventory-panel"), contentAlignment = Alignment.Center) {
+              Text("Panel", style = Wood.sans(17.sp, FontWeight.Bold, Color(0xFFFFF4D8)))
+          }
+          // Inventory: the illustrated resource cards along the bottom, then the dice faces.
+          // Look & art page (#71): Done goes back to the start screen. The Tiles: compare page is gone (Mauro, #136).
+          if (lookAndArt) Row(Modifier.align(Alignment.TopStart).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+              verticalAlignment = Alignment.CenterVertically) {
+              GoButton("Done", "look-done", true, Modifier.width(120.dp).height(44.dp)) { onExit() }
+              BrassButton("Card guide", "look-guide", Modifier.height(44.dp)) { guideOpen = true; settingsOpen = false }
+          }
+          // Every card (#86 Ledger: resources, commodities and the Fortune cards) is more than a screen wide: the row scrolls.
+          if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp).horizontalScroll(rememberScrollState()).testTag("inventory-cards"),
+              horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              for ((c, art) in ALL_CARD_ART.withIndex()) androidx.compose.foundation.Image(
+                  artPainter(art), ALL_CARD_NAMES[c], Modifier.size(width = 76.dp, height = 110.dp))
+              for (c in FORTUNE.indices) androidx.compose.foundation.Image(
+                  artPainter(ThemeArt.fortune(env.art, c)), FORTUNE[c], Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-fortune-$c"))
+              // Knight cards in the chosen theme (Normal / Pirate themed).
+              // Tap a knight card or a die to swap that set on its own.
+              for (lv in 1..3) androidx.compose.foundation.Image(
+                  artPainter(GuideArt.knightCard(lv, env.art.pirate(ArtObject.KNIGHTS))),
+                  "Knight level $lv", Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-knight-$lv")
+                      .clickable { env.art = env.art.cycle(ArtObject.KNIGHTS) })
+              // Dice in the chosen theme: yellow 1-6, red 1-6, the event die's six faces.
+              Column(Modifier.testTag("inventory-dice").clickable { env.art = env.art.cycle(ArtObject.DICE) }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                  val rows = listOf((1..6).map { ThemeArt.dice(env.art, false, it) }, (1..6).map { ThemeArt.dice(env.art, true, it) },
+                      (0..5).map { ThemeArt.event(env.art, it, env.eventDieStyle) })
+                  for (row in rows) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                      for (id in row) androidx.compose.foundation.Image(artPainter(id), null, Modifier.size(32.dp))
+                  }
+              }
+          }
+          if (!inventory) {
+              val report = tick.let { if (speed == MAX_SPEED) tracker.last else turnHeader(tracker, state) }
+              val previous = tick.let { if (speed == MAX_SPEED) null else (if (report === tracker.current) tracker.last else tracker.current ?: tracker.last).takeIf { it !== report } }
+              // The roll's dice roll across the turn HUD and rest on its top-right corner until the next roll.
+              val rolled = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }
+              // While the trade chest is open it docks here, over the turn panel, so the board stays in view.
+              // One left side panel (#73): a single brass-edged frame behind the player list and the turn news, as narrow
+              // as the list needs; the news below takes that width and wraps. See-through is a setting.
+              val sideWidth = with(LocalDensity.current) { stripWidth.toDp() }
+              if (stripWidth > 0f) Box(Modifier.align(Alignment.TopStart).padding(8.dp).width(sideWidth).fillMaxHeight()
+                  .brassEdgedWood(woodAlpha = if (env.seeThrough) 0.4f else 1f))
+              if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
+                  TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
+                      eventDie = state.ck != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
+                      width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false })
+              }
+              if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
+                  modifier = Modifier.fillMaxSize())
+          }
+          // Board A: players top-left; in Play mode the prompt across the top and your hand along the bottom.
+          // The game state is mutated in place, so these get `tick` to redraw after every move.
+          // The side panel's width: the prompt, the notices and the hand keep clear of it.
+          val panelDp = with(LocalDensity.current) { stripWidth.toDp() }
+          if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
+              .heightIn(max = stripMaxHeight(with(LocalDensity.current) { screenHeight.toDp() }))
+              .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
+              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false)
+          if (net != null && !inventory) onlineView?.let { v ->
+              Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                  OnlineConnectionStatus(v)
+              }
+          }
+          if (me >= 0 && !inventory && !state.isOver && pending.isEmpty()) tick.let {
+              // Another player's card or bandit cost you something: say who, with what card and why, until OK.
+              tracker.hits.lastOrNull { it.victim == me && it.seq > seenHit }?.let { hit ->
+                  Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 64.dp)
+                      .widthIn(max = 460.dp).chest().testTag("hit-notice"),
+                      horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                      Text("${names[hit.by]} ${hit.cause}", color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                      hit.why?.let { Text(it, color = Color(0xFFEDE6D8), fontSize = 12.sp) }
+                      Text("You lost ${hit.lost}", color = Color(0xFFFFB4A0), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                      ColorButton("OK", Color(0xFF3E9B4F), "hit-ok") { seenHit = hit.seq }
+                  }
+              }
+              if (!state.isOver) TurnPrompt(tapHint ?: prompt(state, legal, names),
+                  Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 8.dp))
+              // The hand row steps aside while a card sheet (a 7's discard, a card to pick) covers the bottom centre.
+              val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.CkActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
+              if (!tradeOpen && !tradeNeedsMe(state, me) && !cardSheet) HandRow(state, me, tick,
+                  // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
+                  // It starts at the side panel's edge, not a fixed 384 dp, which left one card's room on a 640 dp screen.
+                  Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = handStart(panelDp), end = 196.dp, bottom = 6.dp),
+                  fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { fortuneAsk = it },
+                  fortuneArt = { GuideArt.fortuneArt(it, env.art.pirate(ArtObject.KNIGHTS)) })
+          }
+          if (me >= 0 && !inventory) {
+              val send: (Action) -> Unit = { a -> pending = emptyList(); humanMoves.trySend(a) }
+              val needsMe = tradeNeedsMe(state, me)
+              // The trade chest floats over the board (0.2.6), centred right of the side panel so the turn history stays in view.
+              val panelEdge = with(LocalDensity.current) { stripWidth.toDp() } + 16.dp
+              // On a narrow screen (640 dp across, CI's emulator and small phones) the Age of Chivalry chest's 8 cards and its
+              // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
+              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, bottom = 8.dp, end = 8.dp)) {
+                  val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
+                  TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
+                      room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
+              }
+              else if (cardPick.isNotEmpty() && chosen.isEmpty()) Column(
+                  // Aiming a board card: say what to tap, with a way out.
+                  Modifier.align(Alignment.BottomEnd).padding(8.dp).width(260.dp).brassEdgedWood().padding(12.dp).testTag("card-pick"),
+                  verticalArrangement = Arrangement.spacedBy(6.dp),
+              ) {
+                  val card = cardPick[0].a
+                  Text("${PROGRESS_NAMES.getOrElse(card) { "Card" }}: ${progressHint(card)}", color = Color(0xFFEDE6D8), fontSize = 12.sp)
+                  Text(if (card == wgbg.engine.Progress.INVENTOR) (if (cardSecond) "Now tap the other tile" else "Tap the first tile")
+                      else "Tap a glowing ${when (cardSpotKind(card)) { CardSpot.EDGE -> "road"; CardSpot.HEX -> "tile"; else -> "corner" }}",
+                      color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold)
+                  ColorButton("Cancel", Color(0xFFC0392B), "card-pick-cancel") { cardPick = emptyList(); cardSecond = false }
+              }
+              else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, end = 8.dp, bottom = 8.dp),
+                  onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
+                  fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
+                  discardCause = tick.let {
+                      if (tracker.turnCard == wgbg.engine.Progress.SABOTEUR && state.currentPlayer != me) "${names[state.currentPlayer]} played Wrecker against you" else null
+                  },
+                  tradeButton = if (tick.let { tradeButtonVisible(state) }) ({
+                      IconPlateButton(MoveIcon.TRADE, "Trade", "trade-toggle", lit = tradeOpen || tradeNeedsMe(state, me)) { tradeOpen = !tradeOpen }
+                  }) else null)
+              // The confirm box keeps clear of the spot it asks about: at the bottom when the spot is high on the board.
+              val confirmLow = chosen.isNotEmpty() && boardSize.minDimension > 0f && confirmBelow((spotOf(state.board, chosen[0]) ?: pendingAt)
+                  ?.let { Layout.fit(state.board, boardSize.width, boardSize.height, camera).project(it.x, it.y).y }, boardSize.height)
+              if (chosen.isNotEmpty()) Column(
+                  (if (confirmLow) Modifier.align(Alignment.BottomCenter).padding(bottom = 130.dp) else Modifier.align(Alignment.TopCenter).rightOfPanel(panelEdge - 16.dp).padding(top = 8.dp)).zIndex(2f).chest(),
+                  verticalArrangement = Arrangement.spacedBy(6.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally,
+              ) {
+                  // A spot that takes more than one thing: a vertical list, icon + name + cost per row (#124).
+                  val spotList = if (chosen.size > 1) spotChoices(state, chosen, names).takeIf { l -> l.any { it.icon != null } } else null
+                  Text(if (spotList != null) "What goes here?" else confirmTitle(state, chosen[0]), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold)
+                  confirmWarning(state, me, chosen[0])?.let { Text(it, color = Color(0xFFFFB4A0), fontSize = 13.sp) }
+                  if (spotList != null) SpotPicker(spotList) { send(it) }
+                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      // Compact: a check to place it, a cross to cancel (Mauro: "just an x or check, save space, look cleaner");
+                      // a choice that needs words (who to rob) keeps them after the check.
+                      if (spotList == null) for (a in chosen) ColorButton(confirmLabel(state, a, names).let { if (it == "Confirm") "✓" else "✓ $it" }, Color(0xFF3E9B4F), "confirm",
+                          androidx.compose.ui.Modifier.confirmA11y("Confirm")) { send(a) }
+                      ColorButton("✗", Color(0xFFC0392B), "cancel", androidx.compose.ui.Modifier.confirmA11y("Cancel")) {
+                          pending = emptyList(); if (cardSecond) { cardPick = emptyList(); cardSecond = false } }
+                  }
+              }
+              if (tick.let { state.isOver }) {
+                  var folded by remember(seed) { mutableStateOf(false) }
+                  CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it },
+                      if (online == null) ({ seed++; playing = true; panelOpen = false }) else null, onExit)
+              }
+          }
         }
       }
+        // The Menu panel and every button and dialog below keep clear of the camera cutout; the board runs under it (0.3.4).
+        Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+          if (panelOpen) CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) {
+              Column(
+                  Modifier.align(Alignment.TopEnd)
+                      .padding(top = 60.dp, end = 8.dp, bottom = 8.dp)
+                      .width(340.dp)
+                      .brassEdgedWood()
+                      .verticalScroll(rememberScrollState())
+                      .padding(14.dp),
+                  verticalArrangement = Arrangement.spacedBy(6.dp),
+              ) {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      GearButton(settingsOpen, { settingsOpen = true; panelOpen = false }, Modifier.size(44.dp))
+                      Spacer(Modifier.width(8.dp))
+                      Text("Turn ${players.first().turn}  ·  v${appVersion()}", style = Wood.title(16.sp), modifier = Modifier.weight(1f))
+                      // A real red plate, not a small word; it still asks before leaving (Fable review T10, Mauro: "i cant exit the game").
+                      StopButton("Leave game", "menu-exit") { confirmExit = true; panelOpen = false }
+                  }
+                  // Actions only (Fable review W7); every setting, and this game's own controls, are behind Settings.
+                  // Every card and what it does, and what everything costs (Mauro: "make a map in the menu").
+                  WoodButton("Card guide", "menu-guide") { guideOpen = true; panelOpen = false; settingsOpen = false }
+                  WoodButton("Fit the board", "menu-fit") { camera = Camera.FIT; panelOpen = false }
+                  WoodButton("Dice stats", "menu-dice-stats") { histogramOpen = true; panelOpen = false; settingsOpen = false }
+                  WoodButton("Settings", "menu-settings") { settingsOpen = true; panelOpen = false }
+                  // A bug or an idea, typed or spoken, with this whole game attached (Mauro, 2026-10-12).
+                  WoodButton("Report a bug or idea", "menu-feedback") { panelOpen = false; settingsOpen = false; reportCapture = true }
+                  if (online != null) Text("Online · room ${online.id}", fontWeight = FontWeight.Bold, modifier = Modifier.testTag("menu-room"))
+              }
+          }
+        }
+      }
+      // Every button, banner and dialog over the board keeps clear of the camera cutout (0.3.4).
+      Box(Modifier.fillMaxSize().displayCutoutPadding()) {
         // Debug autoplay must never be invisible: a bot playing your seat looked like a desync in a playtest.
         if (autoplay || autoSetup) Text(if (autoplay) "AUTOPLAY (debug): a bot plays your seat" else "AUTOSETUP (debug)",
             color = Color(0xFFFFB4A0), fontSize = 12.sp, fontWeight = FontWeight.Bold,
@@ -1621,6 +1651,7 @@ fun WatchGameScreen(
             // Upper right under Trade, short, clear of the move buttons that stack up from the bottom right.
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 104.dp, end = 8.dp))
         overlay?.invoke(this, state, tick)
+      }
     }
     }
 }

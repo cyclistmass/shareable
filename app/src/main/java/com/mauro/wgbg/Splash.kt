@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -134,7 +135,7 @@ fun SplashScreen(
     var accountSeen by remember { mutableIntStateOf(0) }
     val signedIn = remember(accountSeen, account) { account?.let { GoogleAccount.status(it.account).signedIn } ?: false }
     if (about) { BackHandler { about = false }; AboutScreen { about = false }; return }
-    Box(Modifier.fillMaxSize().background(SPLASH_SEA).testTag("splash")) {
+    Box(Modifier.fillMaxSize().background(SPLASH_SEA).displayCutoutPadding().testTag("splash")) {
         Column(Modifier.fillMaxSize().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
             Text("Working German Board Game", style = Wood.title(34.sp, Color(0xFFFFF6DE)).copy(shadow = Shadow(Color(0xB3000000), Offset(0f, 4f), 12f)),
                 textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
@@ -229,7 +230,7 @@ private fun BottomLink(label: String, tag: String, onClick: () -> Unit) {
 @Composable
 fun AboutScreen(onClose: () -> Unit) {
     val context = LocalContext.current
-    Row(Modifier.fillMaxSize().tableTop().padding(14.dp).testTag("about"), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    Row(Modifier.fillMaxSize().tableTop().displayCutoutPadding().padding(14.dp).testTag("about"), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.width(300.dp).fillMaxHeight().brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Working German Board Game", style = Wood.title(22.sp))
