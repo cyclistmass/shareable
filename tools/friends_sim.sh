@@ -72,8 +72,14 @@ for d in $HOST $GUEST; do
 done
 sleep 5
 wait_for $GUEST "Room $R2" 30
-"$A" -s $GUEST shell input keyevent KEYCODE_BACK   # a guest's lobby has no Leave button: Back leaves, to the start screen
 wait_for $HOST "Room $R2" 30
+wait_for $HOST "Erin" 15
+tap_text $GUEST "Leave room"              # the guest's own Leave button (#72), then its confirm
+tap_text $GUEST "Leave room" 2
+wait_for $GUEST "New game" 15             # straight back to the start screen
+gone=; for _ in $(seq 1 15); do texts $HOST | grep -q "Erin" || { gone=1; break; }; sleep 1; done
+[ -n "$gone" ] || { echo "FAIL: the guest left but still holds a seat"; texts $HOST; exit 1; }
+echo "PASS: the guest left $R2 by its Leave button and the seat opened"
 tap_text $HOST "Leave room"
 tap_text $HOST "Leave room" 2             # the confirm box's button, over the lobby's own
 "$A" -s $HOST shell input keyevent KEYCODE_BACK    # Leave room opens the setup screen; Back to the start

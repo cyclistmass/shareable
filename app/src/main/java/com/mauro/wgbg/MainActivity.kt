@@ -513,7 +513,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
             Screen.ONLINE_LOBBY -> session?.let { s ->
                 BackHandler { leaveRoom() }
                 OnlineLobbyScreen(s, onPlaying = { v -> v.room?.let { recordMet(s, it) }; if (screen == Screen.ONLINE_LOBBY) { gameNo++; screen = Screen.ONLINE_GAME } },
-                    onSettings = { leaveRoom(); screen = Screen.SETUP }, onError = { e -> scope.launch { problem = onlineProblem(e) } })
+                    onSettings = { val host = s.client.view().room?.host == s.uid; leaveRoom(); if (host) screen = Screen.SETUP }, onError = { e -> scope.launch { problem = onlineProblem(e) } })
             } ?: RejoiningOr(savedRoom) { screen = Screen.START }
             Screen.ONLINE_GAME -> session?.let { s ->
                 key(gameNo) {

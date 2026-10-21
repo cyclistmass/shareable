@@ -131,7 +131,11 @@ fun LobbyScreen(
                     }
                     GoButton("Start game", "start", lobby.canStart, Modifier.fillMaxWidth().height(46.dp)) { onStart(lobby.gameSetup()) }
                     BrassButton("Leave room", "leave-room", Modifier.fillMaxWidth().height(36.dp)) { confirmLeave = true }
-                } else Text("Waiting for ${lobby.seats[0].label} to start", style = Wood.sans(14.sp, FontWeight.Bold, Wood.INK_MUTED))
+                } else {
+                    Text("Waiting for ${lobby.seats[0].label} to start", style = Wood.sans(14.sp, FontWeight.Bold, Wood.INK_MUTED))
+                    // A guest's way out too (#72): only Back used to leave, which gesture-navigation players may not find.
+                    BrassButton("Leave room", "leave-room", Modifier.fillMaxWidth().height(36.dp)) { confirmLeave = true }
+                }
             }
         }
         if (confirmLeave) Box(Modifier.fillMaxSize().background(Color(0x99000000)), contentAlignment = Alignment.Center) {
@@ -139,7 +143,7 @@ fun LobbyScreen(
             Column(Modifier.widthIn(max = 440.dp).brassEdgedWood().padding(18.dp).testTag("leave-room-confirm"),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Leave room ${lobby.code}?", style = Wood.title(20.sp))
-                Text("You go back to the game settings.", style = Wood.sans(14.sp))
+                Text(if (lobby.isHost) "You go back to the game settings." else "Your seat opens for someone else.", style = Wood.sans(14.sp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GoButton("Stay", "leave-room-no", true, Modifier.heightIn(min = 44.dp)) { confirmLeave = false }
                     StopButton("Leave room", "leave-room-yes", Modifier.heightIn(min = 44.dp)) { confirmLeave = false; onSettings() }
