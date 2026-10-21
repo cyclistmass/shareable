@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Publishes release wgbg-v<versionName> on cyclistmass/shareable: the debug APK built by CI for the pushed
-# commit, plus the gameplay video from tools/record_showcase.sh. Asset names never change, so
+# Publishes release wgbg-v<versionName> on cyclistmass/shareable: the release APK built by CI for the pushed
+# commit (not debuggable, so no test hooks, #147; the same stable key as every earlier release), plus the gameplay
+# video from tools/record_showcase.sh. Asset names never change, so
 #   https://github.com/cyclistmass/shareable/releases/latest/download/working-german-board-game.apk
 # always serves the newest version. Run from the project root after CI is green for the pushed commit.
 # The GitHub token comes from Git Credential Manager for one command at a time; it is never printed or saved.
@@ -31,10 +32,13 @@ print(ok[0]['id'] if ok else '')")
 [ -n "$RUN" ] || { echo "CI is not green for ${SHA:0:7}; not publishing"; exit 1; }
 ART=$(api "https://api.github.com/repos/$REPO/actions/runs/$RUN/artifacts" | py -c "
 import json,sys
-print([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'].endswith('debug-apk') or a['name']=='shards-apk'][0])")
+print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'].endswith('release-apk') or a['name']=='shards-apk']+[''])[0])")
+[ -n "$ART" ] || { echo "run $RUN has no release APK artifact (built before #147?); not publishing"; exit 1; }
 curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://api.github.com/repos/$REPO/actions/artifacts/$ART/zip"
-# The release check's artifact also holds the instrumented-test APK, in its own folder: take the app's.
-(cd "$WORK" && unzip -q apk.zip && mv "$(find . -name app-debug.apk -not -path '*androidTest*' | head -1)" working-german-board-game.apk)
+# The release APK (#147: not debuggable, so no test hooks), never the debug one; the release check's artifact holds both.
+REL=$(cd "$WORK" && unzip -q apk.zip && find . -name app-release.apk | head -1)
+[ -n "$REL" ] || { echo "run $RUN's artifact has no app-release.apk; not publishing a debug build"; exit 1; }
+mv "$WORK/$REL" "$WORK/working-german-board-game.apk"
 # APK=<file>: publish the exact APK that was user-tested (same commit), not CI's rebuild of it. CI must still be green.
 if [ -n "${APK:-}" ]; then
   echo "CI's APK:    $(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)"
@@ -44,13 +48,15 @@ if [ -n "${APK:-}" ]; then
   [ "$(cert "$APK")" = "$(cert "$WORK/working-german-board-game.apk")" ] || { echo "Tested APK is signed with a different cert than CI's; not publishing"; exit 1; }
   cp "$APK" "$WORK/working-german-board-game.apk"
 fi
+# Whatever is published: the stable key, and not debuggable (an APK= from a debug build is refused here too).
+bash "$(dirname "$0")/ci/apk_check.sh" "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
 
 # KNOWN=<text> adds a Known issues section (read from the environment, so its quotes and $ stay as written).
 KNOWN="${KNOWN:-}" py -c "
 import json,sys,os
 known=os.environ.get('KNOWN','').strip()
 print(json.dumps({'tag_name':'wgbg-v$VERSION','target_commitish':'$SHA','name':'Working German Board Game $VERSION'+(' (pre-release)' if os.environ.get('PRERELEASE') else ''),'draft':True,'prerelease':bool(os.environ.get('PRERELEASE')),
- 'body':'''Android build $VERSION of Working German Board Game (debug-signed, for testing).
+ 'body':'''Android build $VERSION of Working German Board Game (signed with the project's own key, for testing).
 
 **Install:** download working-german-board-game.apk below on an Android phone (Android 8+), open it, and allow installing from this source when asked. It updates any earlier version.
 

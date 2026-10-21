@@ -1,6 +1,6 @@
 name: wgbg device shards
 
-# Reusable: builds the debug APK (stable key) and runs the given device shards side by side, one emulator each
+# Reusable: builds the debug and release APKs (stable key) and runs the given device shards side by side, one emulator each
 # (tools/ci/shard.sh says what each shard runs). Called by the nightly full playtest (wgbg-nightly.yml) and the remote
 # release check (wgbg-check.yml). Lives in shareable's .github/workflows; drafted in catan-android tools/ci/.
 on:
@@ -39,14 +39,18 @@ jobs:
         run: |
           if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
             echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
-          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard will fail: phones refuse a new key)"; fi
-      - name: Build debug APK (and the instrumented test APK)
-        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard and the key check will fail: phones refuse a new key)"; fi
+      # The shards play the debug APK; the update shard installs the release one, as players get it (#147).
+      - name: Build the debug and release APKs (and the instrumented test APK)
+        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest
+      - name: Check the APKs' signing key, and that the release is not debuggable
+        run: bash tools/ci/apk_check.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: shards-apk
           path: |
             working-german-board-game/app/build/outputs/apk/debug/app-debug.apk
+            working-german-board-game/app/build/outputs/apk/release/app-release.apk
             working-german-board-game/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
   device:
