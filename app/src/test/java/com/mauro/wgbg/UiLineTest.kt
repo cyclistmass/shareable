@@ -38,6 +38,10 @@ class UiLineTest {
         assertEquals(listOf("2", "3", "100", "300"), m!!.groupValues.let { listOf(it[1], it[3], it[4], it[5]) })
         assertTrue("class=\"android.widget.EditText\"" in UiLine.xml(node(edit = true)), "ci_reach finds the code box by its class")
         assertTrue("scrollable=\"true\"" in UiLine.xml(UiLine.Node("", "", "", false, false, 0, 0, 9, 9, scrollable = true)), "ci_reach scrolls the panels marked so")
+        // The window goes first, as uiautomator's root does: ci_update's screen_size greps its [0,0] bounds.
+        val w = UiLine.xml(UiLine.Node("", "", "", false, false, 0, 0, 2400, 1080, window = true))
+        assertTrue("class=\"android.widget.FrameLayout\"" in w && "bounds=\"[0,0][2400,1080]\"" in w, w)
+        assertEquals("screen=- sheets=- items=", UiLine.line("", listOf(UiLine.Node("", "", "", false, false, 0, 0, 9, 9, window = true))), "not a tappable item")
     }
 
     @Test

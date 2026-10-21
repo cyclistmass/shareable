@@ -37,7 +37,9 @@ object UiLine {
 
     /** One thing on screen, its visible part in screen px. */
     data class Node(val text: String, val tag: String, val desc: String, val clickable: Boolean, val editable: Boolean,
-                    val l: Int, val t: Int, val r: Int, val b: Int, val scrollable: Boolean = false) {
+                    val l: Int, val t: Int, val r: Int, val b: Int, val scrollable: Boolean = false,
+                    /** The window itself, listed first like uiautomator's root: ci_update reads the screen size from it. */
+                    val window: Boolean = false) {
         val cx get() = (l + r) / 2
         val cy get() = (t + b) / 2
     }
@@ -51,7 +53,7 @@ object UiLine {
 
     /** A node as uiautomator writes it, so `grep 'text="Trade"'`, `resource-id=`, `class=` and `bounds=` read it as before. */
     fun xml(n: Node) = "<node text=\"${esc(n.text)}\" resource-id=\"${esc(n.tag)}\" " +
-        "class=\"${if (n.editable) "android.widget.EditText" else "android.view.View"}\" content-desc=\"${esc(n.desc)}\" " +
+        "class=\"${if (n.editable) "android.widget.EditText" else if (n.window) "android.widget.FrameLayout" else "android.view.View"}\" content-desc=\"${esc(n.desc)}\" " +
         "clickable=\"${n.clickable}\" scrollable=\"${n.scrollable}\" bounds=\"[${n.l},${n.t}][${n.r},${n.b}]\" />"
 
     /** The whole screen for `files/ui.txt`; the closing line tells a reader it's complete. */
@@ -116,11 +118,17 @@ object UiLine {
         tmp.renameTo(f)
     }
 
-    /** What's on screen now: the focused window's roots (else all shown), uncovered nodes in tree order. */
+    /** What's on screen now: the focused window's roots (else all shown), each window then its uncovered nodes in tree order. */
     fun snapshot(): List<Node> {
         val live = roots.mapNotNull { it.get() }.filter { it.view.isAttachedToWindow && it.view.isShown }
         val use = live.filter { it.view.hasWindowFocus() }.ifEmpty { live }
-        return use.flatMap { nodes(it) }
+        return use.flatMap { listOf(window(it)) + nodes(it) }
+    }
+
+    private fun window(root: ViewRootForTest): Node {
+        val w = root.view.rootView
+        val at = IntArray(2).also { w.getLocationOnScreen(it) }
+        return Node("", "", "", false, false, at[0], at[1], at[0] + w.width, at[1] + w.height, window = true)
     }
 
     private fun important(n: SemanticsNode): Boolean {

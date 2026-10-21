@@ -13,7 +13,7 @@ export MSYS_NO_PATHCONV=1
 # adb.exe on Windows needs Windows paths for the APKs it installs.
 native() { if command -v cygpath >/dev/null; then cygpath -w "$1"; else printf '%s\n' "$1"; fi; }
 
-dump() { local x; for _ in 1 2 3 4 5 6; do x=$("$ADB" exec-out uiautomator dump /dev/tty 2>/dev/null | tr '>' '\n'); case "$x" in *hierarchy*) echo "$x"; return;; esac; sleep 1; done; }
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app answers in 0.2 s; the old release (no WGBG-UI) falls back to uiautomator
 fail() {
   echo "UPDATE FAILED: $*"
   "$ADB" exec-out screencap -p > "$OUT/update-fail.png" 2>/dev/null; dump > "$OUT/update-fail.xml"
