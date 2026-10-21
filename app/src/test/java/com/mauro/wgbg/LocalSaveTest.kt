@@ -156,4 +156,14 @@ class LocalSaveTest {
         val now = LocalSave.decode(LocalSave(GameSetup(), 7, emptyList()).encode())!!
         assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.PURPLE, SeatColour.WHITE), now.setup.playerColours(7))
     }
+
+    @Test
+    fun `a save whose players the ruleset refuses is not resumed, rather than crashing the app at every start`(@TempDir dir: File) {
+        val two = chivalry.copy(seats = listOf(SeatSetup(SeatKind.FRIEND), SeatSetup(SeatKind.BOT), SeatSetup(SeatKind.EMPTY), SeatSetup(SeatKind.EMPTY)))
+        val save = LocalSave.decode(LocalSave(two, 7L, emptyList()).encode())
+        assertNotNull(save)
+        assertFalse(save!!.resumable)
+        val file = File(dir, "local-game.txt").apply { writeText(LocalSave(two, 7L, emptyList()).encode()) }
+        assertNull(LocalSaveStore(file).load())
+    }
 }

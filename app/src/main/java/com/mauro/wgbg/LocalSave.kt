@@ -32,8 +32,11 @@ data class LocalSave(val setup: GameSetup, val seed: Long, val moves: List<Actio
         return state
     }
 
-    /** The game can be picked up: it replays cleanly and isn't finished. */
-    val resumable: Boolean get() = replay()?.isOver == false
+    /**
+     * The game can be picked up: it replays cleanly and isn't finished. A setup the rules refuse (a player count its
+     * ruleset doesn't allow) is not resumable either, rather than a crash every time the app opens.
+     */
+    val resumable: Boolean get() = runCatching { replay() }.getOrNull()?.isOver == false
 
     companion object {
         const val HEADER = "wgbg-local v2"

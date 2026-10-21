@@ -182,6 +182,18 @@ data class GameSetup(
 
     val canStart get() = problems.isEmpty()
 
+    /**
+     * A setup the board can be drawn from even when Start can't (Look & art opens from the New game screen with
+     * whatever is picked): empty seats become bots until the ruleset has enough players. Monkey found Age of Chivalry
+     * with two players crashing it.
+     */
+    fun viewable(): GameSetup {
+        var s = this
+        for (i in seats.indices) if (s.players.size < ruleset.players.first && s.seats[i].kind == SeatKind.EMPTY)
+            s = s.copy(seats = s.seats.mapIndexed { j, x -> if (j == i) x.copy(kind = SeatKind.BOT) else x })
+        return s
+    }
+
     fun config(): GameConfig = GameConfig(expansion = ruleset.expansion, numPlayers = players.size, vpToWin = points,
         randomFirstPlayer = randomFirst)
 

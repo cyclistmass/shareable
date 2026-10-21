@@ -271,4 +271,17 @@ class GameSetupTest {
         // Defaults: you, then three bots (a Friend seat is only ever chosen, never the default).
         assertTrue(base.seats.drop(1).all { it.kind == SeatKind.BOT })
     }
+
+    @Test
+    fun `Look & art draws a board from any setup the New game screen allows, even one Start refuses`() {
+        val two = GameSetup().copy(seats = listOf(SeatSetup(SeatKind.FRIEND), SeatSetup(SeatKind.BOT), SeatSetup(SeatKind.EMPTY), SeatSetup(SeatKind.EMPTY)))
+        val alone = two.copy(seats = two.seats.mapIndexed { i, x -> if (i == 0) x else SeatSetup(SeatKind.EMPTY) })
+        for (setup in listOf(two.withRuleset(Ruleset.CHIVALRY), alone, alone.withRuleset(Ruleset.CHIVALRY), GameSetup(), GameSetup().withRuleset(Ruleset.CHIVALRY))) {
+            val v = setup.viewable()
+            assertTrue(v.players.size in setup.ruleset.players, "$setup")
+            Rules.newGame(v.config(), 1L)   // no "supports 3-4 players" crash (CI monkey, 0.3.4)
+            if (setup.canStart) assertEquals(setup, v)   // a setup that can start is drawn as it is
+        }
+        assertThrows<IllegalArgumentException> { two.withRuleset(Ruleset.CHIVALRY).config() }
+    }
 }
