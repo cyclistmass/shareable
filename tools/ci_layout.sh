@@ -140,5 +140,7 @@ done
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || { echo "layout: FAILED: the app crashed"; fail=1; }
 echo "layout: $steps screens checked in $((SECONDS - t0)) s"
+# Every step skipped (no cutout overlays on CI's aosp_atd image) is not a pass: it checked nothing.
+[ $steps -gt 0 ] || { echo "layout: FAILED: nothing was checked, every step was skipped"; fail=1; }
 [ $fail = 0 ] && echo "layout: PASSED"
 exit $fail
