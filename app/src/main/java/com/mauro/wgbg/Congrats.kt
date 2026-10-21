@@ -63,6 +63,8 @@ internal fun CongratsScreen(
     folded: Boolean, onFold: (Boolean) -> Unit, onPlayAgain: (() -> Unit)?, onExit: () -> Unit,
     /** Online, a guest: "Join rematch" once the host has opened one (#72). */
     playAgainLabel: String = "Play again",
+    /** Each player's cameo (0.3.5), or null for the colour dot: the winner's shows large above the standings. */
+    cameos: List<String?> = emptyList(),
 ) {
     if (folded) {
         Box(Modifier.fillMaxSize()) {
@@ -78,6 +80,8 @@ internal fun CongratsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            val cameo = { p: Int -> cameos.getOrNull(p)?.takeIf { it in Cameos.PAINTED } }
+            if (winner >= 0) cameo(winner)?.let { CameoDisc(it, Wood.BRASS, 96.dp, Modifier.testTag("congrats-cameo"), ring = 4.dp) }
             Text(congratsTitle(winner, me, names), color = Color(0xFFF1D58A), fontSize = 28.sp, fontWeight = FontWeight.Bold,
                 fontFamily = ALEGREYA_SC, modifier = Modifier.testTag("congrats-title"))
             val top = players.firstOrNull { it.seat == winner }
@@ -92,7 +96,8 @@ internal fun CongratsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("${place + 1}.", Modifier.width(24.dp), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold)
-                Box(Modifier.size(14.dp).background(PLAYER_COLORS[pl.seat], CircleShape))
+                val c = cameo(pl.seat)
+                if (c != null) CameoDisc(c, PLAYER_COLORS[pl.seat], 36.dp) else Box(Modifier.size(14.dp).background(PLAYER_COLORS[pl.seat], CircleShape))
                 Spacer(Modifier.width(8.dp))
                 Text(names[pl.seat] + if (pl.seat == me && names[pl.seat] != "You") " (you)" else "", Modifier.weight(1f), color = Color(0xFFEDE6D8),
                     // A 16-letter name ends in "…" before the award tags, which it ran into (0.3.4).

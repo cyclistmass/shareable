@@ -154,7 +154,7 @@ class SeatColoursTest {
         val v2 = "v2|Mauro||BASE|10|0|FRIEND:GREEDY:,BOT:EASY:,BOT:GREEDY:,BOT:GREEDY:|COLOURS"
         val old = GameSetup.decode(v2)!!
         assertEquals(SeatColour.DEFAULT.take(4), old.playerColours(5)); assertFalse(old.randomColours)
-        assertTrue(old.encode().startsWith("v3|"))
+        assertTrue(old.encode().startsWith("v4|"))
         assertEquals(SeatColour.DEFAULT.take(3), GameSetup.decode("v1|Mauro||BASE|10|0|FRIEND:GREEDY,BOT:EASY,EMPTY:GREEDY,BOT:GREEDY")!!.playerColours(1))
     }
 
@@ -193,13 +193,60 @@ class SeatColoursTest {
         h.close()
     }
 
+    /** A room without colours, as every room was before 0.3.4: Anne hosts, Erin plays, a bot, an open seat. */
+    private val oldRoom = Room("ROVER-42", "h", wgbg.engine.GameConfig(numPlayers = 3), 7, listOf(
+        Seat("h", "Anne", ready = true), Seat("g", "Erin", ready = true), Seat(null, "", "EASY", open = false), Seat(null, "", null, open = true)),
+        Status.playing)
+    private val before034 = listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE)
+
     @Test
-    fun `a room without colours plays the default ones by player, as every game before`() {
-        val room = Room("ROVER-42", "h", wgbg.engine.GameConfig(numPlayers = 3), 7, listOf(
-            Seat("h", "Anne", ready = true), Seat(null, "", null, open = true), Seat(null, "", "EASY", open = false), Seat(null, "", "GREEDY", open = false)))
-        assertEquals(SeatColour.DEFAULT.take(3), OnlineSeats(room, "h").colours)
-        assertEquals(emptyList<String>(), com.mauro.wgbg.room(room.id, room.wire()).colours)
-        assertFalse("colours" in (room.wire()["options"] as Map<*, *>), "nothing written when there are none")
+    fun `a room without colours plays the pre-0_3_4 ones by player (Orange, never Purple), and resumes in them`() {
+        assertEquals(before034, OnlineSeats(oldRoom, "h").colours)
+        assertEquals(listOf("Anne", "Erin", "Orange"), OnlineSeats(oldRoom, "h").names, "a bot is named by that colour")
+        // Resumed from the server (the app was closed): still none written, the same colours read back.
+        val back = com.mauro.wgbg.room(oldRoom.id, oldRoom.wire())
+        assertEquals(emptyList<String>(), back.colours)
+        assertFalse("colours" in (oldRoom.wire()["options"] as Map<*, *>), "nothing written when there are none")
+        assertEquals(before034, OnlineSeats(back, "h").colours)
+        // The lobby's dots, by seat, are the same colours as the game's.
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE), roomSeatColours(oldRoom))
+        assertEquals(LocalSave.BEFORE_034, before034Colours(4), "the same colours an old local save keeps")
+        // A seat left empty between players keeps its colour out of play, as in a 0.3.4 room: the lobby's dots and the
+        // game agree.
+        val gap = oldRoom.copy(seats = oldRoom.seats.mapIndexed { i, st -> if (i == 1) Seat(open = true) else st })
+        assertEquals(listOf(SeatColour.RED, SeatColour.ORANGE), OnlineSeats(gap, "h").colours)
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE, SeatColour.PURPLE, SeatColour.YELLOW), before034Colours(6))
+    }
+
+    @Test
+    fun `both phones in a room without colours derive the same colours and names from the same doc`() {
+        val host = OnlineSeats(oldRoom, "h"); val guest = OnlineSeats(oldRoom, "g"); val watcher = OnlineSeats(oldRoom, "x")
+        assertEquals(host.colours, guest.colours); assertEquals(host.colours, watcher.colours)
+        assertEquals(host.names, guest.names); assertEquals(host.names, watcher.names)
+    }
+
+    @Test
+    fun `a rematch of a room without colours keeps them, unless the host plays random colours`() {
+        val store = MemoryStore()
+        val done = oldRoom.copy(status = Status.done)
+        val same = LobbySession.rematch(InMemoryTransport("h", store), GameSetup(name = "Anne"), done, 9, code = "ELM-2").join()
+        val r = same.client.view().room!!
+        assertEquals(emptyList<String>(), r.colours)
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE), same.model(r).colours)
+        assertEquals(listOf(SeatColour.RED, SeatColour.ORANGE), OnlineSeats(r, "h").colours, "Erin not back yet: Anne and the bot")
+        same.close()
+        val random = LobbySession.rematch(InMemoryTransport("h", store), GameSetup(name = "Anne").withRandomColours(true), done, 9, code = "ELM-3").join()
+        assertEquals(4, random.client.view().room!!.colours.size)
+        random.close()
+    }
+
+    @Test
+    fun `only a room no 0_3_4 phone wrote lacks colours - every room made now carries one per seat`() {
+        for (s in listOf(GameSetup(name = "Anne"), GameSetup(name = "Anne").withRandomColours(true), GameSetup(name = "Anne").withSeat(2, SeatKind.EMPTY))) {
+            val h = LobbySession.host(InMemoryTransport("h", MemoryStore()), s, 5, code = "ROVER-42").join()
+            assertEquals(GameSetup.MAX_SEATS, h.client.view().room!!.colours.size, "$s")
+            h.close()
+        }
     }
 
     @Test
@@ -247,7 +294,7 @@ class SeatColoursTest {
         val f = good.split("|")
         val bad = listOf(
             good.replace("BLACK", "PINK"), good.replace("BLACK", "black"), good.replace(":BLACK", ":BLACK:extra"),
-            f.dropLast(1).joinToString("|") + "|X", f.joinToString("|") + "|R", good.replace("v3|", "v4|"),
+            f.dropLast(1).joinToString("|") + "|X", f.joinToString("|") + "|R", good.replace("v4|", "v5|"),
             f.take(8).joinToString("|"), good.replace(":BLACK", ""),
         )
         for (b in bad) assertNull(GameSetup.decode(b), b)
