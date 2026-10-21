@@ -20,7 +20,7 @@ class TransportTest {
         assertThrows(Exception::class.java) { p.leave("ROOM").join() }
     }
     @Test fun codec() {
-        for (kind in ActionType.entries + CkActionType.entries) for (payload in listOf(0L, 1L, Action.PAYLOAD_MASK)) {
+        for (kind in ActionType.entries + ChivalryActionType.entries) for (payload in listOf(0L, 1L, Action.PAYLOAD_MASK)) {
             val a = Action.of(kind, payload); assertEquals(a, MoveCodec.decode(MoveCodec.encode(a)))
         }
         for (bad in listOf("", "2:ROLL:0", "1:UNKNOWN:0", "1:ROLL:-1", "1:ROLL:+0", "1:ROLL:00", "1:ROLL:9999999999999999999", "1:ROLL:0:0")) assertNull(MoveCodec.decode(bad))
@@ -120,7 +120,7 @@ class TransportTest {
             val store = MemoryStore(); val h = InMemoryTransport("host", store); val p = InMemoryTransport("guest", store)
             val chivalry = seed % 2 == 1
             val count = if (chivalry) 3 + seed % 3 % 2 else 2 + seed % 3
-            val r = room().copy(seed = seed.toLong(), config = GameConfig(expansion = if (chivalry) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE,
+            val r = room().copy(seed = seed.toLong(), config = GameConfig(expansion = if (chivalry) Expansion.CHIVALRY else Expansion.BASE,
                 numPlayers = count, maxTurns = 120, generateTradeOffers = seed % 3 == 0), seats = room().seats.toMutableList().also {
                     it[1] = Seat("guest", "Guest", ready = true)
                     for (i in 2 until count) it[i] = Seat(bot = "GREEDY", open = false)

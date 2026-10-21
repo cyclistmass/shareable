@@ -63,9 +63,9 @@ object Rules {
     /** Distance rule: vertex empty and all neighbours empty. */
     fun isVertexFree(s: GameState, v: Int): Boolean {
         if (s.vertexOwner[v] >= 0) return false
-        // C&K: no settlement on a knight (knights do not count for the distance rule).
-        val ck = s.ck
-        if (ck != null && ck.knightOwner[v] >= 0) return false
+        // Age of Chivalry: no settlement on a knight (knights do not count for the distance rule).
+        val chivalry = s.chivalry
+        if (chivalry != null && chivalry.knightOwner[v] >= 0) return false
         val b = s.board
         for (i in 0 until 3) {
             val n = b.vertexNbr[v * 3 + i]
@@ -79,9 +79,9 @@ object Rules {
         val owner = s.vertexOwner[v]
         if (owner == p) return true
         if (owner >= 0) return false
-        // C&K: an opponent's knight blocks roads like a building.
-        val ck = s.ck
-        if (ck != null && ck.knightOwner[v] >= 0 && ck.knightOwner[v] != p) return false
+        // Age of Chivalry: an opponent's knight blocks roads like a building.
+        val chivalry = s.chivalry
+        if (chivalry != null && chivalry.knightOwner[v] >= 0 && chivalry.knightOwner[v] != p) return false
         return hasRoadAt(s, p, v)
     }
 
@@ -117,7 +117,7 @@ object Rules {
     /** Fills [out] with every legal action for [GameState.actingPlayer] (OFFER_TRADE only if configured). */
     fun legalActions(s: GameState, out: ActionBuffer): ActionBuffer {
         out.clear()
-        if (s.ck != null) return CitiesAndKnights.legalActions(s, out)
+        if (s.chivalry != null) return Chivalry.legalActions(s, out)
         val p = s.actingPlayer
         val b = s.board
         when (s.phase) {
@@ -151,7 +151,7 @@ object Rules {
             Phase.DECIDE_ACCEPTEES -> acceptees(s, out)
 
             Phase.GAME_OVER -> {}
-            else -> {} // C&K-only prompts never occur in base games
+            else -> {} // Age of Chivalry-only prompts never occur in base games
         }
         return out
     }
@@ -246,7 +246,7 @@ object Rules {
         var gives = 0
         var wants = 0
         for (r in 0 until CARD_TYPES) { gives += s.tradeOffer[r]; wants += s.tradeOffer[CARD_TYPES + r] }
-        s.ck?.let { ck -> for (l in 0 until Commodity.COUNT) { gives += ck.offer[l]; wants += ck.offer[Commodity.COUNT + l] } }
+        s.chivalry?.let { chivalry -> for (l in 0 until Commodity.COUNT) { gives += chivalry.offer[l]; wants += chivalry.offer[Commodity.COUNT + l] } }
         return gives > 0 && wants > 0
     }
 
@@ -255,11 +255,11 @@ object Rules {
      * in Age of Chivalry); all zero when [p] can pay or no offer is open.
      */
     fun offerShortfall(s: GameState, p: Int): IntArray {
-        val types = if (s.ck != null) CK_CARD_TYPES else CARD_TYPES
+        val types = if (s.chivalry != null) CHIVALRY_CARD_TYPES else CARD_TYPES
         val out = IntArray(types)
         if (s.phase != Phase.DECIDE_TRADE) return out
         for (c in 0 until types) {
-            val asked = if (c < CARD_TYPES) s.tradeOffer[CARD_TYPES + c] else s.ck!!.offer[Commodity.COUNT + c - CARD_TYPES]
+            val asked = if (c < CARD_TYPES) s.tradeOffer[CARD_TYPES + c] else s.chivalry!!.offer[Commodity.COUNT + c - CARD_TYPES]
             out[c] = maxOf(0, asked - s.card(p, c))
         }
         return out
@@ -294,7 +294,7 @@ object Rules {
      * itself, and both sides must hold what they would hand over.
      */
     fun isValidCounter(s: GameState, a: Action): Boolean {
-        if (s.ck != null || s.phase != Phase.DECIDE_TRADE) return false
+        if (s.chivalry != null || s.phase != Phase.DECIDE_TRADE) return false
         if (a.payload ushr 40 != 0L) return false
         val p = s.actingPlayer
         val o = s.currentPlayer
@@ -344,10 +344,10 @@ object Rules {
 
     fun isLegal(s: GameState, a: Action): Boolean {
         if (s.phase == Phase.DECIDE_TRADE && a.type == ActionType.CANCEL_TRADE) return a.payload == 0L // #114, see [mover]
-        if (s.ck != null) {
+        if (s.chivalry != null) {
             if (a.type == ActionType.OFFER_TRADE || a.type == ActionType.COUNTER_TRADE) return false
-            if (a.type == CkActionType.OFFER_TRADE_CK) return CitiesAndKnights.isValidOffer(s, a)
-            if (a.type == CkActionType.COUNTER_TRADE_CK) return CitiesAndKnights.isValidCounter(s, a)
+            if (a.type == ChivalryActionType.OFFER_TRADE_CK) return Chivalry.isValidOffer(s, a)
+            if (a.type == ChivalryActionType.COUNTER_TRADE_CK) return Chivalry.isValidCounter(s, a)
         }
         if (a.type == ActionType.OFFER_TRADE) return isValidOffer(s, a)
         if (a.type == ActionType.COUNTER_TRADE) return isValidCounter(s, a)
@@ -369,7 +369,7 @@ object Rules {
 
     /** Applies a legal action for [GameState.actingPlayer]. Behaviour is undefined for illegal actions. */
     fun apply(s: GameState, a: Action) {
-        if (s.ck != null) CitiesAndKnights.apply(s, a) else applyBase(s, a)
+        if (s.chivalry != null) Chivalry.apply(s, a) else applyBase(s, a)
         if (s.phase != Phase.GAME_OVER && s.victoryPoints(s.currentPlayer) >= s.config.vpToWin) {
             // Victory is only claimed during your own turn (checked after every action, including turn start).
             s.winner = s.currentPlayer
@@ -735,9 +735,9 @@ object Rules {
     private fun dfs(s: GameState, p: Int, v: Int, used: BooleanArray, start: Boolean): Int {
         val o = s.vertexOwner[v]
         if (!start && o >= 0 && o != p) return 0
-        // C&K: opponents' knights break roads too.
-        val ck = s.ck
-        if (!start && ck != null && ck.knightOwner[v] >= 0 && ck.knightOwner[v] != p) return 0
+        // Age of Chivalry: opponents' knights break roads too.
+        val chivalry = s.chivalry
+        if (!start && chivalry != null && chivalry.knightOwner[v] >= 0 && chivalry.knightOwner[v] != p) return 0
         val b = s.board
         var best = 0
         for (i in 0 until 3) {

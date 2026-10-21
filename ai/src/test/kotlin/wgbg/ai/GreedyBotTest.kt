@@ -26,7 +26,7 @@ class GreedyBotTest {
     @Test
     fun `greedy bots finish Age of Chivalry games without crashing`() {
         repeat(30) { g ->
-            val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 3 + g % 2, maxTurns = 400), g.toLong())
+            val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 3 + g % 2, maxTurns = 400), g.toLong())
             val bots = List(s.numPlayers) { GreedyBot(g * 10L + it) }
             val buf = wgbg.engine.ActionBuffer()
             var steps = 0

@@ -26,7 +26,7 @@ class DiceFairnessTest {
 
     @Test
     fun `online true-random dice are fair over 10,000 throws, event die included`() {
-        for (expansion in listOf(Expansion.BASE, Expansion.CITIES_AND_KNIGHTS)) {
+        for (expansion in listOf(Expansion.BASE, Expansion.CHIVALRY)) {
             val s = atFirstRoll(expansion)
             val hash = s.stateHash()
             val rolls = List(10_000) { rollFromHistory(s, emptyList(), 0) }

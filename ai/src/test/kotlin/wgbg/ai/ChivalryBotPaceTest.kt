@@ -35,7 +35,7 @@ class ChivalryBotPaceTest {
             val buf = ActionBuffer()
             for (g in 0 until games) {
                 val seed = firstSeed + g
-                val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = players, maxTurns = cap), seed)
+                val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = players, maxTurns = cap), seed)
                 val bots = List(players) { GreedyBot(seed * 31 + it) }
                 var steps = 0
                 while (!s.isOver && steps < 500_000) {

@@ -125,7 +125,7 @@ class GameClientTest {
         var moves=0
         repeat(300) { seed ->
             val store=MemoryStore();val h=InMemoryTransport("host",store);val p=InMemoryTransport("guest",store)
-            val expansion=if(seed%2==0) Expansion.BASE else Expansion.CITIES_AND_KNIGHTS
+            val expansion=if(seed%2==0) Expansion.BASE else Expansion.CHIVALRY
             val count=if(expansion==Expansion.BASE)2+seed%3 else 3+seed%2
             val room=r.copy(seed=seed.toLong(),config=GameConfig(expansion=expansion,numPlayers=count,maxTurns=50),
                 seats=List(4){i->when(i){0->r.seats[0];1->r.seats[1];else->Seat(bot=if(i<count)"GREEDY" else null,open=false)}})

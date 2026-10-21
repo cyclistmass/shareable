@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 /**
  * Every Age of Chivalry progress card, played in real mid-game positions: each one does what it says, and
  * afterwards it is still the player's own turn (Mauro, 2026-10-12: "test every card works", after a card seemed
- * to end his turn). Printer and Constitution are revealed, not played; CkRulesTest covers them.
+ * to end his turn). Printer and Constitution are revealed, not played; ChivalryRulesTest covers them.
  */
 class EveryCardTest {
     private val played = IntArray(Progress.COUNT)
@@ -25,46 +25,46 @@ class EveryCardTest {
             if (ready) break
             Rules.legalActions(s, buf)
             // Bots never play progress cards here, so the decks keep every card for the test to deal.
-            val choices = (0 until buf.size).map { buf[it] }.filter { it.type != CkActionType.PLAY_PROGRESS }.ifEmpty { (0 until buf.size).map { buf[it] } }
+            val choices = (0 until buf.size).map { buf[it] }.filter { it.type != ChivalryActionType.PLAY_PROGRESS }.ifEmpty { (0 until buf.size).map { buf[it] } }
             Rules.apply(s, choices[bots[s.actingPlayer].nextInt(choices.size)])
         }
         s.takeIf { !it.isOver && it.currentPlayer == 0 && it.phase == Phase.PLAY_TURN }
     }
 
-    /** Answers prompts (player 0 ends theirs with CK_DONE when it can) until play is back in player 0's main turn. */
+    /** Answers prompts (player 0 ends theirs with CHIVALRY_DONE when it can) until play is back in player 0's main turn. */
     private fun settle(s: GameState, tag: String) {
         var guard = 0
         while (s.phase != Phase.PLAY_TURN && !s.isOver) {
             if (guard++ > 300) throw AssertionError("$tag: stuck in ${s.phase}")
             val legal = Rules.legalActions(s)
-            Rules.applyChecked(s, legal.firstOrNull { it == Action.CK_DONE } ?: legal.first())
+            Rules.applyChecked(s, legal.firstOrNull { it == Action.CHIVALRY_DONE } ?: legal.first())
         }
     }
 
-    private fun knights(s: GameState, p: Int) = s.ck!!.knightOwner.count { it == p }
+    private fun knights(s: GameState, p: Int) = s.chivalry!!.knightOwner.count { it == p }
 
     /** Checks [card]'s effect from [b] (before) to [s] (after) for the play [a]. */
     private fun effect(card: Int, a: Action, b: GameState, s: GameState, tag: String) {
-        val ck = s.ck!!
-        val was = b.ck!!
+        val chivalry = s.chivalry!!
+        val was = b.chivalry!!
         when (card) {
             Progress.ALCHEMIST -> assertEquals(a.b + a.c, s.lastRoll, "$tag: the chosen dice are the roll")
-            Progress.CRANE -> assertEquals(was.trackLevel[a.b] + 1, ck.trackLevel[a.b], "$tag: improved one level")
-            Progress.ENGINEER -> assertEquals(1, ck.wall[a.b], "$tag: Ramparts built")
+            Progress.CRANE -> assertEquals(was.trackLevel[a.b] + 1, chivalry.trackLevel[a.b], "$tag: improved one level")
+            Progress.ENGINEER -> assertEquals(1, chivalry.wall[a.b], "$tag: Ramparts built")
             Progress.INVENTOR -> {
-                assertEquals(was.hexNumber[a.b], ck.hexNumber[a.c], "$tag: numbers swapped")
-                assertEquals(was.hexNumber[a.c], ck.hexNumber[a.b], "$tag: numbers swapped")
-                assertEquals(ck.hexNumber[a.b], s.numberAt(a.b), "$tag: the board shows the new number")
+                assertEquals(was.hexNumber[a.b], chivalry.hexNumber[a.c], "$tag: numbers swapped")
+                assertEquals(was.hexNumber[a.c], chivalry.hexNumber[a.b], "$tag: numbers swapped")
+                assertEquals(chivalry.hexNumber[a.b], s.numberAt(a.b), "$tag: the board shows the new number")
             }
             Progress.IRRIGATION -> assertTrue(s.card(0, Resource.WHEAT) > b.card(0, Resource.WHEAT), "$tag: grain gained")
             Progress.MINING -> assertTrue(s.card(0, Resource.ORE) > b.card(0, Resource.ORE), "$tag: stone gained")
             Progress.MEDICINE -> assertEquals(Piece.CITY, s.vertexBuilding[a.b], "$tag: town built")
             Progress.ROAD_BUILDING -> assertEquals(minOf(2, Rules.piecesLeft(b, 0, Piece.ROAD)), s.freeRoads, "$tag: two free roads")
-            Progress.SMITH -> assertEquals(2, ck.freePromotions, "$tag: two free promotions")
+            Progress.SMITH -> assertEquals(2, chivalry.freePromotions, "$tag: two free promotions")
             Progress.COMMERCIAL_HARBOR -> assertEquals(b.cardCount(0), s.cardCount(0), "$tag: swaps keep your card count")
             Progress.MASTER_MERCHANT -> assertEquals(b.cardCount(0) + minOf(2, b.cardCount(a.b)), s.cardCount(0), "$tag: took up to 2 cards")
-            Progress.MERCHANT -> { assertEquals(a.b, ck.merchantHex, tag); assertEquals(0, ck.merchantOwner, tag) }
-            Progress.MERCHANT_FLEET -> assertTrue(ck.fleetMask and (1 shl a.b) != 0, "$tag: 2:1 for the turn")
+            Progress.MERCHANT -> { assertEquals(a.b, chivalry.merchantHex, tag); assertEquals(0, chivalry.merchantOwner, tag) }
+            Progress.MERCHANT_FLEET -> assertTrue(chivalry.fleetMask and (1 shl a.b) != 0, "$tag: 2:1 for the turn")
             Progress.RESOURCE_MONOPOLY, Progress.TRADE_MONOPOLY -> {
                 val most = if (card == Progress.RESOURCE_MONOPOLY) 2 else 1
                 var expect = b.card(0, a.b)
@@ -78,7 +78,7 @@ class EveryCardTest {
             Progress.BISHOP -> assertEquals(a.b, s.robberHex, "$tag: bandit moved")
             Progress.DESERTER -> assertEquals(knights(b, a.b) - 1, knights(s, a.b), "$tag: a knight deserted")
             Progress.DIPLOMAT -> assertTrue(s.edgeOwner[a.b] < 0 || b.edgeOwner[a.b] == 0, "$tag: road removed")
-            Progress.INTRIGUE -> assertTrue(ck.knightOwner[a.b] != was.knightOwner[a.b] || s.phase != Phase.PLAY_TURN, "$tag: knight chased off")
+            Progress.INTRIGUE -> assertTrue(chivalry.knightOwner[a.b] != was.knightOwner[a.b] || s.phase != Phase.PLAY_TURN, "$tag: knight chased off")
             Progress.SABOTEUR -> {
                 val mine = b.victoryPoints(0)
                 for (q in 1 until s.numPlayers) if (b.victoryPoints(q) >= mine)
@@ -88,11 +88,11 @@ class EveryCardTest {
             Progress.SPY -> {
                 // You give up the Spy and take one of the target's progress cards (Printer and Constitution are never held).
                 val took = if (was.progressCount(a.b) > 0) 1 else 0
-                assertEquals(was.progressCount(0) - 1 + took, ck.progressCount(0), "$tag: a card taken")
-                assertEquals(was.progressCount(a.b) - took, ck.progressCount(a.b), "$tag: the target lost it")
+                assertEquals(was.progressCount(0) - 1 + took, chivalry.progressCount(0), "$tag: a card taken")
+                assertEquals(was.progressCount(a.b) - took, chivalry.progressCount(a.b), "$tag: the target lost it")
             }
             Progress.WARLORD -> {
-                for (v in 0 until s.board.vertexCount) if (ck.knightOwner[v] == 0) assertTrue(ck.isActive(v), "$tag: knight $v active")
+                for (v in 0 until s.board.vertexCount) if (chivalry.knightOwner[v] == 0) assertTrue(chivalry.isActive(v), "$tag: knight $v active")
                 assertTrue((0 until s.board.vertexCount).any { was.knightOwner[it] == 0 && !was.isActive(it) }, "$tag: a knight was raised")
             }
             Progress.WEDDING -> assertTrue(s.cardCount(0) > b.cardCount(0), "$tag: gifts received")
@@ -101,7 +101,7 @@ class EveryCardTest {
     }
 
     /** Every player's card count and every knight's flags: what the no-target cards can change. */
-    private fun footprint(s: GameState) = (0 until s.numPlayers).map { s.cardCount(it) } + s.ck!!.knightFlags.toList()
+    private fun footprint(s: GameState) = (0 until s.numPlayers).map { s.cardCount(it) } + s.chivalry!!.knightFlags.toList()
 
     @Test
     fun `a no-target card is offered exactly when it would do something`() {
@@ -110,9 +110,9 @@ class EveryCardTest {
         val seen = HashSet<Pair<Int, Boolean>>()
         for ((i, start) in positions(beforeRoll = false).withIndex()) for (card in cards) for (emptyBank in listOf(false, true)) {
             val base = start.copy()
-            if (base.ck!!.progressHand[card] > 0 || runCatching { CK.giveProgress(base, 0, card) }.isFailure) continue
+            if (base.chivalry!!.progressHand[card] > 0 || runCatching { CK.giveProgress(base, 0, card) }.isFailure) continue
             if (emptyBank) for (r in 0 until Resource.COUNT) base.bank[r] = 0      // nothing left to hand out
-            val playable = CitiesAndKnights.progressHasEffect(base, 0, card)
+            val playable = Chivalry.progressHasEffect(base, 0, card)
             val s = base.copy()
             Rules.apply(s, Action.playProgress(card))                             // played anyway, to see what it does
             settle(s, "${Progress.NAMES[card]} position $i")
@@ -134,13 +134,13 @@ class EveryCardTest {
                 val base = start.copy()
                 // Plenty to pay with (Medicine costs 2 stone and a grain) and a card to play.
                 for (r in 0 until CARD_TYPES) CK.give(base, 0, r, minOf(3, base.bank[r]))
-                if (base.ck!!.deckSize[Progress.track(card)] == 0 || base.ck!!.progressHand[card] > 0) continue
+                if (base.chivalry!!.deckSize[Progress.track(card)] == 0 || base.chivalry!!.progressHand[card] > 0) continue
                 if (runCatching { CK.giveProgress(base, 0, card) }.isFailure) continue // every copy is in a hand
-                val plays = Rules.legalActions(base).filter { it.type == CkActionType.PLAY_PROGRESS && it.a == card && CitiesAndKnights.progressHasEffect(base, 0, card) }
+                val plays = Rules.legalActions(base).filter { it.type == ChivalryActionType.PLAY_PROGRESS && it.a == card && Chivalry.progressHasEffect(base, 0, card) }
                 for (a in plays.take(6)) {
                     val tag = "${Progress.NAMES[card]} position $i $a"
                     val s = base.copy()
-                    val held = s.ck!!.progressHand[card]
+                    val held = s.chivalry!!.progressHand[card]
                     Rules.applyChecked(s, a)
                     settle(s, tag)
                     if (s.isOver) continue
@@ -151,12 +151,12 @@ class EveryCardTest {
                     var roads = 0
                     while (s.freeRoads > 0 && roads++ < 3) Rules.applyChecked(s, Rules.legalActions(s).first { it.type == ActionType.BUILD_ROAD })
                     // The Smith's free promotions end with Done.
-                    if (Action.CK_DONE in Rules.legalActions(s)) Rules.applyChecked(s, Action.CK_DONE)
+                    if (Action.CHIVALRY_DONE in Rules.legalActions(s)) Rules.applyChecked(s, Action.CHIVALRY_DONE)
                     val legal = Rules.legalActions(s)
                     assertFalse(legal.any { it.type == ActionType.ROLL }, "$tag: no second roll")
                     assertTrue(Action.END_TURN in legal, "$tag: I end my own turn")
                     // The Transmuter can draw its twin on the roll, the Spy can steal one.
-                    if (card != Progress.ALCHEMIST && card != Progress.SPY) assertEquals(held - 1, s.ck!!.progressHand[card], "$tag: the card is used up")
+                    if (card != Progress.ALCHEMIST && card != Progress.SPY) assertEquals(held - 1, s.chivalry!!.progressHand[card], "$tag: the card is used up")
                     CK.checkInvariants(s)
                     played[card]++
                 }

@@ -57,7 +57,7 @@ class LocalSaveTest {
             while (!s.isOver && made.size < 400) {
                 Rules.legalActions(s, buf)
                 var a = bots[s.actingPlayer].choose(s, buf)
-                if (a.type == ActionType.ROLL) a = dice.next(withEvent = s.ck != null).toAction()
+                if (a.type == ActionType.ROLL) a = dice.next(withEvent = s.chivalry != null).toAction()
                 val who = Rules.mover(s, a) // as the game loop does
                 live.apply(s, who, a) { Rules.apply(s, a) }; made += a
             }

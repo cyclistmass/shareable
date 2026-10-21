@@ -8,7 +8,7 @@ import wgbg.ai.GreedyBot
 import wgbg.engine.Action
 import wgbg.engine.ActionBuffer
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CK_CARD_TYPES
+import wgbg.engine.CHIVALRY_CARD_TYPES
 import wgbg.engine.Commodity
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
@@ -27,10 +27,10 @@ class AutoNoTest {
         val buf = ActionBuffer()
         val bots = List(3) { GreedyBot(it.toLong()) }
         while (s.phase != Phase.PLAY_TURN) { Rules.legalActions(s, buf); Rules.apply(s, bots[s.actingPlayer].choose(s, buf)) }
-        Rules.apply(s, Action.roll(2, 2, if (s.ck != null) 0 else -1))
+        Rules.apply(s, Action.roll(2, 2, if (s.chivalry != null) 0 else -1))
         while (s.phase != Phase.PLAY_TURN) { Rules.legalActions(s, buf); Rules.apply(s, bots[s.actingPlayer].choose(s, buf)) }
         for (p in 0 until 3) for (c in 0 until tradeCards(s)) {
-            if (c < CARD_TYPES) s.hands[p * CARD_TYPES + c] = 0 else s.ck!!.commodities[p * Commodity.COUNT + c - CARD_TYPES] = 0
+            if (c < CARD_TYPES) s.hands[p * CARD_TYPES + c] = 0 else s.chivalry!!.commodities[p * Commodity.COUNT + c - CARD_TYPES] = 0
         }
         return s
     }
@@ -49,11 +49,11 @@ class AutoNoTest {
 
     @Test
     fun `Age of Chivalry - a missing commodity is named too`() {
-        val s = playing(Expansion.CITIES_AND_KNIGHTS)
+        val s = playing(Expansion.CHIVALRY)
         val from = s.currentPlayer; val to = (from + 1) % 3
         s.hands[from * CARD_TYPES + Resource.WOOD] = 1
-        val get = IntArray(CK_CARD_TYPES).also { it[Commodity.COIN] = 1 }
-        Rules.applyChecked(s, offerFor(s, IntArray(CK_CARD_TYPES).also { it[Resource.WOOD] = 1 }, get)!!)
+        val get = IntArray(CHIVALRY_CARD_TYPES).also { it[Commodity.COIN] = 1 }
+        Rules.applyChecked(s, offerFor(s, IntArray(CHIVALRY_CARD_TYPES).also { it[Resource.WOOD] = 1 }, get)!!)
         assertTrue(Rules.cantPayOffer(s, to))
         assertEquals("1 Silver", shortfallText(s, to))
     }
@@ -91,7 +91,7 @@ class AutoNoTest {
         val buf = ActionBuffer()
         var lines = 0
         for (seed in 1..40L) {
-            val s = Rules.newGame(GameConfig(expansion = if (seed % 2 == 0L) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE, numPlayers = 3), seed)
+            val s = Rules.newGame(GameConfig(expansion = if (seed % 2 == 0L) Expansion.CHIVALRY else Expansion.BASE, numPlayers = 3), seed)
             val bots = List(3) { GreedyBot(seed * 3 + it) }
             val tracker = TurnTracker(names)
             var moves = 0

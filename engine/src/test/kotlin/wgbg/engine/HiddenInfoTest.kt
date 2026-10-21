@@ -71,12 +71,12 @@ class HiddenInfoTest {
 
     @Test
     fun `steals the viewer didn't see are resampled - hand sizes and card totals stay exact`() {
-        for (exp in listOf(Expansion.BASE, Expansion.CITIES_AND_KNIGHTS)) {
+        for (exp in listOf(Expansion.BASE, Expansion.CHIVALRY)) {
             var changed = 0; var tried = 0
             for (seed in 0L until 40L) {
                 val s = withUnseenSteal(exp, 0, seed) ?: continue
                 tried++
-                val types = if (s.ck != null) CK_CARD_TYPES else Resource.COUNT
+                val types = if (s.chivalry != null) CHIVALRY_CARD_TYPES else Resource.COUNT
                 for (k in 0 until 5) {
                     val d = HiddenInfo.determinize(s, 0, seed * 7 + k)
                     for (p in 0 until s.numPlayers) assertEquals(s.cardCount(p), d.cardCount(p), "$exp hand size of $p")

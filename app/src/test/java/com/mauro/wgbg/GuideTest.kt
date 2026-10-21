@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import wgbg.engine.Cost
-import wgbg.engine.CkCost
+import wgbg.engine.ChivalryCost
 
 class GuideTest {
     @Test
@@ -13,10 +13,10 @@ class GuideTest {
         val base = buildCosts(chivalry = false)
         assertEquals(listOf("Road", "Homestead", "Town", "Fortune card"), base.map { it.name })
         assertArrayEquals(Cost.SETTLEMENT, base[1].cards)
-        val ck = buildCosts(chivalry = true)
-        assertTrue("Fortune card" !in ck.map { it.name }, "no Fortune cards in Age of Chivalry")
-        assertArrayEquals(CkCost.WALL, ck.first { it.name == "Ramparts" }.cards)
-        for (b in base + ck) assertTrue(b.cards.sum() > 0 && b.cards.size <= ALL_CARD_ART.size, b.name)
+        val chivalry = buildCosts(chivalry = true)
+        assertTrue("Fortune card" !in chivalry.map { it.name }, "no Fortune cards in Age of Chivalry")
+        assertArrayEquals(ChivalryCost.WALL, chivalry.first { it.name == "Ramparts" }.cards)
+        for (b in base + chivalry) assertTrue(b.cards.sum() > 0 && b.cards.size <= ALL_CARD_ART.size, b.name)
     }
 
     @Test

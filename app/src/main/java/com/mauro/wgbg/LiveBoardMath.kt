@@ -256,9 +256,9 @@ internal fun liveLift(tilt: Float): Float = (PI.toFloat() / 2f - LIVE_PIECE_VIEW
  * `_inactive` for a knight that isn't activated. Exported by Crest with the base contact at the origin, 1 = hex side.
  */
 internal fun liveKnightModel(s: GameState, v: Int, pirate: Boolean): String? {
-    val ck = s.ck ?: return null
-    if (ck.knightOwner[v] < 0) return null
-    return "${if (pirate) "pirate" else "default"}_knight_l${ck.knightLevel[v].coerceIn(1, 3)}" + if (ck.isActive(v)) "" else "_inactive"
+    val chivalry = s.chivalry ?: return null
+    if (chivalry.knightOwner[v] < 0) return null
+    return "${if (pirate) "pirate" else "default"}_knight_l${chivalry.knightLevel[v].coerceIn(1, 3)}" + if (chivalry.isActive(v)) "" else "_inactive"
 }
 
 /** The Merchant pawn's model (the only one so far; a theme adds its own `<theme>_merchant`). */
@@ -305,8 +305,8 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     }
     if (s.robberHex >= 0) add(LivePlacement("bandit", liveHex(b, s.robberHex) + LIVE_PLATE, 0.012f))
     // The Merchant pawn (#112), lower left on its tile, at the buildings' scale; the overlay draws it without the model.
-    s.ck?.takeIf { it.merchantHex >= 0 && it.merchantOwner >= 0 && hasModel(LIVE_MERCHANT) }?.let { ck ->
-        add(LivePlacement(LIVE_MERCHANT, liveHex(b, ck.merchantHex) + MERCHANT_SPOT, scale = BUILDING_SCALE, owner = ck.merchantOwner))
+    s.chivalry?.takeIf { it.merchantHex >= 0 && it.merchantOwner >= 0 && hasModel(LIVE_MERCHANT) }?.let { chivalry ->
+        add(LivePlacement(LIVE_MERCHANT, liveHex(b, chivalry.merchantHex) + MERCHANT_SPOT, scale = BUILDING_SCALE, owner = chivalry.merchantOwner))
     }
     for (e in 0 until b.edgeCount) {
         val owner = s.edgeOwner[e]
@@ -322,10 +322,10 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         val owner = s.vertexOwner[v]
         if (owner < 0) continue
         val at = liveVertex(b, v)
-        val ck = s.ck
-        val walled = ck?.wall?.get(v) == 1
+        val chivalry = s.chivalry
+        val walled = chivalry?.wall?.get(v) == 1
         if (walled) add(LivePlacement("${theme}_ramparts", at, scale = BUILDING_SCALE, owner = owner))
-        val metro = ck?.metroVertex?.indexOf(v) ?: -1
+        val metro = chivalry?.metroVertex?.indexOf(v) ?: -1
         val kind = when {
             metro >= 0 -> liveCapital(metro)
             s.vertexBuilding[v] == Piece.CITY -> "town"
@@ -336,7 +336,7 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     }
     for (v in 0 until b.vertexCount) {
         val model = liveKnightModel(s, v, knightsPirate)?.takeIf(hasModel) ?: continue
-        val owner = s.ck!!.knightOwner[v]
+        val owner = s.chivalry!!.knightOwner[v]
         add(LivePlacement(KNIGHT_RING, liveVertex(b, v), scale = KNIGHT_RING_SCALE, owner = owner))
         add(LivePlacement(KNIGHT_BAND, liveVertex(b, v), KNIGHT_BAND_HEIGHT, KNIGHT_BAND_SCALE))
         add(LivePlacement(model, liveVertex(b, v), KNIGHT_ON_BASE, LIVE_KNIGHT_MODEL_SCALE, owner = owner))

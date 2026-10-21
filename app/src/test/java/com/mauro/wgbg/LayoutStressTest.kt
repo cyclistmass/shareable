@@ -11,24 +11,24 @@ import java.io.File
 
 /** The debug stress state tools/ci_layout.sh checks the player list with: it must really be the fullest list. */
 class LayoutStressTest {
-    private fun game(ck: Boolean, n: Int = 4) =
-        Rules.newGame(GameConfig(expansion = if (ck) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE, numPlayers = n), 3)
+    private fun game(chivalry: Boolean, n: Int = 4) =
+        Rules.newGame(GameConfig(expansion = if (chivalry) Expansion.CHIVALRY else Expansion.BASE, numPlayers = n), 3)
 
     @Test
     fun `everyone gets double-digit counts and player 0 every badge, one point short of winning`() {
-        for (ck in listOf(false, true)) for (n in 3..4) {
-            val s = game(ck, n); layoutStress(s, discard = false)
+        for (chivalry in listOf(false, true)) for (n in 3..4) {
+            val s = game(chivalry, n); layoutStress(s, discard = false)
             for (p in 0 until n) {
                 assertTrue(s.cardCount(p) >= 10, "cards of $p")
                 assertTrue(s.roadLength[p] >= 10, "road of $p")
-                if (!ck) assertTrue(knightsShown(s, p) >= 10, "knights of $p")
+                if (!chivalry) assertTrue(knightsShown(s, p) >= 10, "knights of $p")
             }
             assertEquals(0, s.longestRoadOwner)
-            if (!ck) assertEquals(0, s.largestArmyOwner)
+            if (!chivalry) assertEquals(0, s.largestArmyOwner)
             // One short of winning, so the scripted moves after it don't end the game (0.3.4: the offer step met the end screen).
             assertEquals(s.config.vpToWin - 1, s.victoryPoints(0))
-            if (ck) assertTrue(s.victoryPoints(0) >= 10, "two-digit score")
-            if (ck) {
+            if (chivalry) assertTrue(s.victoryPoints(0) >= 10, "two-digit score")
+            if (chivalry) {
                 assertTrue(cardsLabel(s, 0).length >= 4, "cards/progress like 20/4: ${cardsLabel(s, 0)}")
                 // The Raiders warning line shows on player 0's turn.
                 s.currentPlayer = 0
@@ -39,8 +39,8 @@ class LayoutStressTest {
 
     @Test
     fun `discard leaves player 0 owing half, as after a rolled 7`() {
-        for (ck in listOf(false, true)) {
-            val s = game(ck); layoutStress(s, discard = true)
+        for (chivalry in listOf(false, true)) {
+            val s = game(chivalry); layoutStress(s, discard = true)
             assertEquals(Phase.DISCARD, s.phase)
             assertEquals(0, s.actingPlayer)
             assertEquals(s.cardCount(0) / 2, s.discardOwed[0])

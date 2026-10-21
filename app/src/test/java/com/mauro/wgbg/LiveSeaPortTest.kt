@@ -21,8 +21,8 @@ class LiveSeaPortTest {
 
     @Test
     fun `the painted 3D board floats on the animated water with surf on every coast edge, and no flat sea under it`() {
-        for (ck in listOf(false, true)) for (pirate in listOf(false, true)) {
-            val s = Rules.newGame(GameConfig(expansion = if (ck) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE), 5L)
+        for (chivalry in listOf(false, true)) for (pirate in listOf(false, true)) {
+            val s = Rules.newGame(GameConfig(expansion = if (chivalry) Expansion.CHIVALRY else Expansion.BASE), 5L)
             val models = themedLivePlacements(s, ArtChoice(if (pirate) ArtSet.PIRATE else ArtSet.DEFAULT), 0) { true }.map { it.model }
             assertEquals(1, models.count { it == "live_water_mesh" })
             assertEquals(30, models.count { it == "coast_a" })
@@ -33,7 +33,7 @@ class LiveSeaPortTest {
 
     @Test
     fun `a Space board keeps its starfield - no water, surf, boats or gulls from the painted sea`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5L)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5L)
         val models = themedLivePlacements(s, ArtChoice(ArtSet.SPACE), 0) { true }.map { it.model }
         assertTrue(models.none { it == "live_water_mesh" || it == "coast_a" || it == "sea" }, models.filter { "sea" in it || "coast" in it }.toString())
         val call = main.substringAfter("LiveBoardView(placements").substringBefore("{ reason ->")

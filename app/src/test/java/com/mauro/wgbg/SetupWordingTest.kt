@@ -16,7 +16,7 @@ import wgbg.engine.Rules
 class SetupWordingTest {
     @Test
     fun `setup asks for a homestead, then in Age of Chivalry for a town on an empty corner, never an upgrade`() {
-        for (expansion in listOf(Expansion.BASE, Expansion.CITIES_AND_KNIGHTS)) {
+        for (expansion in listOf(Expansion.BASE, Expansion.CHIVALRY)) {
             val s = Rules.newGame(GameConfig(expansion, numPlayers = 3), 5)
             val bots = List(3) { GreedyBot(it.toLong()) }
             val buf = ActionBuffer()

@@ -31,11 +31,11 @@ class CardTesterTest {
         assertEquals(fresh.devDeck.sum(), s.devDeck.sum() + s.devHand.sum() + s.devPlayed.sum(), "$id: Fortune cards")
         for (p in 0 until s.numPlayers) for (piece in 0 until Piece.COUNT)
             assertEquals(fresh.piecesLeft[p * Piece.COUNT + piece], s.piecesOnBoard(p, piece) + Rules.piecesLeft(s, p, piece), "$id: player $p piece $piece")
-        val ck = s.ck ?: return
-        val fck = fresh.ck!!
+        val chivalry = s.chivalry ?: return
+        val fck = fresh.chivalry!!
         for (l in 0 until Commodity.COUNT)
-            assertEquals(fck.commodityBank[l], ck.commodityBank[l] + (0 until s.numPlayers).sumOf { ck.commodities[it * Commodity.COUNT + l] }, "$id: commodity $l")
-        assertEquals(fck.deckSize.sum(), ck.deckSize.sum() + ck.progressHand.sum() + ck.progressVp.sum(), "$id: progress cards")
+            assertEquals(fck.commodityBank[l], chivalry.commodityBank[l] + (0 until s.numPlayers).sumOf { chivalry.commodities[it * Commodity.COUNT + l] }, "$id: commodity $l")
+        assertEquals(fck.deckSize.sum(), chivalry.deckSize.sum() + chivalry.progressHand.sum() + chivalry.progressVp.sum(), "$id: progress cards")
     }
 
     @Test
@@ -55,7 +55,7 @@ class CardTesterTest {
             assertEquals(Phase.PLAY_TURN, s.phase, sc.id)
             assertEquals(0, s.currentPlayer); assertEquals(0, s.actingPlayer)
             assertFalse(s.isOver)
-            assertEquals(sc.chivalry, s.ck != null)
+            assertEquals(sc.chivalry, s.chivalry != null)
             assertConserved(sc.id, s)
             assertTrue(p.howTo.isNotBlank() && p.expect.isNotBlank(), sc.id)
             assertTrue(p.facts.isNotEmpty(), sc.id)

@@ -20,19 +20,19 @@ internal const val LIVE_KNIGHT_SHARE = 0.49f
 /** Knight sprites (where no model is loaded) remain screen overlays for this prototype. */
 internal fun DrawScope.drawLiveOverlay(s: GameState, p: LiveProjection, knights: List<ImageBitmap>, merchantModel: Boolean = false,
                                        top: Float = 0f, knightModel: (Int) -> Boolean = { false }) {
-    val ck = s.ck
-    if (ck != null) for (v in 0 until s.board.vertexCount) {
-        val owner = ck.knightOwner[v]
+    val chivalry = s.chivalry
+    if (chivalry != null) for (v in 0 until s.board.vertexCount) {
+        val owner = chivalry.knightOwner[v]
         if (owner < 0 || knightModel(v)) continue   // drawn as a 3D model instead
         val at = p.project(liveVertex(s.board, v), top)
         val size = p.scale * KNIGHT_SCALE * LIVE_KNIGHT_SHARE
-        val image = knights.getOrNull((ck.knightLevel[v].coerceIn(1, 3) - 1) * 2 + if (ck.isActive(v)) 1 else 0)
+        val image = knights.getOrNull((chivalry.knightLevel[v].coerceIn(1, 3) - 1) * 2 + if (chivalry.isActive(v)) 1 else 0)
         drawCircle(PLAYER_COLORS[owner], size * .22f, at)
         if (image != null) drawImage(image, dstOffset = IntOffset((at.x - size / 2).roundToInt(), (at.y - size * .92f).roundToInt()),
             dstSize = IntSize(size.roundToInt(), size.roundToInt()))
     }
-    if (ck != null && ck.merchantHex >= 0 && ck.merchantOwner >= 0 && !merchantModel)   // the Merchant (#112), on the tile, lower left
-        drawMerchantToken(p.project(liveHex(s.board, ck.merchantHex) + MERCHANT_SPOT, top), p.scale, cos(p.tilt), PLAYER_COLORS[ck.merchantOwner])
+    if (chivalry != null && chivalry.merchantHex >= 0 && chivalry.merchantOwner >= 0 && !merchantModel)   // the Merchant (#112), on the tile, lower left
+        drawMerchantToken(p.project(liveHex(s.board, chivalry.merchantHex) + MERCHANT_SPOT, top), p.scale, cos(p.tilt), PLAYER_COLORS[chivalry.merchantOwner])
     // Harbours: the flat board's shallows, piers and buoys, projected (drawLivePorts in MainActivity.kt, #104).
 }
 

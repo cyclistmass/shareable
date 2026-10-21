@@ -130,12 +130,17 @@ object Expired {
     fun latest(room: Long?, lastMove: Long?): Long? = listOfNotNull(room, lastMove).maxOrNull()
 }
 
-/** v1 deliberately uses type names, not enum ordinals, on the wire. */
+/**
+ * v1 deliberately uses type names, not enum ordinals, on the wire. A kind renamed since keeps its old name there (#84:
+ * CHIVALRY_DONE goes as "CK_DONE"), so saves and rooms read the same in every version; decode takes either name.
+ */
 object MoveCodec {
-    fun encode(a: Action): String { require(Action.isKnownType(a.typeId)); return "1:${a.type}:${a.payload}" }
+    private val OLD_NAMES = mapOf<Any, String>(ChivalryActionType.CHIVALRY_DONE to "CK_DONE")
+    fun wireName(kind: Any): String = OLD_NAMES[kind] ?: kind.toString()
+    fun encode(a: Action): String { require(Action.isKnownType(a.typeId)); return "1:${wireName(a.type)}:${a.payload}" }
     fun decode(text: String): Action? = runCatching {
         val p = text.split(':'); require(p.size == 3 && p[0] == "1")
-        val kind = (ActionType.entries + CkActionType.entries).first { it.toString() == p[1] }
+        val kind = (ActionType.entries + ChivalryActionType.entries).first { wireName(it) == p[1] || it.toString() == p[1] }
         val payload = p[2].toLong(); require(payload in 0..Action.PAYLOAD_MASK && p[2] == payload.toString())
         Action.of(kind, payload)
     }.getOrNull()
@@ -201,12 +206,12 @@ class SyncDriver {
 
 fun rollFromHistory(s: GameState, actions: List<Action>, decks: Int, rng: SecureRandom = SecureRandom()): Action {
     require(Rules.isLegal(s, Action.ROLL))
-    val roll = if (decks == 0) TrueRandomDice(rng).next(s.config.citiesAndKnights) else {
+    val roll = if (decks == 0) TrueRandomDice(rng).next(s.config.chivalry) else {
         val drawn = actions.filter { it.type == ActionType.ROLL }.map {
             require(it.payload != 0L) { "Deck games require explicit dice in every roll" }
             DiceDeck.cardOf(it.a, it.b)
         }
-        DiceDeck.nextFromLog(drawn, decks, rng = rng).copy(event = if (s.config.citiesAndKnights) rng.nextInt(6) else -1)
+        DiceDeck.nextFromLog(drawn, decks, rng = rng).copy(event = if (s.config.chivalry) rng.nextInt(6) else -1)
     }
     return roll.toAction()
 }

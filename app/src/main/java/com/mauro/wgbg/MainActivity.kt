@@ -745,8 +745,8 @@ fun WatchGameScreen(
     // Decoded in the background (#111): until the fixed art and the theme's buildings are ready the game shows a light
     // first frame instead of decoding them all on the main thread before its window can come up.
     val art = rememberLoaded(oceanRes) { GameArt.load(oceanRes) }
-    val buildingsLoaded = rememberLoaded(oceanRes, env.art, state.ck != null, inventory) {
-        BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.ck != null || inventory, env.art.pirate(ArtObject.KNIGHTS), env.art)
+    val buildingsLoaded = rememberLoaded(oceanRes, env.art, state.chivalry != null, inventory) {
+        BuildingSprites(oceanRes, env.art.pirate(ArtObject.BUILDINGS), state.chivalry != null || inventory, env.art.pirate(ArtObject.KNIGHTS), env.art)
     }
     // The V3 3D tiles (Settings › Tiles › 3D preview): loaded only when chosen.
     val tiles3dLoaded = rememberLoaded(oceanRes, env.tiles3d) { Tile3dArt.TERRAINS.takeIf { env.tiles3d }?.map { t -> t.map { ImageBitmap.imageResource(oceanRes, it) } } ?: emptyList() }
@@ -814,11 +814,11 @@ fun WatchGameScreen(
     // Answers to your trade offers, shown as marks by each name in the trade panel.
     fun noteResponse(who: Int, action: Action) {
         if (me >= 0 && state.currentPlayer == me) when {
-            action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.CkActionType.OFFER_TRADE_CK || action.type == ActionType.END_TURN -> responses.clear()
+            action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.ChivalryActionType.OFFER_TRADE_CK || action.type == ActionType.END_TURN -> responses.clear()
             who != me && state.phase == Phase.DECIDE_TRADE -> when (action.type) {
                 ActionType.ACCEPT_TRADE -> responses[who] = "✓"
                 ActionType.REJECT_TRADE -> responses[who] = "✗"
-                ActionType.COUNTER_TRADE, wgbg.engine.CkActionType.COUNTER_TRADE_CK -> responses[who] = "⇄"
+                ActionType.COUNTER_TRADE, wgbg.engine.ChivalryActionType.COUNTER_TRADE_CK -> responses[who] = "⇄"
                 else -> {}
             }
         }
@@ -848,7 +848,7 @@ fun WatchGameScreen(
                 withdraw ?: bots[who].choose(state, buf)
             }
             // Real dice: thrown by the OS's secure generator (or dealt from the deck) and recorded in the log.
-            if (action.type == ActionType.ROLL) action = dice.next(withEvent = state.ck != null).toAction()
+            if (action.type == ActionType.ROLL) action = dice.next(withEvent = state.chivalry != null).toAction()
             val by = Rules.mover(state, action) // #114: a withdraw comes from the offerer, not the player who is up
             noteResponse(by, action)
             tracker.apply(state, by, action) { Rules.apply(state, action) }
@@ -860,7 +860,7 @@ fun WatchGameScreen(
                 liveFreezeTurn = 0
                 android.util.Log.i("WGBG-3D-SNAPSHOT", "turn=${state.turn} hash=${state.stateHash()} " +
                     "roads=${state.edgeOwner.count { it >= 0 }} buildings=${state.vertexOwner.count { it >= 0 }} " +
-                    "towns=${state.vertexBuilding.count { it == Piece.CITY }} walls=${state.ck?.wall?.sum()} capitals=${state.ck?.metroVertex?.count { it >= 0 }}")
+                    "towns=${state.vertexBuilding.count { it == Piece.CITY }} walls=${state.chivalry?.wall?.sum()} capitals=${state.chivalry?.metroVertex?.count { it >= 0 }}")
                 if (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
                     val snapshot = org.json.JSONObject().apply {
                         put("turn", state.turn); put("hash", state.stateHash().toString())
@@ -897,7 +897,7 @@ fun WatchGameScreen(
             saveStore?.clear() // a finished game has nothing to resume
             wins[if (state.winner >= 0) state.winner else 4]++
             // One line per finished game: CI self-play counts these and checks every game ends (#46).
-            runCatching { android.util.Log.i("WGBG-GAME", "over ruleset=${if (state.ck != null) "chivalry" else "base"} winner=${state.winner} turns=${state.turn} hash=${state.stateHash()}") }
+            runCatching { android.util.Log.i("WGBG-GAME", "over ruleset=${if (state.chivalry != null) "chivalry" else "base"} winner=${state.winner} turns=${state.turn} hash=${state.stateHash()}") }
             tick++
             if (speed == MAX_SPEED && playing && !human && !oneGame) seed++ // straight into the next game
         }
@@ -1207,7 +1207,7 @@ fun WatchGameScreen(
             androidx.compose.runtime.key(PLAYER_COLORS) {
             LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating,
                 projectionNow = { if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null },
-                sea = sea.takeIf { !inventory && !env.art.space(ArtObject.BOARD) }, raiders = state.ck != null) { reason ->
+                sea = sea.takeIf { !inventory && !env.art.space(ArtObject.BOARD) }, raiders = state.chivalry != null) { reason ->
                 liveFailure = reason; env.liveBoard = false
                 android.widget.Toast.makeText(appContext, "3D board unavailable; using the sprite board", android.widget.Toast.LENGTH_LONG).show()
             }
@@ -1465,7 +1465,7 @@ fun WatchGameScreen(
                   .brassEdgedWood(woodAlpha = if (env.seeThrough) 0.4f else 1f))
               if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
                   TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
-                      eventDie = state.ck != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
+                      eventDie = state.chivalry != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
                       width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false })
               }
               if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
@@ -1499,7 +1499,7 @@ fun WatchGameScreen(
               if (!state.isOver) TurnPrompt(tapHint ?: prompt(state, legal, names),
                   Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 8.dp))
               // The hand row steps aside while a card sheet (a 7's discard, a card to pick) covers the bottom centre.
-              val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.CkActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
+              val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
               if (!tradeOpen && !tradeNeedsMe(state, me) && !cardSheet) HandRow(state, me, tick,
                   // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
                   // It starts at the side panel's edge, not a fixed 384 dp, which left one card's room on a 640 dp screen.
@@ -1627,7 +1627,7 @@ fun WatchGameScreen(
         // Settings open from the gear inside the Menu, so the board stays clean.
         if (histogramOpen) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // Copies, so each move's new counts reach the screen (the arrays themselves never change identity).
-            tick.let { DiceHistogram(tracker.rollCounts.copyOf(), tracker.eventCounts.copyOf(), state.ck != null, onClose = { histogramOpen = false }) }
+            tick.let { DiceHistogram(tracker.rollCounts.copyOf(), tracker.eventCounts.copyOf(), state.chivalry != null, onClose = { histogramOpen = false }) }
         }
         if (feedbackOpen) {
             BackHandler { feedbackOpen = false; reportShot = null }
@@ -1639,7 +1639,7 @@ fun WatchGameScreen(
                 shot = reportShot, onClose = { feedbackOpen = false; reportShot = null })
         }
         if (guideOpen) Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-            CardGuide(state.ck != null, env.art.pirate(ArtObject.KNIGHTS), onClose = { guideOpen = false })
+            CardGuide(state.chivalry != null, env.art.pirate(ArtObject.KNIGHTS), onClose = { guideOpen = false })
         }
         // Pause, speed and Watch bots live under the gear (Mauro, 2026-10-12); local games only, not on Look & art.
         if (settingsOpen) SettingsPanel(env, sound,
@@ -1736,7 +1736,7 @@ fun WatchGameScreen(
         val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen || confirmWatch
         if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && !sheetOpen && tick.let {
                 (state.phase == Phase.PLAY_TURN && state.currentPlayer == me || inSetup(state)) && state.actingPlayer == me })
-            BuildMenu(state.ck != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
+            BuildMenu(state.chivalry != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
                 Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
         // Zoom, Tilt and Turn bars on the right edge, only when switched on under the gear (#137, Mauro: gestures by
         // default). Pinch zooms, two-finger drag tilts and a two-finger twist turns the 3D board without them.
@@ -1934,26 +1934,26 @@ internal fun describe(t: ActionKind) = when (t) {
     ActionType.DISCARD -> "discarded"
     ActionType.CONFIRM_TRADE -> "traded"
     ActionType.CANCEL_TRADE -> "withdrew the trade offer"
-    ActionType.COUNTER_TRADE, wgbg.engine.CkActionType.COUNTER_TRADE_CK -> "made a counter-offer"
+    ActionType.COUNTER_TRADE, wgbg.engine.ChivalryActionType.COUNTER_TRADE_CK -> "made a counter-offer"
     // Age of Chivalry, in our words (the history said "Red build knight").
-    wgbg.engine.CkActionType.BUILD_KNIGHT -> "raised a knight"
-    wgbg.engine.CkActionType.ACTIVATE_KNIGHT -> "supplied a knight"
-    wgbg.engine.CkActionType.PROMOTE_KNIGHT -> "promoted a knight"
-    wgbg.engine.CkActionType.MOVE_KNIGHT -> "moved a knight"
-    wgbg.engine.CkActionType.DISPLACE_KNIGHT -> "chased off a knight"
-    wgbg.engine.CkActionType.CHASE_ROBBER -> "chased the bandit away"
-    wgbg.engine.CkActionType.BUILD_CITY_WALL -> "built Ramparts"
-    wgbg.engine.CkActionType.IMPROVE_CITY -> "improved a town"
-    wgbg.engine.CkActionType.PLAY_PROGRESS -> "played a progress card"
-    wgbg.engine.CkActionType.RELOCATE_KNIGHT -> "set a knight down elsewhere"
-    wgbg.engine.CkActionType.DISCARD_PROGRESS -> "discarded a progress card"
-    wgbg.engine.CkActionType.CHOOSE_CARD -> "chose a card"
-    wgbg.engine.CkActionType.CHOOSE_VERTEX -> "chose a corner"
-    wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK -> "drew a progress card"
-    wgbg.engine.CkActionType.TAKE_PROGRESS -> "took a progress card"
-    wgbg.engine.CkActionType.COMMERCIAL_HARBOR_OFFER -> "offered a Harbour Charter swap"
-    wgbg.engine.CkActionType.CK_DONE -> "finished"
-    wgbg.engine.CkActionType.OFFER_TRADE_CK -> "offered a trade"
+    wgbg.engine.ChivalryActionType.BUILD_KNIGHT -> "raised a knight"
+    wgbg.engine.ChivalryActionType.ACTIVATE_KNIGHT -> "supplied a knight"
+    wgbg.engine.ChivalryActionType.PROMOTE_KNIGHT -> "promoted a knight"
+    wgbg.engine.ChivalryActionType.MOVE_KNIGHT -> "moved a knight"
+    wgbg.engine.ChivalryActionType.DISPLACE_KNIGHT -> "chased off a knight"
+    wgbg.engine.ChivalryActionType.CHASE_ROBBER -> "chased the bandit away"
+    wgbg.engine.ChivalryActionType.BUILD_CITY_WALL -> "built Ramparts"
+    wgbg.engine.ChivalryActionType.IMPROVE_CITY -> "improved a town"
+    wgbg.engine.ChivalryActionType.PLAY_PROGRESS -> "played a progress card"
+    wgbg.engine.ChivalryActionType.RELOCATE_KNIGHT -> "set a knight down elsewhere"
+    wgbg.engine.ChivalryActionType.DISCARD_PROGRESS -> "discarded a progress card"
+    wgbg.engine.ChivalryActionType.CHOOSE_CARD -> "chose a card"
+    wgbg.engine.ChivalryActionType.CHOOSE_VERTEX -> "chose a corner"
+    wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK -> "drew a progress card"
+    wgbg.engine.ChivalryActionType.TAKE_PROGRESS -> "took a progress card"
+    wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> "offered a Harbour Charter swap"
+    wgbg.engine.ChivalryActionType.CHIVALRY_DONE -> "finished"
+    wgbg.engine.ChivalryActionType.OFFER_TRADE_CK -> "offered a trade"
     else -> t.toString().lowercase().replace('_', ' ')
 }
 
@@ -2195,11 +2195,11 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
     fun over() {
         // Age of Chivalry: the Raiders' ship circles closer as the track advances (#37).
         // It bobs with the sea's clock, so it rides above the still board rather than inside it.
-        val ckState = s.ck
-        if (ckState != null && raiders != null) {
-            sea?.observeRaiders(ckState.barbarianPos, ckState.barbarianAttacks)
+        val chivalryState = s.chivalry
+        if (chivalryState != null && raiders != null) {
+            sea?.observeRaiders(chivalryState.barbarianPos, chivalryState.barbarianAttacks)
             val clock = sea?.time ?: 0f
-            val track = sea?.raidersTrack ?: ckState.barbarianPos.toFloat()
+            val track = sea?.raidersTrack ?: chivalryState.barbarianPos.toFloat()
             val landR = sea?.landR ?: board.topology.vertexPos.maxOf { kotlin.math.hypot(it.x * sqrt(3f) / 2f, it.y / 2f) }
             val pose = raidersPose(track, landR, clock)
             val at = l.project(pose.x, pose.y)
@@ -2296,13 +2296,13 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
     // Robber.
     // Age of Chivalry knights, old flat tokens (only until the rendered knights are loaded; those are drawn with the
     // buildings below): the theme's token at each corner, on a ring in the owner's colour.
-    val ck = s.ck
+    val chivalry = s.chivalry
     val rendered3dKnights = buildings != null && buildings.knights.isNotEmpty()
-    if (ck != null && knights != null && !rendered3dKnights) for (v in 0 until board.topology.vertexCount) {
-        val owner = ck.knightOwner[v]
+    if (chivalry != null && knights != null && !rendered3dKnights) for (v in 0 until board.topology.vertexCount) {
+        val owner = chivalry.knightOwner[v]
         if (owner < 0) continue
-        val level = ck.knightLevel[v].coerceIn(1, 3)
-        val img = knights[(level - 1) * 2 + if (ck.isActive(v)) 1 else 0]
+        val level = chivalry.knightLevel[v].coerceIn(1, 3)
+        val img = knights[(level - 1) * 2 + if (chivalry.isActive(v)) 1 else 0]
         val at = l.at(v)
         val size = KNIGHT_SCALE * scale * l.k(v)
         drawOval(PLAYER_COLORS[owner], at + Offset(-size * 0.42f, -size * 0.12f), Size(size * 0.84f, size * 0.3f * l.squash))
@@ -2326,25 +2326,25 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
             drawRobber(l.hexCenter(s.robberHex) + Offset(0.15f * rs, 0.15f * rs * l.squash), rs)
         }
     }
-    s.ck?.let { ck ->
-        if (ck.merchantHex >= 0 && ck.merchantOwner >= 0) {
-            val hs = scale * l.hexK(ck.merchantHex)
-            val at = l.hexCenter(ck.merchantHex) + Offset(MERCHANT_SPOT.x * hs, MERCHANT_SPOT.y * hs * l.squash)
+    s.chivalry?.let { chivalry ->
+        if (chivalry.merchantHex >= 0 && chivalry.merchantOwner >= 0) {
+            val hs = scale * l.hexK(chivalry.merchantHex)
+            val at = l.hexCenter(chivalry.merchantHex) + Offset(MERCHANT_SPOT.x * hs, MERCHANT_SPOT.y * hs * l.squash)
             // The rendered pawn, at the buildings' size and tilt step (Mauro: "same angle as robber", "needs to be 3d").
-            if (buildings != null) drawPieceSprite(buildings.merchant, at, hs * BUILDING_SCALE, l.tilt, PLAYER_COLORS[ck.merchantOwner])
-            else drawMerchantToken(at, hs, l.squash, PLAYER_COLORS[ck.merchantOwner])
+            if (buildings != null) drawPieceSprite(buildings.merchant, at, hs * BUILDING_SCALE, l.tilt, PLAYER_COLORS[chivalry.merchantOwner])
+            else drawMerchantToken(at, hs, l.squash, PLAYER_COLORS[chivalry.merchantOwner])
         }
     }
 
     // Settlements, cities and (rendered) knights, back to front by screen depth so the nearer piece is always drawn
     // on top: big houses no longer swallow a seated knight behind them (Mauro: "knights disappear when inactive").
     for (v in cornerDrawOrder(topo.vertexCount) { l.at(it).y }) {
-        val kOwner = ck?.knightOwner?.get(v) ?: -1
+        val kOwner = chivalry?.knightOwner?.get(v) ?: -1
         if (kOwner >= 0 && rendered3dKnights) {
-            val level = ck!!.knightLevel[v].coerceIn(1, 3)
+            val level = chivalry!!.knightLevel[v].coerceIn(1, 3)
             val color = PLAYER_COLORS[kOwner]
-            drawPieceSprite(buildings!!.knight(level, ck.isActive(v)), l.at(v), scale * l.k(v) * KNIGHT_SCALE / BuildingSprites.FRAME_UNITS, l.tilt, color)
-            if (ck.isActive(v) && !buildings.choice.space(ArtObject.KNIGHTS)) drawKnightFlag(l.at(v), scale * l.k(v) * KNIGHT_SCALE, color)
+            drawPieceSprite(buildings!!.knight(level, chivalry.isActive(v)), l.at(v), scale * l.k(v) * KNIGHT_SCALE / BuildingSprites.FRAME_UNITS, l.tilt, color)
+            if (chivalry.isActive(v) && !buildings.choice.space(ArtObject.KNIGHTS)) drawKnightFlag(l.at(v), scale * l.k(v) * KNIGHT_SCALE, color)
             continue
         }
         val owner = s.vertexOwner[v]
@@ -2353,12 +2353,12 @@ private fun DrawScope.drawGame(s: GameState, measurer: TextMeasurer, wood: WoodP
             // Rendered: Ramparts first, then the town, or the Capital that replaces it on a metropolis.
             // Mauro, 2026-10-10: "make the houses twice as large, I can't see the buildings".
             val at = l.at(v); val unit = scale * l.k(v) * BUILDING_SCALE; val color = PLAYER_COLORS[owner]
-            val ckNow = s.ck
+            val chivalryNow = s.chivalry
             // Ramparts (Mauro's pick C): the walls at 65%, the town perched on top of them, a little smaller and lifted.
-            val walled = ckNow != null && ckNow.wall[v] == 1
+            val walled = chivalryNow != null && chivalryNow.wall[v] == 1
             // Taller crenellations as the owner improves their towns (0.2.6), the town perched on whichever height.
-            val height = if (walled) BuildingSprites.rampartsHeight((0 until Track.COUNT).maxOf { ckNow!!.level(owner, it) }) else -1
-            val metro = ckNow?.metroVertex?.indexOf(v) ?: -1
+            val height = if (walled) BuildingSprites.rampartsHeight((0 until Track.COUNT).maxOf { chivalryNow!!.level(owner, it) }) else -1
+            val metro = chivalryNow?.metroVertex?.indexOf(v) ?: -1
             val piece = when {
                 metro >= 0 -> buildings.capital(metro) ?: buildings.town
                 s.vertexBuilding[v] == Piece.CITY -> buildings.town
@@ -2960,7 +2960,7 @@ private fun DrawScope.drawCliffs(board: Board, l: Layout, cliffs: List<ImageBitm
 internal data class RaidersPose(val x: Float, val y: Float, val heading: Float)
 
 internal fun raidersPose(track: Float, landR: Float, time: Float): RaidersPose {
-    val f = (track / wgbg.engine.CkPiece.BARBARIAN_TRACK).coerceIn(0f, 1f)
+    val f = (track / wgbg.engine.ChivalryPiece.BARBARIAN_TRACK).coerceIn(0f, 1f)
     val near = landR + 0.6f
     // Compact enough to fit beside the panels, inside the open-sea bounds with sprite clearance.
     val rx = near + (minOf(6.2f, Sea.OPEN_RX - 0.7f) - near) * (1f - f)

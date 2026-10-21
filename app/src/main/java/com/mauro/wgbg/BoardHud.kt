@@ -78,17 +78,17 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
         // Named for screen readers and for tools/ci_reach.sh, which checks the dice row never overlaps it.
         .semantics { contentDescription = "Players"; testTagsAsResourceId = true }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
         // Age of Chivalry: how near the Raiders are (a ship marker on a 7-step track).
-        s.ck?.let { ck ->
+        s.chivalry?.let { chivalry ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.testTag("raiders-track")) {
                 Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp),
                     maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
-                for (i in 0 until wgbg.engine.CkPiece.BARBARIAN_TRACK) Box(
+                for (i in 0 until wgbg.engine.ChivalryPiece.BARBARIAN_TRACK) Box(
                     Modifier.size(width = 11.dp, height = 8.dp)
-                        .background(if (i < ck.barbarianPos) Color(0xFFC0392B) else Color(0x73000000), RoundedCornerShape(2.dp)),
+                        .background(if (i < chivalry.barbarianPos) Color(0xFFC0392B) else Color(0x73000000), RoundedCornerShape(2.dp)),
                 )
                 // Raiders' strength vs every active knight, on the track's own line (Mauro): green while the knights would hold.
-                val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
-                val knights = (0 until s.numPlayers).sumOf { wgbg.engine.CitiesAndKnights.activeKnightStrength(s, it) }
+                val raiders = wgbg.engine.Chivalry.barbarianStrength(s)
+                val knights = (0 until s.numPlayers).sumOf { wgbg.engine.Chivalry.activeKnightStrength(s, it) }
                 Text("$raiders vs $knights", fontSize = 13.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp).testTag("raiders-vs-knights"),
                     color = if (knights >= raiders) Color(0xFF8BD18B) else Color(0xFFFF6B5E))
             }
@@ -117,9 +117,9 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                     // A long name (16 letters online) or a large font shrinks, then ends in "…", on one line (0.3.4).
                     Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("name-$p"))
-                    val ck = s.ck
-                    if (ck != null) for ((track, color) in IMPROVEMENT_BARS) Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
-                        val filled = barSegments(ck.level(p, track))
+                    val chivalry = s.chivalry
+                    if (chivalry != null) for ((track, color) in IMPROVEMENT_BARS) Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
+                        val filled = barSegments(chivalry.level(p, track))
                         for (i in 0 until 4) Box(Modifier.size(width = 14.dp, height = 4.dp).background(if (i < filled) color else Color(0x73000000), RoundedCornerShape(1.dp)))
                     }
                 }
@@ -137,7 +137,7 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         StatBadge(StatIcon.ROAD, s.roadLength[p], s.longestRoadOwner == p, "road-$p")
-                        StatBadge(StatIcon.SHIELD, knightsShown(s, p), s.ck == null && s.largestArmyOwner == p, "army-$p")
+                        StatBadge(StatIcon.SHIELD, knightsShown(s, p), s.chivalry == null && s.largestArmyOwner == p, "army-$p")
                     }
                 }
                 // The last roll's cards, each overlapping the one before by half in one fixed slot, so the frame never
@@ -172,7 +172,7 @@ internal fun fitScale(height: Int, max: Int): Float = if (height <= max || heigh
 
 
 /** The knights number on a player's shield: Sentinels played (base game), active knight strength (Age of Chivalry). */
-fun knightsShown(s: GameState, p: Int): Int = if (s.ck != null) wgbg.engine.CitiesAndKnights.activeKnightStrength(s, p) else s.knightsPlayed(p)
+fun knightsShown(s: GameState, p: Int): Int = if (s.chivalry != null) wgbg.engine.Chivalry.activeKnightStrength(s, p) else s.knightsPlayed(p)
 
 enum class StatIcon { ROAD, SHIELD }
 
@@ -330,14 +330,14 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         for (r in 0 until CARD_TYPES) {
             val n = s.hand(me, r)
             if (n == 0) continue
-            Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.ck != null))) {
+            Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.chivalry != null))) {
                 Image(artPainter(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
             }
         }
         // Fortune cards (base game) as cards in the hand, dimmed when they can't be played; a tap plays one, a long press
         // shows it large. They were worded buttons beside the move buttons before (Fable review 2.5).
-        if (s.ck == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
+        if (s.chivalry == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
             val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
             if (n == 0) continue
             val now = c in fortunePlayable && onFortune != null
@@ -354,7 +354,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                 }
             }
         }
-        val ck = s.ck ?: return@Row
+        val chivalry = s.chivalry ?: return@Row
         // Commodities: Parchment, Fabric, Silver, with their card art (#62).
         for (c in 0 until wgbg.engine.Commodity.COUNT) {
             val n = s.card(me, CARD_TYPES + c)
@@ -366,7 +366,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         // Cards you can't play right now are dimmed and say why (#117: "don't let me play it"); the engine's own list.
         val playable = androidx.compose.runtime.remember(version, me) { playableProgress(s, me) }
         for (c in 0 until wgbg.engine.Progress.COUNT) {
-            val n = ck.progressHand[me * wgbg.engine.Progress.COUNT + c]
+            val n = chivalry.progressHand[me * wgbg.engine.Progress.COUNT + c]
             val now = c in playable
             if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now)) {
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
@@ -388,11 +388,11 @@ internal const val HAND_MIN_SLICE = 24f
 /** How many cards [HandRow] shows for [me]: one per kind held (resources, Fortune cards, commodities, progress cards). */
 internal fun handCardCount(s: GameState, me: Int): Int {
     var n = (0 until CARD_TYPES).count { s.hand(me, it) > 0 }
-    val ck = s.ck
-    if (ck == null) n += (0 until wgbg.engine.DevCard.COUNT).count { s.devHand[me * wgbg.engine.DevCard.COUNT + it] > 0 }
+    val chivalry = s.chivalry
+    if (chivalry == null) n += (0 until wgbg.engine.DevCard.COUNT).count { s.devHand[me * wgbg.engine.DevCard.COUNT + it] > 0 }
     else {
         n += (0 until wgbg.engine.Commodity.COUNT).count { s.card(me, CARD_TYPES + it) > 0 }
-        n += (0 until wgbg.engine.Progress.COUNT).count { ck.progressHand[me * wgbg.engine.Progress.COUNT + it] > 0 }
+        n += (0 until wgbg.engine.Progress.COUNT).count { chivalry.progressHand[me * wgbg.engine.Progress.COUNT + it] > 0 }
     }
     return n
 }
@@ -419,8 +419,8 @@ private fun Modifier.dimmed(dim: Boolean): Modifier = if (!dim) this else
 
 /** Progress cards [me] may play right now: the engine's legal plays (none when it isn't their move). */
 fun playableProgress(s: GameState, me: Int): Set<Int> =
-    if (s.ck == null || s.currentPlayer != me) emptySet()
-    else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.CkActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
+    if (s.chivalry == null || s.currentPlayer != me) emptySet()
+    else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
 
 /** Why progress card [c] can't be played by [me] now, in a few words. */
 fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
@@ -436,20 +436,20 @@ fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
  * Grand Factor card and can't use it", with no reason given). Public facts only: points, card counts, the board.
  */
 internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
-    val ck = s.ck ?: return "nothing it can do right now"
+    val chivalry = s.chivalry ?: return "nothing it can do right now"
     val b = s.board
     val P = wgbg.engine.Progress
     val others = (0 until s.numPlayers).filter { it != me }
     val mine = s.victoryPoints(me)
     val cities = s.piecesOnBoard(me, wgbg.engine.Piece.CITY)
-    fun knights(q: Int) = (0 until b.vertexCount).count { ck.knightOwner[it] == q }
+    fun knights(q: Int) = (0 until b.vertexCount).count { chivalry.knightOwner[it] == q }
     return when (c) {
         P.CRANE -> when {
             cities == 0 -> "you need a town to improve"
-            (0 until wgbg.engine.Track.COUNT).all { ck.level(me, it) >= wgbg.engine.Track.MAX_LEVEL } -> "every improvement is at the top"
+            (0 until wgbg.engine.Track.COUNT).all { chivalry.level(me, it) >= wgbg.engine.Track.MAX_LEVEL } -> "every improvement is at the top"
             else -> "not enough commodities for any improvement, even one less: " + (0 until wgbg.engine.Track.COUNT)
-                .filter { ck.level(me, it) < wgbg.engine.Track.MAX_LEVEL }
-                .joinToString(", ") { t -> "${DECK_NAMES[t]} needs ${ck.level(me, t)} ${ALL_CARD_NAMES[wgbg.engine.Track.commodity(t)]}" }
+                .filter { chivalry.level(me, it) < wgbg.engine.Track.MAX_LEVEL }
+                .joinToString(", ") { t -> "${DECK_NAMES[t]} needs ${chivalry.level(me, t)} ${ALL_CARD_NAMES[wgbg.engine.Track.commodity(t)]}" }
         }
         P.MASTER_MERCHANT -> if (others.none { s.victoryPoints(it) > mine }) "it only takes from a player with more points than you, and nobody has more"
             else "the players ahead of you have no cards"
@@ -463,11 +463,11 @@ internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
         }
         P.WARLORD -> if (knights(me) == 0) "you have no knights" else "your knights are all raised already"
         P.SMITH -> "no knight of yours can be promoted"
-        P.ENGINEER -> if (ck.wallsLeft[me] == 0) "no Ramparts left" else "every town of yours has Ramparts"
+        P.ENGINEER -> if (chivalry.wallsLeft[me] == 0) "no Ramparts left" else "every town of yours has Ramparts"
         P.MEDICINE -> "it needs a homestead, a town piece left, 1 Grain and 2 Stone"
         P.ROAD_BUILDING -> "no road pieces or spots left"
         P.COMMERCIAL_HARBOR -> if (s.handSize(me) == 0) "you have no resources to give" else "nobody else has a commodity"
-        P.BISHOP -> if (!ck.robberActive) "the bandit stays put until the Raiders first land" else "nowhere to move the bandit"
+        P.BISHOP -> if (!chivalry.robberActive) "the bandit stays put until the Raiders first land" else "nowhere to move the bandit"
         P.DESERTER -> "nobody else has a knight on the board"
         P.DIPLOMAT -> "no open road end to remove"
         P.INTRIGUE -> "no enemy knight on your roads"
@@ -501,26 +501,26 @@ internal val PROMPT_END = 112.dp
  * and what happens if they land now.
  */
 fun raidersWarning(s: GameState, me: Int): String? {
-    val ck = s.ck ?: return null
-    val left = raidersStepsLeft(ck.barbarianPos)
+    val chivalry = s.chivalry ?: return null
+    val left = raidersStepsLeft(chivalry.barbarianPos)
     if (left !in 1..3 || s.currentPlayer != me || s.isOver) return null
-    val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
-    val knights = (0 until s.numPlayers).sumOf { wgbg.engine.CitiesAndKnights.activeKnightStrength(s, it) }
-    val mine = wgbg.engine.CitiesAndKnights.activeKnightStrength(s, me)
+    val raiders = wgbg.engine.Chivalry.barbarianStrength(s)
+    val knights = (0 until s.numPlayers).sumOf { wgbg.engine.Chivalry.activeKnightStrength(s, it) }
+    val mine = wgbg.engine.Chivalry.activeKnightStrength(s, me)
     val near = if (left == 1) "1 step" else "$left steps"
     // Raiders first, like the "R vs K" on the track line above it.
     return "Raiders $near away!\n$raiders vs $knights: " + if (knights >= raiders) "knights hold (you $mine)"
         else "too weak, weakest lose a town (you $mine)"
 }
 
-fun raidersStepsLeft(pos: Int) = (wgbg.engine.CkPiece.BARBARIAN_TRACK - pos).coerceAtLeast(0)
+fun raidersStepsLeft(pos: Int) = (wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - pos).coerceAtLeast(0)
 
 /** Hand size for the player list: "8", or "8/3" (cards / progress cards) in Age of Chivalry. */
 /** True if [p] holds more cards than a rolled 7 allows (they would discard half): the engine's own limit and count. */
 fun overCardLimit(s: GameState, p: Int): Boolean =
-    if (s.ck != null) s.cardCount(p) > wgbg.engine.CitiesAndKnights.discardLimit(s, p) else s.handSize(p) > s.config.discardLimit
+    if (s.chivalry != null) s.cardCount(p) > wgbg.engine.Chivalry.discardLimit(s, p) else s.handSize(p) > s.config.discardLimit
 
-fun cardsLabel(s: GameState, p: Int): String = s.ck?.let { "${s.cardCount(p)}/${it.progressCount(p)}" } ?: "${s.cardCount(p)}"
+fun cardsLabel(s: GameState, p: Int): String = s.chivalry?.let { "${s.cardCount(p)}/${it.progressCount(p)}" } ?: "${s.cardCount(p)}"
 
 /** One mini card in the player list: [card] (-1 = face down, a robbery others can't see) and [n] (+ got, - lost). */
 data class RollMini(val card: Int, val n: Int)

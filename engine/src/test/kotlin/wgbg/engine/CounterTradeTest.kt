@@ -19,7 +19,7 @@ import wgbg.engine.Resource.WOOD
  */
 class CounterTradeTest {
     private fun cards(vararg rc: Pair<Int, Int>) = IntArray(CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
-    private fun ckCards(vararg rc: Pair<Int, Int>) = IntArray(CK_CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
+    private fun chivalryCards(vararg rc: Pair<Int, Int>) = IntArray(CHIVALRY_CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
 
     /** Player 0 offers 1 wood for 1 brick; players 1 and 2 hold brick, sheep and ore. */
     private fun offered(): GameState {
@@ -168,9 +168,9 @@ class CounterTradeTest {
         val turn = T.playState(4).also { T.roll(it, 8) }
         T.give(turn, 0, WOOD, 1)
         assertFalse(Rules.isLegal(turn, Action.counterTrade(cards(WOOD to 1), cards(BRICK to 1))))
-        val ck = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 1)
-        assertFalse(Rules.isLegal(ck, Action.counterTrade(cards(WOOD to 1), cards(BRICK to 1))))
-        assertFalse(Rules.isLegal(s, Action.counterTradeCk(ckCards(WHEAT to 1), ckCards(BRICK to 1))), "no Chivalry counter in a base game")
+        val chivalry = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 1)
+        assertFalse(Rules.isLegal(chivalry, Action.counterTrade(cards(WOOD to 1), cards(BRICK to 1))))
+        assertFalse(Rules.isLegal(s, Action.counterTradeCk(chivalryCards(WHEAT to 1), chivalryCards(BRICK to 1))), "no Chivalry counter in a base game")
     }
 
     @Test
@@ -196,14 +196,14 @@ class CounterTradeTest {
         CK.give(s, 0, PAPER, 1)
         CK.give(s, 1, WHEAT, 1)
         CK.give(s, 2, WHEAT, 1)
-        val ask = Action.offerTradeCk(ckCards(), ckCards(WHEAT to 1))
+        val ask = Action.offerTradeCk(chivalryCards(), chivalryCards(WHEAT to 1))
         assertTrue(Rules.isLegal(s, ask))
         Rules.applyChecked(s, ask)
         assertFalse(Action.ACCEPT_TRADE in CK.legal(s))
         assertFalse(Rules.isLegal(s, Action.counterTrade(cards(), cards(WHEAT to 1))), "base counters are off")
-        val c1 = Action.counterTradeCk(ckCards(PAPER to 1), ckCards(WHEAT to 1))
+        val c1 = Action.counterTradeCk(chivalryCards(PAPER to 1), chivalryCards(WHEAT to 1))
         assertTrue(Rules.isLegal(s, c1))
-        assertFalse(Rules.isLegal(s, Action.counterTradeCk(ckCards(CLOTH to 1), ckCards(WHEAT to 1))), "offerer has no cloth")
+        assertFalse(Rules.isLegal(s, Action.counterTradeCk(chivalryCards(CLOTH to 1), chivalryCards(WHEAT to 1))), "offerer has no cloth")
         Rules.applyChecked(s, c1)
         Rules.applyChecked(s, Action.REJECT_TRADE)
         Rules.applyChecked(s, Action.REJECT_TRADE)
@@ -212,7 +212,7 @@ class CounterTradeTest {
         Rules.applyChecked(s, Action.confirmTrade(1))
         assertEquals(1, s.card(0, WHEAT)); assertEquals(0, s.card(0, PAPER))
         assertEquals(1, s.card(1, PAPER)); assertEquals(0, s.card(1, WHEAT))
-        assertEquals(0, s.ck!!.offer.sum())
+        assertEquals(0, s.chivalry!!.offer.sum())
         assertFalse(s.anyCounter)
         CK.checkInvariants(s)
     }
@@ -222,10 +222,10 @@ class CounterTradeTest {
         val s = CK.playState()
         CK.roll(s, 6, 6)
         CK.give(s, 0, CLOTH, 1)
-        Rules.applyChecked(s, Action.offerTradeCk(ckCards(CLOTH to 1), ckCards()))
+        Rules.applyChecked(s, Action.offerTradeCk(chivalryCards(CLOTH to 1), chivalryCards()))
         repeat(3) { Rules.applyChecked(s, Action.REJECT_TRADE) }
         assertEquals(Phase.PLAY_TURN, s.phase)
-        assertEquals(0, s.ck!!.offer.sum())
+        assertEquals(0, s.chivalry!!.offer.sum())
     }
 
     @Test
@@ -244,13 +244,13 @@ class CounterTradeTest {
         assertEquals(hand0, hand(s, 0)); assertFalse(s.anyCounter); assertEquals(0, s.tradeOffer.sum())
         assertFalse(Rules.isLegal(s, Action.CANCEL_TRADE), "nothing left to withdraw")
 
-        val ck = CK.playState()
-        CK.roll(ck, 6, 6)
-        CK.give(ck, 0, PAPER, 1)
-        Rules.applyChecked(ck, Action.offerTradeCk(ckCards(PAPER to 1), ckCards()))
-        assertEquals(0, Rules.mover(ck, Action.CANCEL_TRADE))
-        Rules.applyChecked(ck, Action.CANCEL_TRADE)
-        assertEquals(Phase.PLAY_TURN, ck.phase); assertEquals(0, ck.ck!!.offer.sum())
-        CK.checkInvariants(ck)
+        val chivalry = CK.playState()
+        CK.roll(chivalry, 6, 6)
+        CK.give(chivalry, 0, PAPER, 1)
+        Rules.applyChecked(chivalry, Action.offerTradeCk(chivalryCards(PAPER to 1), chivalryCards()))
+        assertEquals(0, Rules.mover(chivalry, Action.CANCEL_TRADE))
+        Rules.applyChecked(chivalry, Action.CANCEL_TRADE)
+        assertEquals(Phase.PLAY_TURN, chivalry.phase); assertEquals(0, chivalry.chivalry!!.offer.sum())
+        CK.checkInvariants(chivalry)
     }
 }

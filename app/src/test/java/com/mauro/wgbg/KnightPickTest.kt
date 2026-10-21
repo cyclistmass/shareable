@@ -9,7 +9,7 @@ import wgbg.ai.GreedyBot
 import wgbg.ai.RandomBot
 import wgbg.engine.Action
 import wgbg.engine.ActionBuffer
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.GameState
@@ -24,7 +24,7 @@ class KnightPickTest {
     private fun knightPositions(seeds: LongRange, players: Int, random: Boolean, check: (GameState, List<Action>) -> Unit): Int {
         var found = 0
         for (seed in seeds) {
-            val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = players), seed)
+            val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = players), seed)
             val bots = List(players) { if (random) RandomBot(it + seed) else GreedyBot(it + seed) }
             val buf = ActionBuffer()
             while (!s.isOver && s.turn < 400) {
@@ -76,7 +76,7 @@ class KnightPickTest {
         knightPositions(25L..36L, 3, random = true) { s, legal ->
             for (k in movableKnights(legal)) {
                 val at = vertexLattice(s.board, k)
-                val busy = legal.any { it.type !in KNIGHT_MOVES && it.type in CK_VERTEX_KINDS && ckVertex(it) == k }
+                val busy = legal.any { it.type !in KNIGHT_MOVES && it.type in CHIVALRY_VERTEX_KINDS && chivalryVertex(it) == k }
                 if (busy) {
                     // Supply or Promote at that knight comes first; Move knight in the build menu is the way to move it.
                     assertEquals(null, knightPickAt(s, legal, at, null))
@@ -100,7 +100,7 @@ class KnightPickTest {
     fun `Move knight in the build menu offers moves and charges, nothing else`() {
         val found = knightPositions(37L..44L, 4, random = true) { _, legal ->
             val menu = boardMoves(legal, BuildKind.MOVE)
-            assertEquals(legal.filter { it.type == CkActionType.MOVE_KNIGHT || it.type == CkActionType.DISPLACE_KNIGHT }, menu)
+            assertEquals(legal.filter { it.type == ChivalryActionType.MOVE_KNIGHT || it.type == ChivalryActionType.DISPLACE_KNIGHT }, menu)
             assertTrue(BuildKind.MOVE in shownKinds(true, legal, null))
         }
         assertTrue(found > 0)

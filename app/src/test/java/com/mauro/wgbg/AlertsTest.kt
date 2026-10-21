@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import wgbg.ai.RandomBot
 import wgbg.engine.ActionBuffer
-import wgbg.engine.CkPiece
+import wgbg.engine.ChivalryPiece
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.Rules
@@ -42,17 +42,17 @@ class AlertsTest {
     @Test
     fun `steps left come from the Raiders' track, and the base game has none`() {
         assertNull(raidersStepsLeft(Rules.newGame(GameConfig(numPlayers = 3), 1)))
-        val ck = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 1)
-        assertEquals(CkPiece.BARBARIAN_TRACK, raidersStepsLeft(ck))
-        ck.ck!!.barbarianPos = 5
-        assertEquals(CkPiece.BARBARIAN_TRACK - 5, raidersStepsLeft(ck))
+        val chivalry = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 1)
+        assertEquals(ChivalryPiece.BARBARIAN_TRACK, raidersStepsLeft(chivalry))
+        chivalry.chivalry!!.barbarianPos = 5
+        assertEquals(ChivalryPiece.BARBARIAN_TRACK - 5, raidersStepsLeft(chivalry))
     }
 
     @Test
     fun `fuzz - over whole games the horn sounds only on the ship's moves inside the range`() {
         var horns = 0; var advances = 0
         for (seed in 1L..20L) {
-            val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 4), seed)
+            val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 4), seed)
             val bots = List(4) { RandomBot(it + seed) }
             val buf = ActionBuffer()
             var before = raidersStepsLeft(s)

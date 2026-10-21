@@ -13,7 +13,7 @@ import wgbg.engine.Rules
 class HarbourAndPedestalTest {
     @Test
     fun `every harbour points straight out from the middle of its own coast edge`() {
-        for (seed in 1L..30L) for (config in listOf(GameConfig(), GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS))) {
+        for (seed in 1L..30L) for (config in listOf(GameConfig(), GameConfig(expansion = Expansion.CHIVALRY))) {
             val b = Rules.newGame(config, seed).board
             for (port in b.ports) {
                 val a = liveVertex(b, port.v1); val c = liveVertex(b, port.v2)
@@ -66,9 +66,9 @@ class HarbourAndPedestalTest {
 
     @Test
     fun `each knight on the 3D board gets its ring and dark disc underneath`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 3L)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 3L)
         val v = (0 until s.board.vertexCount).first()
-        s.ck!!.knightOwner[v] = 2; s.ck!!.knightLevel[v] = 1
+        s.chivalry!!.knightOwner[v] = 2; s.chivalry!!.knightLevel[v] = 1
         val placed = livePlacements(s, false, 0) { true }.filter { it.position == liveVertex(s.board, v) }
         val ring = placed.single { it.model == KNIGHT_RING }; val band = placed.single { it.model == KNIGHT_BAND }
         val knight = placed.single { "_knight_" in it.model }

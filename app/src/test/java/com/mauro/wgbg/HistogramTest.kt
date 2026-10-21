@@ -13,7 +13,7 @@ import wgbg.engine.Rules
 class HistogramTest {
     @Test
     fun `every roll is counted once, totals and the event die, with fair-dice expectations`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 4)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 4)
         val tracker = TurnTracker(listOf("You", "Blue", "Orange"))
         val bots = List(3) { GreedyBot(it.toLong()) }
         val buf = ActionBuffer()
@@ -37,6 +37,6 @@ class HistogramTest {
 
     @Test
     fun `every Age of Chivalry move reads as words in the history, never an engine name`() {
-        for (t in wgbg.engine.CkActionType.entries) assertTrue(describe(t).none { it == '_' } && describe(t) != t.toString().lowercase().replace('_', ' '), "$t -> ${describe(t)}")
+        for (t in wgbg.engine.ChivalryActionType.entries) assertTrue(describe(t).none { it == '_' } && describe(t) != t.toString().lowercase().replace('_', ' '), "$t -> ${describe(t)}")
     }
 }

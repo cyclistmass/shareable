@@ -91,14 +91,14 @@ fun tradeNeedsMe(s: GameState, me: Int) = tradeMode(s, me).let {
 }
 
 /** Card kinds a trade covers: the five resources, plus three commodities in Age of Chivalry. */
-fun tradeCards(s: GameState) = if (s.ck != null) wgbg.engine.CK_CARD_TYPES else CARD_TYPES
+fun tradeCards(s: GameState) = if (s.chivalry != null) wgbg.engine.CHIVALRY_CARD_TYPES else CARD_TYPES
 
 /** Cards of kind [i] in [p]'s hand (resources, or commodities in Age of Chivalry). */
 fun holding(s: GameState, p: Int, i: Int) = if (i < CARD_TYPES) s.hand(p, i) else s.card(p, i)
 
 /** The offer action for these counts, in the ruleset's own encoding. */
 fun offerFor(s: GameState, give: IntArray, get: IntArray): Action? = runCatching {
-    if (s.ck != null) Action.offerTradeCk(give, get) else Action.offerTrade(give, get)
+    if (s.chivalry != null) Action.offerTradeCk(give, get) else Action.offerTrade(give, get)
 }.getOrNull()
 
 /** True when [me] holds every card a trade offered to them asks them to give (#44). */
@@ -121,24 +121,24 @@ const val AUTO_NO_SECONDS = 5
  * offer itself; for anyone else it is mirrored.
  */
 fun termsFor(s: GameState, me: Int): Pair<IntArray, IntArray> {
-    val ck = s.ck
+    val chivalry = s.chivalry
     val n = tradeCards(s)
-    val gives = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[it] else ck!!.offer[it - CARD_TYPES] }
-    val gets = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[CARD_TYPES + it] else ck!!.offer[wgbg.engine.Commodity.COUNT + it - CARD_TYPES] }
+    val gives = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[it] else chivalry!!.offer[it - CARD_TYPES] }
+    val gets = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[CARD_TYPES + it] else chivalry!!.offer[wgbg.engine.Commodity.COUNT + it - CARD_TYPES] }
     return if (me == s.currentPlayer) gets to gives else gives to gets
 }
 
 /** The offerer's (get, give) with taker [q] (#135): [q]'s counter-offer, or the offer as it stands if they said yes. */
 fun takerTerms(s: GameState, q: Int): Pair<IntArray, IntArray> {
     val c = s.counterOf(q) ?: return termsFor(s, s.currentPlayer)
-    val ck = s.ck != null
+    val chivalry = s.chivalry != null
     val n = tradeCards(s)
-    return IntArray(n) { if (ck) c.ckOfferWant(it) else c.offerWant(it) } to IntArray(n) { if (ck) c.ckOfferGive(it) else c.offerGive(it) }
+    return IntArray(n) { if (chivalry) c.chivalryOfferWant(it) else c.offerWant(it) } to IntArray(n) { if (chivalry) c.chivalryOfferGive(it) else c.offerGive(it) }
 }
 
 /** The counter a responder means by "I get [get], I give [give]", in the ruleset's encoding (counters are offerer-side). */
 fun counterFor(s: GameState, get: IntArray, give: IntArray): Action? = runCatching {
-    if (s.ck != null) Action.counterTradeCk(give = get, want = give) else Action.counterTrade(give = get, want = give)
+    if (s.chivalry != null) Action.counterTradeCk(give = get, want = give) else Action.counterTrade(give = get, want = give)
 }.getOrNull()
 
 /** [me] made the open offer and may withdraw it now, while the others are still answering (#114). */
@@ -148,7 +148,7 @@ fun canWithdraw(s: GameState, me: Int) = s.phase == Phase.DECIDE_TRADE && s.curr
 fun isOpenAsk(s: GameState) = s.phase == Phase.DECIDE_TRADE && !Rules.isTwoSided(s)
 
 fun bankRate(s: GameState, p: Int, r: Int): Int {
-    if (s.ck != null) return wgbg.engine.CitiesAndKnights.tradeRate(s, p, r)
+    if (s.chivalry != null) return wgbg.engine.Chivalry.tradeRate(s, p, r)
     val m = s.portMask[p]
     return if (m and (1 shl r) != 0) 2 else if (m and Port.GENERIC_BIT != 0) 3 else 4
 }
@@ -481,8 +481,8 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
 internal fun cardChoiceTitle(s: GameState, names: List<String>): String = when (s.phase) {
     Phase.AQUEDUCT -> "Science bonus: nothing came your way, so take any one card free"
     Phase.COMMERCIAL_HARBOR_RESPOND -> "${names[s.currentPlayer]} played Harbour Charter: give back one commodity"
-    Phase.MASTER_MERCHANT -> "Grand Factor: take a card from ${names[s.ck?.pendingTarget ?: 0]}"
-    Phase.WEDDING -> "${names[s.currentPlayer]} played Feast against you: give them ${s.ck?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s), one at a time"
+    Phase.MASTER_MERCHANT -> "Grand Factor: take a card from ${names[s.chivalry?.pendingTarget ?: 0]}"
+    Phase.WEDDING -> "${names[s.currentPlayer]} played Feast against you: give them ${s.chivalry?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s), one at a time"
     else -> "Choose a card"
 }
 
@@ -492,7 +492,7 @@ internal fun cardChoiceTitle(s: GameState, names: List<String>): String = when (
  */
 @Composable
 fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<String>, onMove: (Action) -> Unit, modifier: Modifier = Modifier) {
-    val owner = if (s.phase == Phase.MASTER_MERCHANT) s.ck?.pendingTarget ?: me else me
+    val owner = if (s.phase == Phase.MASTER_MERCHANT) s.chivalry?.pendingTarget ?: me else me
     Column(modifier.chest().testTag("card-choice").semantics { testTagsAsResourceId = true }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(cardChoiceTitle(s, names), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

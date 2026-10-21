@@ -299,7 +299,7 @@ private fun expiresIn(days: Int) = com.google.firebase.Timestamp(java.util.Date(
 internal fun Room.wire(): Map<String, Any?> = mapOf(
     "host" to host, "status" to status.name, "seed" to seed.toString(), "nextSeq" to nextSeq, "decks" to decks,
     "seats" to seats.mapIndexed { i, s -> i.toString() to mapOf("uid" to s.uid, "name" to s.name, "bot" to s.bot, "open" to s.open, "ready" to s.ready, "google" to s.google) }.toMap(),
-    "options" to mapOf("expansion" to config.expansion.name, "numPlayers" to config.numPlayers, "vpToWin" to config.vpToWin,
+    "options" to mapOf("expansion" to config.expansion.wire, "numPlayers" to config.numPlayers, "vpToWin" to config.vpToWin,
         "layout" to config.layout.name, "avoidAdjacentRedNumbers" to config.avoidAdjacentRedNumbers, "discardLimit" to config.discardLimit,
         "maxTurns" to config.maxTurns, "randomDiscard" to config.randomDiscard, "generateTradeOffers" to config.generateTradeOffers,
         "randomFirstPlayer" to config.randomFirstPlayer) + (if (colours.isEmpty()) emptyMap() else mapOf("colours" to colours)),
@@ -325,7 +325,7 @@ internal fun room(id: String, d: Map<String, Any?>): Room {
     val o = d["options"] as Map<String, Any>; fun n(k: String) = (o[k] as Number).toInt()
     val seats = d["seats"] as Map<String, Map<String, Any?>>
     return Room(id, d["host"] as String,
-        GameConfig(Expansion.valueOf(o["expansion"] as String), n("numPlayers"), n("vpToWin"), BoardLayout.valueOf(o["layout"] as String),
+        GameConfig(Expansion.ofWire(o["expansion"] as String), n("numPlayers"), n("vpToWin"), BoardLayout.valueOf(o["layout"] as String),
             o["avoidAdjacentRedNumbers"] as Boolean, n("discardLimit"), n("maxTurns"), o["randomDiscard"] as Boolean, o["generateTradeOffers"] as Boolean,
             o["randomFirstPlayer"] as Boolean? ?: false),   // rooms made before #126: seat 0 starts
         (d["seed"] as String).toLong(), List(4) { i -> val s = seats[i.toString()]!!

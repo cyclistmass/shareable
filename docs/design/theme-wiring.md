@@ -18,7 +18,7 @@ no settings, picker, Look & art, game rules, names or card text change here.
 | Knight cards | `GuideArt.knightCard(level, pirate)` → `card_knight_{normal,pirate}_N`. |
 | Resource / commodity cards | `ALL_CARD_ART`, the Ledger pages (`card_<name>`); shared, no Pirate flag. |
 | Fortune cards | `GuideArt.fortuneArt(card, pirate)` → Ledger `card_fortune_<name>`, drawn plain; only Sentinel switches to the pirate knight card. |
-| Progress cards / deck backgrounds | `CkPlay`, card guide and card-face drawing; the commodity paintings (`COMMODITY_PICTURE`, `card_paint_*`) and deck colours. |
+| Progress cards / deck backgrounds | `ChivalryPlay`, card guide and card-face drawing; the commodity paintings (`COMMODITY_PICTURE`, `card_paint_*`) and deck colours. |
 | Production dice | `DiceArt.face/tumble(red, pirate)` → NR/NI or PR/PB; used by `Hud` and `RollingDice`. |
 | Event die | `DiceArt.eventFace/eventTumble(pirate, eventDieStyle)` → AE or PE/PE1/PE2/PE3; source face numbering remapped to engine tracks. |
 | Bandit | `BANDIT_SPRITES` / `bandit_tilt_N`; live `bandit.glb`; shared. |
@@ -80,7 +80,7 @@ No second settings enum is introduced here, avoiding ownership conflicts with th
 - **Critters:** select only the selected theme's modules and cap their combined population at
   `SpaceArt.MAX_CRITTERS` (3); retain the turtle's fixed board-centre anchor and animate only its clips.
   Five available module types do not mean five simultaneously enabled populations.
-- **MerchantToken/CkPlay/BoardHud/TurnReport:** choose Space icon/card resources without changing the
+- **MerchantToken/ChivalryPlay/BoardHud/TurnReport:** choose Space icon/card resources without changing the
   current player-facing names, commodity rules or card descriptions.
 - **Dice/RollingDice:** source art contains static views and face models, not tumbling loops. Hold a
   supplied face or animate the die GLB; camera tilt frames are not a fabricated tumble animation.

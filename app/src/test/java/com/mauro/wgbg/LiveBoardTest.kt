@@ -98,11 +98,11 @@ class LiveBoardTest {
     }
 
     @Test fun `both themes and LODs use real terrain numbers roads and expansion pieces without state changes`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5)
         // A rendering fixture isolates all piece forms from rule progression.
         s.edgeOwner[0] = 2
         for (v in 0..2) { s.vertexOwner[v] = v; s.vertexBuilding[v] = if (v == 0) Piece.SETTLEMENT else Piece.CITY }
-        s.ck!!.wall[1] = 1; s.ck!!.metroVertex[0] = 2; s.ck!!.metroOwner[0] = 2
+        s.chivalry!!.wall[1] = 1; s.chivalry!!.metroVertex[0] = 2; s.chivalry!!.metroOwner[0] = 2
         val hash = s.stateHash()
         for (pirate in listOf(false, true)) for (lod in 0..1) {
             val list = livePlacements(s, pirate, lod)
@@ -131,9 +131,9 @@ class LiveBoardTest {
     }
 
     @Test fun `the merchant stands as a tinted model on its tile when the model is there`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5)
         assertTrue(livePlacements(s, false, 0) { true }.none { it.model == LIVE_MERCHANT }, "nobody holds it yet")
-        s.ck!!.merchantHex = 7; s.ck!!.merchantOwner = 2
+        s.chivalry!!.merchantHex = 7; s.chivalry!!.merchantOwner = 2
         assertTrue(livePlacements(s, false, 0).none { it.model == LIVE_MERCHANT }, "no model file: the overlay draws it")
         val m = livePlacements(s, true, 0) { true }.single { it.model == LIVE_MERCHANT }
         assertEquals(2, m.owner)
@@ -142,10 +142,10 @@ class LiveBoardTest {
     }
 
     @Test fun `knights become tinted standing models by theme, level and active, and stay sprites without a model`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
-        val ck = s.ck!!
-        ck.knightOwner[4] = 1; ck.knightLevel[4] = 2; ck.knightFlags[4] = ck.knightFlags[4] or CkState.ACTIVE
-        ck.knightOwner[9] = 3; ck.knightLevel[9] = 3
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5)
+        val chivalry = s.chivalry!!
+        chivalry.knightOwner[4] = 1; chivalry.knightLevel[4] = 2; chivalry.knightFlags[4] = chivalry.knightFlags[4] or ChivalryState.ACTIVE
+        chivalry.knightOwner[9] = 3; chivalry.knightLevel[9] = 3
         assertEquals("default_knight_l2", liveKnightModel(s, 4, false))
         assertEquals("pirate_knight_l3_inactive", liveKnightModel(s, 9, true))
         assertNull(liveKnightModel(s, 0, false))

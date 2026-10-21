@@ -24,7 +24,7 @@ class LiveOverlayTopTest {
 
     @Test
     fun `rings sit where the pieces and plates are drawn, and taps on them come back to the same spot`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5)
         s.vertexOwner[0] = 0; s.vertexBuilding[0] = Piece.SETTLEMENT
         for (theme in themes) {
             val choice = ArtChoice(theme)

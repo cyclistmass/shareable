@@ -101,10 +101,10 @@ class TradePanelTest {
         val base = Rules.newGame(GameConfig(numPlayers = 3), 1)
         val c = counterFor(base, get = cards(Resource.WOOD to 2), give = cards(Resource.ORE to 1))!!
         assertEquals(ActionType.COUNTER_TRADE, c.type)
-        val ck = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 1)
-        val k = counterFor(ck, get = IntArray(8).also { it[5] = 1 }, give = IntArray(8).also { it[0] = 1 })!!
-        assertEquals(wgbg.engine.CkActionType.COUNTER_TRADE_CK, k.type)
-        assertEquals(1, k.ckOfferGive(5)); assertEquals(1, k.ckOfferWant(0))
+        val chivalry = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 1)
+        val k = counterFor(chivalry, get = IntArray(8).also { it[5] = 1 }, give = IntArray(8).also { it[0] = 1 })!!
+        assertEquals(wgbg.engine.ChivalryActionType.COUNTER_TRADE_CK, k.type)
+        assertEquals(1, k.chivalryOfferGive(5)); assertEquals(1, k.chivalryOfferWant(0))
         assertEquals(2, c.offerGive(Resource.WOOD)) // the offerer gives us 2 timber
         assertEquals(1, c.offerWant(Resource.ORE)) // and gets our stone
     }
@@ -128,7 +128,7 @@ class TradePanelTest {
         // Mauro wasn't sure which action card it was, so every card bots play in 40 games is covered.
         var checked = 0; var cardsPlayed = 0
         for (seed in 1L..40L) {
-            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 4), seed)
+            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 4), seed)
             val bots = List(4) { GreedyBot(it.toLong() + seed) }
             val buf = ActionBuffer()
             var afterCard = false
@@ -144,7 +144,7 @@ class TradePanelTest {
                 }
                 Rules.legalActions(s, buf)
                 val a = bots[s.actingPlayer].choose(s, buf)
-                if (a.type == wgbg.engine.CkActionType.PLAY_PROGRESS && s.actingPlayer == s.currentPlayer && s.hasRolled) { afterCard = true; cardsPlayed++ }
+                if (a.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && s.actingPlayer == s.currentPlayer && s.hasRolled) { afterCard = true; cardsPlayed++ }
                 Rules.apply(s, a)
             }
         }
@@ -155,12 +155,12 @@ class TradePanelTest {
     fun `every pick-a-card moment says what it is for`() {
         val seen = mutableSetOf<Phase>()
         for (seed in 1L..40L) {
-            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 4), seed)
+            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 4), seed)
             val bots = List(4) { GreedyBot(it.toLong() + seed) }
             val buf = ActionBuffer()
             while (!s.isOver && s.turn < 400) {
                 Rules.legalActions(s, buf)
-                if (Rules.legalActions(s).any { it.type == wgbg.engine.CkActionType.CHOOSE_CARD }) {
+                if (Rules.legalActions(s).any { it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD }) {
                     assertTrue(cardChoiceTitle(s, listOf("You", "Blue", "Orange", "White")) != "Choose a card", "${s.phase}")
                     seen += s.phase
                 }
@@ -193,16 +193,16 @@ class TradePanelTest {
     }
 
     @Test
-    fun `Age of Chivalry trades cover the commodities, mirror terms, and send the C&K offer`() {
-        val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 4), 3)
+    fun `Age of Chivalry trades cover the commodities, mirror terms, and send the Age of Chivalry offer`() {
+        val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 4), 3)
         assertEquals(8, tradeCards(s))
         // Give seat 0 a Parchment (card 5) and seat 1 a Timber, then offer one for the other.
-        s.ck!!.commodities[0 * wgbg.engine.Commodity.COUNT + 0] += 1   // seat 0: a Parchment (card 5)
+        s.chivalry!!.commodities[0 * wgbg.engine.Commodity.COUNT + 0] += 1   // seat 0: a Parchment (card 5)
         s.hands[1 * wgbg.engine.CARD_TYPES + 0] += 1                    // seat 1: a Timber
         val give = IntArray(8).also { it[5] = 1 }
         val get = IntArray(8).also { it[0] = 1 }
         val offer = offerFor(s, give, get)!!
-        assertEquals(wgbg.engine.CkActionType.OFFER_TRADE_CK, offer.type)
+        assertEquals(wgbg.engine.ChivalryActionType.OFFER_TRADE_CK, offer.type)
         assertEquals(1, holding(s, 0, 5))
         // Pretend it's our turn after rolling, so the offer applies.
         s.phase = Phase.PLAY_TURN; s.hasRolled = true; s.currentPlayer = 0; s.actingPlayer = 0
@@ -271,13 +271,13 @@ class TradePanelTest {
     private fun setHand(s: GameState, p: Int, vararg counts: Pair<Int, Int>) {
         val nc = wgbg.engine.Commodity.COUNT
         for (r in 0 until CARD_TYPES) s.hands[p * CARD_TYPES + r] = 0
-        s.ck?.let { ck -> for (i in 0 until nc) ck.commodities[p * nc + i] = 0 }
-        for ((r, n) in counts) if (r < CARD_TYPES) s.hands[p * CARD_TYPES + r] = n else s.ck!!.commodities[p * nc + r - CARD_TYPES] = n
+        s.chivalry?.let { chivalry -> for (i in 0 until nc) chivalry.commodities[p * nc + i] = 0 }
+        for ((r, n) in counts) if (r < CARD_TYPES) s.hands[p * CARD_TYPES + r] = n else s.chivalry!!.commodities[p * nc + r - CARD_TYPES] = n
     }
 
     @Test
     fun `#122 two bank trades in a row, several lots and mixed rates go through, in both rulesets`() {
-        for (exp in listOf(wgbg.engine.Expansion.BASE, wgbg.engine.Expansion.CITIES_AND_KNIGHTS)) for (seed in 1L..6L) {
+        for (exp in listOf(wgbg.engine.Expansion.BASE, wgbg.engine.Expansion.CHIVALRY)) for (seed in 1L..6L) {
             val s = midTurn(exp, seed)
             val me = s.actingPlayer
             val n = tradeCards(s)
@@ -358,7 +358,7 @@ class TradePanelTest {
 
     @Test
     fun `#109 for commodities - Parchment, Fabric and Silver step back to none too (Age of Chivalry rows)`() {
-        val n = wgbg.engine.CK_CARD_TYPES
+        val n = wgbg.engine.CHIVALRY_CARD_TYPES
         for (r in wgbg.engine.CARD_TYPES until n) {
             var g = IntArray(n); var v = IntArray(n)
             repeat(2) { askOffer(g, v, r, CardTap.ASK, have = 0).let { g = it.first; v = it.second } }

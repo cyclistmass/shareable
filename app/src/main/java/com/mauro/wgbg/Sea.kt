@@ -302,7 +302,7 @@ class Sea(board: Board, seed: Int = 1) {
         val pdt = dt * (0.25f + 1.5f * motion)
         time += pdt
         raidersRunIn = (raidersRunIn - pdt).coerceAtLeast(0f)
-        val orbitTarget = if (raidersRunIn > 0f) wgbg.engine.CkPiece.BARBARIAN_TRACK.toFloat() else raidersTarget.toFloat()
+        val orbitTarget = if (raidersRunIn > 0f) wgbg.engine.ChivalryPiece.BARBARIAN_TRACK.toFloat() else raidersTarget.toFloat()
         raidersTrack += (orbitTarget - raidersTrack) * (1f - exp(-pdt / 3f))
         viewArea?.let { v -> for (c in critters) c.update(pdt, v) }
         for (p in drops) p.age += dt

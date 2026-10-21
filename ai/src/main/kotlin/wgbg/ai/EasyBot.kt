@@ -4,7 +4,7 @@ import wgbg.engine.Action
 import wgbg.engine.ActionBuffer
 import wgbg.engine.ActionType
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 import wgbg.engine.GameState
 import wgbg.engine.Phase
 import wgbg.engine.Rng
@@ -19,7 +19,7 @@ class EasyBot(seed: Long = 0, override val name: String = "Easy") : Bot {
     private val rng = Rng(seed)
 
     override fun choose(state: GameState, legal: ActionBuffer): Action {
-        if (state.ck == null) when (state.phase) {
+        if (state.chivalry == null) when (state.phase) {
             Phase.DECIDE_TRADE -> return if (Action.ACCEPT_TRADE in legal && clearlyGood(state, offerIn(state), offerOut(state), state.currentPlayer))
                 Action.ACCEPT_TRADE else Action.REJECT_TRADE
             else -> {}
@@ -52,6 +52,6 @@ class EasyBot(seed: Long = 0, override val name: String = "Easy") : Bot {
 
     companion object {
         private val BUILD_ORDER = listOf(ActionType.BUILD_CITY, ActionType.BUILD_SETTLEMENT, ActionType.BUILD_ROAD)
-        private val TRADE_STARTS = setOf(ActionType.OFFER_TRADE, ActionType.COUNTER_TRADE, CkActionType.OFFER_TRADE_CK, CkActionType.COUNTER_TRADE_CK)
+        private val TRADE_STARTS = setOf(ActionType.OFFER_TRADE, ActionType.COUNTER_TRADE, ChivalryActionType.OFFER_TRADE_CK, ChivalryActionType.COUNTER_TRADE_CK)
     }
 }

@@ -33,7 +33,7 @@ class TurnHistoryTest {
     fun `players hit by someone else's card or bandit are told who, with what, and what they lost`() {
         var hits = 0; var byCard = 0; var byBandit = 0
         for (seed in 1L..20L) {
-            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), seed)
+            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 3), seed)
             val tracker = TurnTracker(listOf("You", "Blue", "Orange"))
             val bots = List(3) { GreedyBot(it.toLong() + seed) }
             val buf = ActionBuffer()
@@ -61,7 +61,7 @@ class TurnHistoryTest {
         // hand of 4 resources + 2 commodities showed 4 cards.
         var discards = 0; var commodityDiscards = 0; var commoditySteals = 0
         for (seed in 1L..30L) {
-            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), seed)
+            val s = Rules.newGame(GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY, numPlayers = 3), seed)
             val tracker = TurnTracker(listOf("You", "Blue", "Orange"))
             val bots = List(3) { GreedyBot(it.toLong() + seed) }
             val buf = ActionBuffer()

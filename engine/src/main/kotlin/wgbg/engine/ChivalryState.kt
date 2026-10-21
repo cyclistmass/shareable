@@ -1,14 +1,14 @@
 package wgbg.engine
 
 /**
- * Cities & Knights part of a [GameState] (null in base games). Flat arrays like the
- * rest of the state so [copy] stays cheap. Rules live in [CitiesAndKnights].
+ * Age of Chivalry part of a [GameState] (null in base games). Flat arrays like the
+ * rest of the state so [copy] stays cheap. Rules live in [Chivalry].
  */
-class CkState internal constructor(
+class ChivalryState internal constructor(
     /** Commodity cards, `player * Commodity.COUNT + local commodity`. */
     val commodities: IntArray,
     val commodityBank: IntArray,
-    /** Number token per hex; mutable in C&K because of the Inventor. */
+    /** Number token per hex; mutable in Age of Chivalry because of the Inventor. */
     val hexNumber: IntArray,
     /** City-improvement level per track, `player * Track.COUNT + track`. */
     val trackLevel: IntArray,
@@ -49,7 +49,7 @@ class CkState internal constructor(
     var lastRed = 0
     /** Last event die face 0..5, -1 before the first roll. */
     var lastEvent = -1
-    /** Where an interrupted dice roll resumes (see [CitiesAndKnights.resume]). */
+    /** Where an interrupted dice roll resumes (see [Chivalry.resume]). */
     var rollStage = 0
     /** Players that must still pick a city to lose to the barbarians. */
     var barbLossMask = 0
@@ -73,7 +73,7 @@ class CkState internal constructor(
     var heldFrom = -1
     /** Opponents already offered a Commercial Harbor trade this card. */
     var chDoneMask = 0
-    var defenderLeft = CkPiece.DEFENDER_CARDS
+    var defenderLeft = ChivalryPiece.DEFENDER_CARDS
 
     val robberActive get() = barbarianAttacks > 0
 
@@ -102,12 +102,12 @@ class CkState internal constructor(
     fun isMetropolis(v: Int): Boolean = metroVertex[0] == v || metroVertex[1] == v || metroVertex[2] == v
 
     fun extraVictoryPoints(p: Int): Int =
-        CkPiece.METROPOLIS_VP * metropolises(p) + defenderVp[p] + progressVp[p] + (if (merchantOwner == p) 1 else 0)
+        ChivalryPiece.METROPOLIS_VP * metropolises(p) + defenderVp[p] + progressVp[p] + (if (merchantOwner == p) 1 else 0)
 
     fun isActive(v: Int) = knightFlags[v] and ACTIVE != 0
 
-    fun copy(): CkState {
-        val c = CkState(
+    fun copy(): ChivalryState {
+        val c = ChivalryState(
             commodities.copyOf(), commodityBank.copyOf(), hexNumber.copyOf(), trackLevel.copyOf(),
             metroOwner.copyOf(), metroVertex.copyOf(), wall.copyOf(), wallsLeft.copyOf(),
             knightOwner.copyOf(), knightLevel.copyOf(), knightFlags.copyOf(), knightsLeft.copyOf(),
@@ -160,7 +160,7 @@ class CkState internal constructor(
         /** Knight was promoted this turn (one promotion per knight per turn). */
         const val PROMOTED = 4
 
-        internal fun initial(n: Int, board: Board, rng: Rng): CkState {
+        internal fun initial(n: Int, board: Board, rng: Rng): ChivalryState {
             val deck = IntArray(Track.COUNT * Progress.PER_DECK)
             val fill = IntArray(Track.COUNT)
             for (c in 0 until Progress.COUNT) {
@@ -174,7 +174,7 @@ class CkState internal constructor(
                 rng.shuffle(tmp)
                 tmp.copyInto(deck, t * Progress.PER_DECK)
             }
-            return CkState(
+            return ChivalryState(
                 commodities = IntArray(n * Commodity.COUNT),
                 commodityBank = IntArray(Commodity.COUNT) { Commodity.BANK },
                 hexNumber = board.hexNumber.copyOf(),
@@ -182,11 +182,11 @@ class CkState internal constructor(
                 metroOwner = IntArray(Track.COUNT) { -1 },
                 metroVertex = IntArray(Track.COUNT) { -1 },
                 wall = IntArray(board.vertexCount),
-                wallsLeft = IntArray(n) { CkPiece.WALLS },
+                wallsLeft = IntArray(n) { ChivalryPiece.WALLS },
                 knightOwner = IntArray(board.vertexCount) { -1 },
                 knightLevel = IntArray(board.vertexCount),
                 knightFlags = IntArray(board.vertexCount),
-                knightsLeft = IntArray(n * CkPiece.MAX_KNIGHT_LEVEL) { CkPiece.KNIGHTS_PER_LEVEL },
+                knightsLeft = IntArray(n * ChivalryPiece.MAX_KNIGHT_LEVEL) { ChivalryPiece.KNIGHTS_PER_LEVEL },
                 progressHand = IntArray(n * Progress.COUNT),
                 progressVp = IntArray(n),
                 defenderVp = IntArray(n),

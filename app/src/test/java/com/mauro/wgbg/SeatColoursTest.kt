@@ -202,6 +202,14 @@ class SeatColoursTest {
         assertFalse("colours" in (room.wire()["options"] as Map<*, *>), "nothing written when there are none")
     }
 
+    @Test
+    fun `the server's rules allow exactly these colours (a new colour needs the rules deployed first)`() {
+        val rules = java.io.File("../firestore.rules").readText()
+        val listed = Regex("""o\.get\('colours', \[\]\)\.hasOnly\(\[([^]]*)]""").find(rules)!!.groupValues[1]
+            .split(",").map { it.trim().trim('\'') }
+        assertEquals(all.map { it.name }.toSet(), listed.toSet())
+    }
+
     // ------------------------------------------------------------ fuzz
 
     @Test

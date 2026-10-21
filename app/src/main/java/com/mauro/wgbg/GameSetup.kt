@@ -33,7 +33,7 @@ data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, va
 /** Rulesets the screen offers, with our names (never the original game's). */
 enum class Ruleset(val label: String, val expansion: Expansion, val defaultPoints: Int, val players: IntRange) {
     BASE("Base game", Expansion.BASE, 10, 2..4),
-    CHIVALRY("Age of Chivalry", Expansion.CITIES_AND_KNIGHTS, 13, 3..4),
+    CHIVALRY("Age of Chivalry", Expansion.CHIVALRY, 13, 3..4),
 }
 
 /**

@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import wgbg.engine.Action
 import wgbg.engine.ActionKind
 import wgbg.engine.ActionType
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 
 /**
  * One entry of the build menu down the right edge (Mauro: "a menu on the right side with the build/activate options,
@@ -24,12 +24,12 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
     HOMESTEAD(ActionType.BUILD_SETTLEMENT, MoveIcon.HOMESTEAD, "Homestead"),
     TOWN(ActionType.BUILD_CITY, MoveIcon.TOWN, "Town"),
     FORTUNE(ActionType.BUY_DEVELOPMENT_CARD, MoveIcon.CARD, "Fortune card", onBoard = false, chivalry = false),
-    KNIGHT(CkActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "New knight", chivalry = true),
-    ROUSE(CkActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply knight", chivalry = true),
-    PROMOTE(CkActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote knight", chivalry = true),
+    KNIGHT(ChivalryActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "New knight", chivalry = true),
+    ROUSE(ChivalryActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply knight", chivalry = true),
+    PROMOTE(ChivalryActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote knight", chivalry = true),
     /** Picks the knights that can move (a charge too); tap one, then where it goes. */
-    MOVE(CkActionType.MOVE_KNIGHT, MoveIcon.MOVE_KNIGHT, "Move knight", chivalry = true),
-    RAMPARTS(CkActionType.BUILD_CITY_WALL, MoveIcon.RAMPARTS, "Ramparts", chivalry = true);
+    MOVE(ChivalryActionType.MOVE_KNIGHT, MoveIcon.MOVE_KNIGHT, "Move knight", chivalry = true),
+    RAMPARTS(ChivalryActionType.BUILD_CITY_WALL, MoveIcon.RAMPARTS, "Ramparts", chivalry = true);
 
     companion object {
         /** The entries for a ruleset, in menu order. */

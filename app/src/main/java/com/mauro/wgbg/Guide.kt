@@ -25,7 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import wgbg.engine.CkCost
+import wgbg.engine.ChivalryCost
 import wgbg.engine.Cost
 import wgbg.engine.Progress
 import wgbg.engine.Track
@@ -43,10 +43,10 @@ fun buildCosts(chivalry: Boolean): List<BuildCost> = buildList {
     add(BuildCost("Town", Cost.CITY, "2 points; replaces a homestead"))
     if (!chivalry) add(BuildCost("Fortune card", Cost.DEV_CARD))
     if (chivalry) {
-        add(BuildCost("Knight", CkCost.KNIGHT, "raised at a corner on your roads, level 1"))
-        add(BuildCost("Promote a knight", CkCost.PROMOTE, "level 3 needs Crown improvement 3"))
-        add(BuildCost("Supply a knight", CkCost.ACTIVATE, "a supplied knight defends and can act"))
-        add(BuildCost("Ramparts", CkCost.WALL, "on a town: hold 2 more cards on a 7"))
+        add(BuildCost("Knight", ChivalryCost.KNIGHT, "raised at a corner on your roads, level 1"))
+        add(BuildCost("Promote a knight", ChivalryCost.PROMOTE, "level 3 needs Crown improvement 3"))
+        add(BuildCost("Supply a knight", ChivalryCost.ACTIVATE, "a supplied knight defends and can act"))
+        add(BuildCost("Ramparts", ChivalryCost.WALL, "on a town: hold 2 more cards on a 7"))
     }
 }
 

@@ -1,7 +1,7 @@
 package com.mauro.wgbg
 
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CkPiece
+import wgbg.engine.ChivalryPiece
 import wgbg.engine.Commodity
 import wgbg.engine.DevCard
 import wgbg.engine.GameState
@@ -24,15 +24,15 @@ internal fun layoutStress(s: GameState, discard: Boolean) {
     for (p in 0 until s.numPlayers) {
         for (r in 0 until CARD_TYPES) s.hands[p * CARD_TYPES + r] = if (p == 0) 4 else 2
         s.roadLength[p] = 10 + p
-        if (s.ck == null) s.devPlayed[p * DevCard.COUNT + DevCard.KNIGHT] = 10 + p
+        if (s.chivalry == null) s.devPlayed[p * DevCard.COUNT + DevCard.KNIGHT] = 10 + p
     }
     s.longestRoadOwner = 0
-    if (s.ck == null) s.largestArmyOwner = 0
-    s.ck?.let { ck ->
-        ck.barbarianPos = CkPiece.BARBARIAN_TRACK - 1
-        for (c in 0 until Commodity.COUNT) ck.commodities[c] = 3
-        for (t in 0 until Track.COUNT) ck.trackLevel[t] = 5
-        for (c in 0 until minOf(4, Progress.COUNT)) ck.progressHand[c] = 1
+    if (s.chivalry == null) s.largestArmyOwner = 0
+    s.chivalry?.let { chivalry ->
+        chivalry.barbarianPos = ChivalryPiece.BARBARIAN_TRACK - 1
+        for (c in 0 until Commodity.COUNT) chivalry.commodities[c] = 3
+        for (t in 0 until Track.COUNT) chivalry.trackLevel[t] = 5
+        for (c in 0 until minOf(4, Progress.COUNT)) chivalry.progressHand[c] = 1
     }
     // Hidden points make up the rest; one short of the target, so the next move doesn't end the game.
     s.devHand[DevCard.VICTORY_POINT] = 0

@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import wgbg.engine.Action
-import wgbg.engine.CkCost
+import wgbg.engine.ChivalryCost
 import wgbg.engine.Cost
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
@@ -16,7 +16,7 @@ import wgbg.engine.Rules
 class SpotChoiceTest {
     private val names = listOf("You", "Blue", "Orange")
 
-    private fun midTurn() = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 7).also { s ->
+    private fun midTurn() = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 7).also { s ->
         while (s.phase != Phase.PLAY_TURN) Rules.apply(s, Rules.legalActions(s).first())
     }
 
@@ -30,8 +30,8 @@ class SpotChoiceTest {
         assertEquals(listOf("Town", "Ramparts", "New knight"), rows.map { it.name })
         assertEquals(listOf(MoveIcon.TOWN, MoveIcon.RAMPARTS, MoveIcon.KNIGHT), rows.map { it.icon })
         assertArrayEquals(Cost.CITY, rows[0].cost)
-        assertArrayEquals(CkCost.WALL, rows[1].cost)
-        assertArrayEquals(CkCost.KNIGHT, rows[2].cost)
+        assertArrayEquals(ChivalryCost.WALL, rows[1].cost)
+        assertArrayEquals(ChivalryCost.KNIGHT, rows[2].cost)
     }
 
     @Test

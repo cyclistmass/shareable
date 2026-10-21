@@ -2,7 +2,7 @@ package wgbg.engine
 
 /**
  * Turn phases, modelled on Catanatron's ActionPrompt. Expansions add entries
- * (e.g. C&K's progress-card or barbarian prompts).
+ * (e.g. Age of Chivalry's progress-card or barbarian prompts).
  */
 enum class Phase {
     BUILD_INITIAL_SETTLEMENT,
@@ -14,7 +14,7 @@ enum class Phase {
     DECIDE_ACCEPTEES,
     GAME_OVER,
 
-    // Cities & Knights prompts (appended so base ordinals stay stable).
+    // Age of Chivalry prompts (appended so base ordinals stay stable).
     /** Acting player holds more than 4 progress cards and discards one (DISCARD_PROGRESS). */
     PROGRESS_DISCARD,
     /** Barbarians won: acting player picks a city to lose (CHOOSE_VERTEX). */
@@ -25,7 +25,7 @@ enum class Phase {
     AQUEDUCT,
     /** Acting player moves their displaced knight (RELOCATE_KNIGHT). */
     RELOCATE_KNIGHT,
-    /** Commercial Harbor: offer a resource to an opponent (COMMERCIAL_HARBOR_OFFER) or stop (CK_DONE). */
+    /** Commercial Harbor: offer a resource to an opponent (COMMERCIAL_HARBOR_OFFER) or stop (CHIVALRY_DONE). */
     COMMERCIAL_HARBOR,
     /** Commercial Harbor: the acting opponent returns a commodity of their choice (CHOOSE_CARD). */
     COMMERCIAL_HARBOR_RESPOND,
@@ -35,12 +35,12 @@ enum class Phase {
     WEDDING,
     /** Deserter: acting opponent removes one of their knights (CHOOSE_VERTEX). */
     DESERTER_REMOVE,
-    /** Deserter: place a knight of equal strength (CHOOSE_VERTEX) or decline (CK_DONE). */
+    /** Deserter: place a knight of equal strength (CHOOSE_VERTEX) or decline (CHIVALRY_DONE). */
     DESERTER_PLACE,
     /** Spy: take a progress card from the target's hand (TAKE_PROGRESS). */
     SPY,
 
-    // Appended after the C&K prompts so every earlier ordinal stays stable.
+    // Appended after the Age of Chivalry prompts so every earlier ordinal stays stable.
     /** No longer entered (0.2.10: counters are collected with the round, see [GameState.counters]); kept for ordinals. */
     DECIDE_COUNTER,
 }
@@ -80,8 +80,8 @@ class GameState internal constructor(
     val discardOwed: IntArray,
     /** Current domestic trade: offered cards then requested cards (2 * CARD_TYPES). */
     val tradeOffer: IntArray,
-    /** Cities & Knights state, null in base games. */
-    val ck: CkState? = null,
+    /** Age of Chivalry state, null in base games. */
+    val chivalry: ChivalryState? = null,
 ) {
     val numPlayers get() = config.numPlayers
 
@@ -120,7 +120,7 @@ class GameState internal constructor(
 
     /** [q]'s counter-offer in the open round as a COUNTER_TRADE / COUNTER_TRADE_CK action, or null. */
     fun counterOf(q: Int): Action? = if (counters[q] == 0L) null
-        else Action.of(if (ck != null) CkActionType.COUNTER_TRADE_CK else ActionType.COUNTER_TRADE, counters[q])
+        else Action.of(if (chivalry != null) ChivalryActionType.COUNTER_TRADE_CK else ActionType.COUNTER_TRADE, counters[q])
 
     val anyCounter: Boolean get() = counters.any { it != 0L }
 
@@ -148,18 +148,18 @@ class GameState internal constructor(
     fun publicVictoryPoints(p: Int): Int =
         piecesOnBoard(p, Piece.SETTLEMENT) + 2 * piecesOnBoard(p, Piece.CITY) +
             (if (longestRoadOwner == p) 2 else 0) + (if (largestArmyOwner == p) 2 else 0) +
-            (ck?.extraVictoryPoints(p) ?: 0)
+            (chivalry?.extraVictoryPoints(p) ?: 0)
 
-    /** Resource cards plus (C&K) commodity cards. */
-    fun cardCount(p: Int): Int = handSize(p) + (ck?.commodityCount(p) ?: 0)
+    /** Resource cards plus (Age of Chivalry) commodity cards. */
+    fun cardCount(p: Int): Int = handSize(p) + (chivalry?.commodityCount(p) ?: 0)
 
-    /** Cards of type [c] in [p]'s hand; C&K card index space (commodities 5..7). */
+    /** Cards of type [c] in [p]'s hand; Age of Chivalry card index space (commodities 5..7). */
     fun card(p: Int, c: Int): Int =
-        if (c < Resource.COUNT) hands[p * CARD_TYPES + c] else ck!!.commodities[p * Commodity.COUNT + c - Resource.COUNT]
+        if (c < Resource.COUNT) hands[p * CARD_TYPES + c] else chivalry!!.commodities[p * Commodity.COUNT + c - Resource.COUNT]
 
     /** Actual points, including hidden VP cards. */
     /** The number on hex [h] now: an Inventor can swap them in Age of Chivalry, so draw and score from this, not [Board.hexNumber]. */
-    fun numberAt(h: Int): Int = ck?.hexNumber?.get(h) ?: board.hexNumber[h]
+    fun numberAt(h: Int): Int = chivalry?.hexNumber?.get(h) ?: board.hexNumber[h]
 
     fun victoryPoints(p: Int) = publicVictoryPoints(p) + devHand[p * DevCard.COUNT + DevCard.VICTORY_POINT]
 
@@ -176,7 +176,7 @@ class GameState internal constructor(
             vertexOwner.copyOf(), vertexBuilding.copyOf(), edgeOwner.copyOf(), bank.copyOf(),
             hands.copyOf(), devDeck.copyOf(), devHand.copyOf(), devNew.copyOf(), devPlayed.copyOf(),
             piecesLeft.copyOf(), portMask.copyOf(), roadLength.copyOf(), discardOwed.copyOf(),
-            tradeOffer.copyOf(), ck?.copy(),
+            tradeOffer.copyOf(), chivalry?.copy(),
         )
         s.phase = phase
         s.currentPlayer = currentPlayer
@@ -222,8 +222,8 @@ class GameState internal constructor(
         mix((rng.seed ushr 32).toInt()); mix(rng.seed.toInt())
         // Counters are mixed in only while one is open, so older hashes are unchanged.
         for (q in counters.indices) if (counters[q] != 0L) { mix(q); mix((counters[q] ushr 32).toInt()); mix(counters[q].toInt()) }
-        // Base games hash exactly as before; C&K state is appended only when present.
-        ck?.hashInto(::mix)
+        // Base games hash exactly as before; Age of Chivalry state is appended only when present.
+        chivalry?.hashInto(::mix)
         return h
     }
 
@@ -247,7 +247,7 @@ class GameState internal constructor(
                 roadLength = IntArray(n),
                 discardOwed = IntArray(n),
                 tradeOffer = IntArray(2 * CARD_TYPES),
-                ck = if (config.citiesAndKnights) CkState.initial(n, board, rng) else null,
+                chivalry = if (config.chivalry) ChivalryState.initial(n, board, rng) else null,
             )
             s.robberHex = board.desertHex
             return s

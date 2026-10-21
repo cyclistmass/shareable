@@ -52,13 +52,13 @@ class SpaceArtTest {
     }
 
     @Test fun `Space live placements cover expansion state without duplicate plates or knight discs`() {
-        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 5)
-        val ck = s.ck!!
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 5)
+        val chivalry = s.chivalry!!
         s.edgeOwner[0] = 1
         for (v in 0..3) { s.vertexOwner[v] = v; s.vertexBuilding[v] = if (v == 0) wgbg.engine.Piece.SETTLEMENT else wgbg.engine.Piece.CITY }
-        for (t in 0..2) { ck.metroVertex[t] = t + 1; ck.metroOwner[t] = t + 1; ck.wall[t + 1] = 1 }
-        for (i in 0..5) { ck.knightOwner[8 + i] = i % 4; ck.knightLevel[8 + i] = 1 + i / 2; if (i % 2 == 1) ck.knightFlags[8 + i] = wgbg.engine.CkState.ACTIVE }
-        ck.merchantOwner = 2; ck.merchantHex = 7
+        for (t in 0..2) { chivalry.metroVertex[t] = t + 1; chivalry.metroOwner[t] = t + 1; chivalry.wall[t + 1] = 1 }
+        for (i in 0..5) { chivalry.knightOwner[8 + i] = i % 4; chivalry.knightLevel[8 + i] = 1 + i / 2; if (i % 2 == 1) chivalry.knightFlags[8 + i] = wgbg.engine.ChivalryState.ACTIVE }
+        chivalry.merchantOwner = 2; chivalry.merchantHex = 7
         val hash = s.stateHash()
         for (lod in 0..1) {
             val placements = themedLivePlacements(s, ArtChoice(ArtSet.SPACE), lod) { true }

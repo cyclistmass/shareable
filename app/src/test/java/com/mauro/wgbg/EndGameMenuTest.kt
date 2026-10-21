@@ -58,8 +58,8 @@ class EndGameMenuTest {
         val tries = listOf(Action.of(ActionType.ROLL), Action.of(ActionType.END_TURN), Action.REJECT_TRADE, Action.BUY_DEVELOPMENT_CARD)
         var finished = 0
         for (seed in 1..24L) {
-            val ck = seed % 2 == 0L; val n = if (seed % 3 == 0L) 3 else 4
-            val s = Rules.newGame(GameConfig(expansion = if (ck) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE, numPlayers = n), seed)
+            val chivalry = seed % 2 == 0L; val n = if (seed % 3 == 0L) 3 else 4
+            val s = Rules.newGame(GameConfig(expansion = if (chivalry) Expansion.CHIVALRY else Expansion.BASE, numPlayers = n), seed)
             val bots = List(n) { GreedyBot(seed * 7 + it) }
             var moves = 0
             while (!s.isOver && moves++ < 20_000) { Rules.legalActions(s, buf); Rules.apply(s, bots[s.actingPlayer].choose(s, buf)) }

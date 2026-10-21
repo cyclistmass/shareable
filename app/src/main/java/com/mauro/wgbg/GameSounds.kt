@@ -45,7 +45,7 @@ class GameSounds(context: Context) : AutoCloseable {
 }
 
 /** Steps left before the Raiders' ship reaches the island, or null outside Age of Chivalry. */
-fun raidersStepsLeft(s: wgbg.engine.GameState): Int? = s.ck?.let { wgbg.engine.CkPiece.BARBARIAN_TRACK - it.barbarianPos }
+fun raidersStepsLeft(s: wgbg.engine.GameState): Int? = s.chivalry?.let { wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - it.barbarianPos }
 
 /**
  * True when the Raiders' ship has just moved closer, from [before] to [after] steps left, and is now [warnAt] steps away

@@ -24,8 +24,9 @@ Never use the original game's names in UI, art, card text or docs. Our names:
 - Expansion **Age of Chivalry**: commodities Parchment, Fabric, Silver; progress decks Guilds, Academy, Crown;
   the **Raiders** (barbarians), Capital (metropolis), Ramparts (city walls).
 
-Keep the "Not affiliated with or endorsed by Catan GmbH" line in the README. Code identifiers may use the
-standard terms (`CitiesAndKnights.kt`, `Resource.ORE`); player-facing text may not.
+Keep the "Not affiliated with or endorsed by Catan GmbH" line in the README. Use our names in code too
+(`Chivalry.kt`, `ChivalryState`, #84), as in player-facing text. Only the wire keeps two old names, so saves and rooms
+from before still read: `Expansion.wire` and the move codec's `CK_DONE`.
 
 ## Look and feel (required on every panel)
 

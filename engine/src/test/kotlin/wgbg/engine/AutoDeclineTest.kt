@@ -18,7 +18,7 @@ import wgbg.engine.Resource.WOOD
  */
 class AutoDeclineTest {
     private fun cards(vararg rc: Pair<Int, Int>) = IntArray(CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
-    private fun ckCards(vararg rc: Pair<Int, Int>) = IntArray(CK_CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
+    private fun chivalryCards(vararg rc: Pair<Int, Int>) = IntArray(CHIVALRY_CARD_TYPES).also { for ((r, n) in rc) it[r] = n }
 
     @Test
     fun `an offer asking for more than you hold can't be paid, and the shortfall names what's missing`() {
@@ -56,10 +56,10 @@ class AutoDeclineTest {
         CK.roll(s, 6, 2)
         CK.give(s, 0, WOOD, 1)
         CK.give(s, 1, CLOTH, 1)
-        Rules.applyChecked(s, Action.offerTradeCk(ckCards(WOOD to 1), ckCards(CLOTH to 1, COIN to 1)))
+        Rules.applyChecked(s, Action.offerTradeCk(chivalryCards(WOOD to 1), chivalryCards(CLOTH to 1, COIN to 1)))
         assertEquals(1, s.actingPlayer)
         assertTrue(Rules.cantPayOffer(s, 1))
-        assertEquals(ckCards(COIN to 1).toList(), Rules.offerShortfall(s, 1).toList())
+        assertEquals(chivalryCards(COIN to 1).toList(), Rules.offerShortfall(s, 1).toList())
         CK.give(s, 1, COIN, 1)
         assertFalse(Rules.cantPayOffer(s, 1))
         assertTrue(Action.ACCEPT_TRADE in CK.legal(s))
@@ -69,8 +69,8 @@ class AutoDeclineTest {
     @Test
     fun `fuzz - in thousands of trade answers, can't-pay means exactly that Yes isn't legal, and No always is`() {
         var checked = 0; var cantPay = 0
-        for (ck in listOf(false, true)) for (seed in 1L..40L) {
-            val config = GameConfig(expansion = if (ck) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE, numPlayers = 3 + (seed % 2).toInt(),
+        for (chivalry in listOf(false, true)) for (seed in 1L..40L) {
+            val config = GameConfig(expansion = if (chivalry) Expansion.CHIVALRY else Expansion.BASE, numPlayers = 3 + (seed % 2).toInt(),
                 generateTradeOffers = true, maxTurns = 300)
             val s = Rules.newGame(config, seed)
             val rnd = Rng(seed * 7)
@@ -94,7 +94,7 @@ class AutoDeclineTest {
                 // Mostly the way a player would: take the No for them whenever it's due, as the app and CLI do.
                 val a = if (Rules.cantPayOffer(s, p)) Action.REJECT_TRADE else legal[rnd.nextInt(legal.size)]
                 Rules.applyChecked(s, a)
-                if (ck) CK.checkInvariants(s) else T.checkInvariants(s)
+                if (chivalry) CK.checkInvariants(s) else T.checkInvariants(s)
             }
         }
         assertTrue(checked > 1000, "only $checked trade answers")

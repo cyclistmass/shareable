@@ -32,7 +32,7 @@ class BreakItTest {
         val rng = Rng(12345)
         val buf = ActionBuffer()
         val stale = ArrayList<Action>() // legal moves from earlier moments, replayed at the wrong time
-        val maxType = CkActionType.ID_BASE + CkActionType.entries.size
+        val maxType = ChivalryActionType.ID_BASE + ChivalryActionType.entries.size
         for (g in 0 until games) {
             val s = Rules.newGame(config, g.toLong())
             var steps = 0
@@ -67,7 +67,7 @@ class BreakItTest {
     @Test
     fun `age of chivalry survives garbage, mutated and wrong-time actions`() {
         val t = run(CK.config(players = 4), games = 40, invariants = CK::checkInvariants)
-        println("C&K break-it: ${t.rejected} rejected, ${t.accepted} accepted (were legal)")
+        println("Age of Chivalry break-it: ${t.rejected} rejected, ${t.accepted} accepted (were legal)")
         assertTrue(t.rejected > 50_000, "should have thrown a lot of junk, rejected ${t.rejected}")
     }
 }
