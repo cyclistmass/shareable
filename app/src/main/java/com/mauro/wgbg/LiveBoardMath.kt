@@ -96,8 +96,8 @@ internal const val KNIGHT_BAND_HEIGHT = 0.008f // its top just above the ring's
 internal const val KNIGHT_ON_BASE = 0.031f     // the knight stands on the dark disc
 internal val KNIGHT_BAND_COLOR = androidx.compose.ui.graphics.Color(0xFF2B2622)
 
-/** The GLB file a model name loads: the pedestal discs reuse the number plate. */
-internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || model == KNIGHT_BAND) "number_plate" else model
+/** The GLB file a model name loads: the pedestal discs reuse the number plate; a graded tile (`@autumn`) loads its plain one. */
+internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || model == KNIGHT_BAND) "number_plate" else model.substringBefore('@')
 
 /** The colour to paint [material] of [model] for [owner], or null to keep its own: wood in the player colour, the pedestal whole. */
 internal fun liveTint(model: String, material: String, owner: Int): androidx.compose.ui.graphics.Color? = when {

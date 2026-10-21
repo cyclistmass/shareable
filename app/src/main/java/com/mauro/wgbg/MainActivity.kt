@@ -679,12 +679,15 @@ fun WatchGameScreen(
     // Knight art per theme: index (level - 1) * 2 + (active ? 1 : 0).
     val knightsPirate = art.knightsPirate
     val knightsNormal = art.knightsNormal
-    val tileFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) art.framedFaces else art.plainFaces
+    val plainFaces = if (env.tileEdge == EnvSettings.TileEdge.CLASSIC) art.framedFaces else art.plainFaces
+    // Terrain colours (#86), baked off the main thread when the palette changes; the ungraded art stands in meanwhile.
+    val tileFaces = rememberLoaded(plainFaces, env.terrainPalette) { env.terrainPalette.grade(plainFaces) } ?: plainFaces
     val tileLine = env.tileEdge == EnvSettings.TileEdge.THIN
     // Rendered buildings (#41) for the chosen theme; Age of Chivalry pieces only load in those games.
     val space = remember(env.art) { SpaceSprites(oceanRes, env.art) }
     val buildings = buildingsLoaded
-    val tiles3d = tiles3dLoaded.takeIf { env.tiles3d && it.isNotEmpty() }
+    val tiles3d = (rememberLoaded(tiles3dLoaded, env.terrainPalette) { env.terrainPalette.grade3d(tiles3dLoaded) } ?: tiles3dLoaded)
+        .takeIf { env.tiles3d && it.isNotEmpty() }
     val sea = remember { Sea(state.board).also { it.oceanBitmap = art.ocean; it.boatColors = PLAYER_COLORS } }
     sea.gullFlap = art.gullFlap; sea.gullGlide = art.gullGlide; sea.gullShadow = art.gullShadow; sea.boatWake = art.boatWake; sea.boatSprites = art.boatSprites
     if (sea.sprites3d == null) sea.sprites3d = SeaSprites3d(oceanRes)
@@ -779,7 +782,7 @@ fun WatchGameScreen(
                 if (appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
                     val snapshot = org.json.JSONObject().apply {
                         put("turn", state.turn); put("hash", state.stateHash().toString())
-                        put("placements", org.json.JSONArray(themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }.map { p ->
+                        put("placements", org.json.JSONArray(env.terrainPalette.live(themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }).map { p ->
                             org.json.JSONObject().apply {
                                 put("model", p.model); put("x", p.position.x); put("z", p.position.y)
                                 put("height", p.height); put("scale", p.scale); put("heading", p.heading); put("owner", p.owner)
@@ -998,6 +1001,7 @@ fun WatchGameScreen(
                     if (intent.hasExtra("aiPace")) intent.getFloatExtra("aiPace", EnvSettings.AI_PACE_DEFAULT).takeIf { it.isFinite() }?.let { env.aiPace = it }
                     if (intent.hasExtra("lod")) env.liveLod = intent.getIntExtra("lod", 0)
                     if (intent.hasExtra("pirate")) env.pirateTheme = intent.getBooleanExtra("pirate", false)
+                    if (intent.hasExtra("palette")) env.terrainPalette = TerrainPalette.entries.getOrElse(intent.getIntExtra("palette", 0)) { TerrainPalette.TODAY }
                     if (intent.hasExtra("sprites3d")) env.tiles3d = intent.getBooleanExtra("sprites3d", false)
                     if (intent.hasExtra("tilt")) camera = camera.copy(tilt = (intent.getFloatExtra("tilt", Camera.START_TILT).takeIf { it.isFinite() } ?: Camera.START_TILT).coerceIn(0f, Camera.MAX_TILT))
                     if (intent.hasExtra("zoom")) camera = camera.copy(zoom = (intent.getFloatExtra("zoom", 1f).takeIf { it.isFinite() } ?: 1f).coerceIn(Camera.MIN_ZOOM, Camera.MAX_ZOOM))
@@ -1111,8 +1115,8 @@ fun WatchGameScreen(
         val waterLayer = rememberGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen }
         val waterLayerKey = remember(space) { arrayOfNulls<WaterLayerKey>(1) }
         if (liveBoard) {
-            val placements = remember(tick, state, env.art, env.liveLod, inventory) {
-                if (inventory) themedInventoryPlacements(env.art) else themedLivePlacements(state, env.art, env.liveLod) { it in liveModels }
+            val placements = remember(tick, state, env.art, env.liveLod, inventory, env.terrainPalette) {
+                env.terrainPalette.live(if (inventory) themedInventoryPlacements(env.art) else themedLivePlacements(state, env.art, env.liveLod) { it in liveModels })
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
             // Codex's animated 3D water, boats, gulls and Raiders' ship (#63) ride the 2D sea's simulation; a Space board has its own.
