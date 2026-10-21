@@ -29,7 +29,7 @@ HOST="${HOST_SERIAL:-emulator-5554}"; GUEST="${GUEST_SERIAL:-emulator-5556}"
 FS_PORT="${FS_PORT:-8187}"; AUTH_PORT="${AUTH_PORT:-9197}"
 OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-release-check/$(date +%Y%m%d-%H%M%S)}"; mkdir -p "$OUT"
 APK=app/build/outputs/apk/debug/app-debug.apk
-RELEASE=app/build/outputs/apk/release/app-release.apk   # the user test's APK: what players install
+RELEASE=app/build/outputs/apk/release/app-release.apk   # built here for its checks; local builds have no Firebase config
 export MSYS_NO_PATHCONV=1
 REPORT=()
 
@@ -141,14 +141,18 @@ fi
   echo; echo "Release check, $(git log -1 --format='%h %s' | cut -c1-70)"
   printf '  %s\n' "${REPORT[@]}"
   [ -n "${SHA:-}" ] && echo "  debug APK sha256 (device steps): $SHA"
-  [ -f "$RELEASE" ] && echo "  release APK sha256 (the user test's, and what publish_release takes): $(sha256sum < "$RELEASE" | cut -c1-64)"
+  [ -f "$RELEASE" ] && echo "  local release APK sha256: $(sha256sum < "$RELEASE" | cut -c1-64) (no Firebase config: not the one to publish or user-test)"
   cat <<'EOF'
 
 Still to do by hand (AGENTS.md, never by hooks or debug extras):
-  [ ] this exact release APK (app/build/outputs/apk/release/app-release.apk) installed fresh, and as an update over the last release
+  [ ] HARD STEP: the exact APK to be published, downloaded from the green run publish_release will take it from
+      (artifact working-german-board-game-release-apk, or a check run's publish-release-apk; never a local build:
+      those have no Firebase config, and the hand-uploaded 0.3.4 had none). Check it first:
+      tools/ci/apk_check.sh --firebase <apk>. Install it fresh, and as an update over the last release.
+  [ ] HARD STEP: with that APK, host and join online against real Firebase (no --es firebase emu), and send a report
   [ ] in through the start screen with real taps; full games to the end, base and Age of Chivalry, 3 and 4 players
   [ ] closed and reopened mid-game
-  [ ] host and join online; every changed feature tried
+  [ ] every changed feature tried
   Afterwards: ANDROID_SERIAL=<lane> tools/emulator_setup.sh user  on a phone a person uses (Play Store back on).
 EOF
 } | tee "$OUT/report.txt"

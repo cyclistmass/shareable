@@ -114,9 +114,9 @@ jobs:
       - name: Build the release and debug APKs (and the instrumented test APK)
         run: bash ./gradlew --no-daemon :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest
       # Both APKs must carry the stable key (its public certificate fingerprint), or phones can't update to them; the
-      # release one must not be debuggable.
-      - name: Check the APKs' signing key, and that the release is not debuggable
-        run: bash tools/ci/apk_check.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
+      # release one must not be debuggable, and must carry the Firebase config (no secret: no publishable APK).
+      - name: Check the APKs' signing key, and that the release is not debuggable and has the Firebase config
+        run: bash tools/ci/apk_check.sh --firebase app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload the release APK (what tools/publish_release.sh publishes)
         uses: actions/upload-artifact@v4
