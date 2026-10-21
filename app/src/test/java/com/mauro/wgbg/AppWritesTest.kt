@@ -50,6 +50,10 @@ class AppWritesTest {
         val setup = GameSetup(name = "Mauro", theme = NameTheme.ENGLISH_QUEENS, randomColours = true)
             .withSeat(1, SeatKind.FRIEND).withSeat(2, SeatKind.FRIEND)
 
+        // Erin and Bo played with the host before: their own apps keep the host as played with, which is what lets the
+        // host invite them (the rules read that list, so the replay needs these writes first).
+        for (uid in listOf("erin", "bo")) player(uid, google = true).putFriend(Friend("host", "Mauro", NOW)).join()
+
         // A room with an invite from the played-with list, two people joining (one with Google, one a guest), both ready.
         val h = LobbySession.host(hostT, setup, seed = 42, code = "COBALT-1", invited = listOf("erin")).join()
         val g = LobbySession.join(gus, setup.copy(name = "Gus"), h.id, 1).join()

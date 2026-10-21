@@ -35,9 +35,13 @@ check() {
   else REPORT+=("FAIL  $(printf '%5d' $((SECONDS - t0))) s  $name   (log: $OUT/$name.log)"); tail -15 "$OUT/$name.log"; return 1; fi
 }
 on() { case " $STEPS " in *" $1 "*) return 0;; esac; return 1; }
+# A path a Windows program (firebase, adb.exe) can open: Git Bash's /c/... and /tmp/... mean nothing to it.
+natpath() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s
+' "$1"; fi; }
+ADB="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 fbconfig() {   # a firebase.json for a private pair of emulators, so a peer's 8080 or 8186 is never touched
   printf '{"firestore":{"rules":"%s"},"emulators":{"firestore":{"port":%s,"host":"0.0.0.0"},"auth":{"port":%s,"host":"0.0.0.0"},"ui":{"enabled":false},"singleProjectMode":true}}\n' \
-    "$(pwd)/firestore.rules" "$FS_PORT" "$AUTH_PORT" > "$OUT/firebase.json"
+    "$(natpath "$(pwd)/firestore.rules")" "$FS_PORT" "$AUTH_PORT" > "$OUT/firebase.json"
 }
 
 # The instrumented tests are compiled too: assembleDebug never touches them, and 0.3.4 reached CI with one that no
@@ -46,7 +50,7 @@ on unit && check unit bash ./gradlew :engine:test :ai:test :net:test :cli:test :
 
 if on rules; then
   fbconfig
-  check rules firebase emulators:exec --config "$OUT/firebase.json" --only firestore --project demo-wgbg \
+  check rules firebase emulators:exec --config "$(natpath "$OUT/firebase.json")" --only firestore --project demo-wgbg \
     "npm --prefix firebase/rules-test test"
 fi
 
@@ -62,7 +66,7 @@ fi
 if [ -f "$APK" ]; then
   SHA=$(sha256sum < "$APK" | cut -c1-64)
   if on install; then
-    check install-host adb -s "$HOST" install -r "$APK"; check install-guest adb -s "$GUEST" install -r "$APK"
+    check install-host "$ADB" -s "$HOST" install -r "$APK"; check install-guest "$ADB" -s "$GUEST" install -r "$APK"
     # Play Store off, animations off, hints seen; warns about a long-running emulator (they leak memory over hours).
     for d in "$HOST" "$GUEST"; do ANDROID_SERIAL="$d" bash tools/emulator_setup.sh test; done
   fi
