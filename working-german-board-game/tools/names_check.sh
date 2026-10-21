@@ -13,7 +13,7 @@ THEME="$1"; IFS=, read -r -a PICKS <<< "$2"; EVENTS="${3:-2000}"
 : "${ANDROID_SERIAL:?set ANDROID_SERIAL to the device to drive}"
 export ANDROID_SERIAL MSYS_NO_PATHCONV=1
 ADB="${ADB:-adb}"; PKG=com.mauro.wgbg
-OUT="${OUT:-$TEMP/wgbg-names/$ANDROID_SERIAL}"; mkdir -p "$OUT"
+OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-names/$ANDROID_SERIAL}"; mkdir -p "$OUT"
 TAG=$(echo "$THEME" | tr ' ' '-' | tr 'A-Z' 'a-z')
 
 # The small screen, put back however the run ends.

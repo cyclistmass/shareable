@@ -275,7 +275,7 @@ fun TradePanel(
                 // Everyone's answer to your offer, up here beside the tabs: a row at the bottom ran off the
                 // chest on a landscape phone.
                 if (!bankTab && s.currentPlayer == me) for (p in 0 until s.numPlayers) if (p != me) {
-                    val mark = responses[p] ?: if (mode == TradeMode.WAITING && s.actingPlayer == p) "…" else ""
+                    val mark = answerMark(responses[p], mode == TradeMode.WAITING && s.actingPlayer == p)
                     // A long name ends in "…" and the answer mark always shows: three 16-letter names ran off the chest (0.3.4).
                     val ink = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) }
                     Row(Modifier.testTag("answer-$p"), verticalAlignment = Alignment.CenterVertically) {
@@ -369,6 +369,12 @@ private fun Tab(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp).testTag("tab-$label"),
     ) { Text(label, color = if (selected) WOOD_DARK else INK, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 }
+
+/**
+ * The mark after a player's name beside the trade tabs: their answer (✓ yes, ✗ no, ⇄ countered), ⌛ while they're
+ * still [answering], else nothing. Never "…": after a name it read as a name cut short (Mauro's pick, 0.3.5).
+ */
+internal fun answerMark(answer: String?, answering: Boolean): String = answer ?: if (answering) "⌛" else ""
 
 /** What a tap on a trade card does (#49). */
 enum class CardTap { ASK, OFFER, TAKE_BACK }

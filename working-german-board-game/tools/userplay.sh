@@ -12,7 +12,7 @@
 # once never share files or taps.
 # Usage: ANDROID_SERIAL=emulator-5554 tools/userplay.sh <base|chivalry> <local|online|host|join> [players=3] [minutes=40]
 #   RESUME=1 finishes the saved game instead (the splash's Resume game); ruleset and players are then the save's.
-#   host/join meet through ROOM_FILE (default $TEMP/wgbg-userplay/room-code); start the host first.
+#   host/join meet through ROOM_FILE (default ${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/room-code); start the host first.
 set -uo pipefail
 RULESET="$1"; MODE="$2"; PLAYERS="${3:-3}"; MINUTES="${4:-40}"
 : "${ANDROID_SERIAL:?set ANDROID_SERIAL to the device to drive (lane 1 emulator-5554, lane 2 emulator-5556)}"
@@ -20,8 +20,8 @@ export ANDROID_SERIAL
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
-OUT="${OUT:-$TEMP/wgbg-userplay/$ANDROID_SERIAL}"; mkdir -p "$OUT"
-ROOM_FILE="${ROOM_FILE:-$TEMP/wgbg-userplay/room-code}"
+OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/$ANDROID_SERIAL}"; mkdir -p "$OUT"
+ROOM_FILE="${ROOM_FILE:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/room-code}"
 TAG="$RULESET-$MODE-${PLAYERS}p"
 # One run per device: a second run on the same device would tap over this one.
 if [ -f "$OUT/run.pid" ] && kill -0 "$(cat "$OUT/run.pid")" 2>/dev/null; then

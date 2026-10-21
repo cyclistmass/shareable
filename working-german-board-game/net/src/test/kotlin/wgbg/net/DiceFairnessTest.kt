@@ -29,7 +29,7 @@ class DiceFairnessTest {
         for (expansion in listOf(Expansion.BASE, Expansion.CHIVALRY)) {
             val s = atFirstRoll(expansion)
             val hash = s.stateHash()
-            val rolls = List(10_000) { rollFromHistory(s, emptyList(), 0) }
+            val rolls = List(10_000 * (System.getProperty("wgbg.testScale")?.toIntOrNull()?.coerceAtLeast(1) ?: 1)) { rollFromHistory(s, emptyList(), 0) }
             assertEquals(hash, s.stateHash(), "drawing dice leaves the game alone")
             assertTrue(rolls.all { it.type == ActionType.ROLL && Rules.isLegal(s, it) })
             val events = rolls.map { ((it.payload ushr 16) and 0xff).toInt() }

@@ -19,9 +19,9 @@ LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 FB_EXTRA="--es firebase emu"; [ "${FIREBASE:-emu}" = live ] && FB_EXTRA=""
 # EXTRA: more launch extras for both phones, e.g. "--ez fakegoogle true" (tools/friends_sim.sh).
 EXTRA="${EXTRA:-}"
-HOST=emulator-5554
-GUEST=emulator-5556
-A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+HOST="${HOST_SERIAL:-emulator-5554}"
+GUEST="${GUEST_SERIAL:-emulator-5556}"
+A="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 export MSYS_NO_PATHCONV=1
 
 # The screen of device $1 as one element per line. A busy host makes uiautomator answer "null root node" now and then:
@@ -70,6 +70,24 @@ fill() {
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
 # Waits up to $3 s for text matching $2 on device $1.
 wait_for() { for _ in $(seq 1 "$3"); do texts "$1" | grep -q "$2" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
+# A finger's swipe up inside each scrolling panel on device $1 (a wide screen shows two side by side; a swipe between
+# them moves nothing).
+swipe_panels() {
+  local l t r b
+  { dump "$1" | grep 'scrollable="true"' | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]\+' | paste -d' ' - - - - || true; } |
+    while read -r l t r b; do "$A" -s "$1" shell input swipe $(((l + r) / 2)) $((t + (b - t) * 7 / 10)) $(((l + r) / 2)) $((t + (b - t) * 3 / 10)) 400 </dev/null; done
+}
+# Like wait_for, but scrolls to it as a person would, a swipe every third second it's missing: on CI's 640x320 screen
+# Host and Join sit below Play in New game's right panel, which uiautomator doesn't list until it's scrolled to.
+wait_scroll() {
+  local i
+  for i in $(seq 1 "$3"); do
+    texts "$1" | grep -q "$2" && return 0
+    [ $((i % 3)) != 0 ] || swipe_panels "$1"
+    sleep 1
+  done
+  echo "[$1] timed out waiting for '$2', even scrolled"; texts "$1"; return 1
+}
 
 for d in $HOST $GUEST; do
   [ "$("$A" -s $d shell settings get global airplane_mode_on | tr -d '\r')" = 1 ] && "$A" -s $d shell cmd connectivity airplane-mode disable
@@ -88,10 +106,11 @@ for d in $HOST $GUEST; do tap_text $d "Got it" 2>/dev/null || true; done
 for d in $HOST $GUEST; do wait_for $d "New game" 30 && tap_text $d "New game"; done
 
 # Host: name, a Friend seat for the guest, the ruleset, then open the room.
-wait_for $HOST "Host a room" 20
+wait_for $HOST "Your name" 20
 fill $HOST 1 Mauro
 tap_text $HOST "Friend" 1
 [ "$RULESET" = chivalry ] && scroll_tap $HOST "Age of Chivalry"
+wait_scroll $HOST "Host a room" 20
 tap_text $HOST "Host a room"
 wait_for $HOST "Room [A-Z]*-[0-9]*" 20
 CODE=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 | cut -d' ' -f2) || true
@@ -100,6 +119,7 @@ echo "Room $CODE"
 
 # Guest: join by code (typed the way people do: lower case, no dash).
 fill $GUEST 1 Erin                  # online needs a real name: Join stays off for "You"
+wait_scroll $GUEST "Join a room" 20
 tap_text $GUEST "Join a room"
 wait_for $GUEST "Room code" 10
 fill $GUEST 2 "$(echo "$CODE" | tr -d - | tr '[:upper:]' '[:lower:]')"

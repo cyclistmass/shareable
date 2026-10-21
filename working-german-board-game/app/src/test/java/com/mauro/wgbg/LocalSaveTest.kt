@@ -144,6 +144,20 @@ class LocalSaveTest {
     }
 
     @Test
+    fun `a game saved by 0_3_3 keeps the colours it was played in after the update, and a new game uses the new defaults`() {
+        // 0.3.3's own setup line (v1) inside a 0.3.3 save, 4 players and then 3 with seat 2 empty.
+        val four = LocalSave.decode("wgbg-local v2\nv1|You||BASE|10|0|FRIEND:GREEDY,BOT:GREEDY,BOT:GREEDY,BOT:GREEDY\n7")!!
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE), four.setup.playerColours(7))
+        assertEquals(listOf("You", "Blue", "Orange", "White"), four.setup.playerNames("You", 7))
+        val three = LocalSave.decode("wgbg-local v2\nv1|You||BASE|10|0|FRIEND:GREEDY,BOT:GREEDY,EMPTY:GREEDY,BOT:GREEDY\n7")!!
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE), three.setup.playerColours(7))
+        // Saved again, it stays that way; a game started now gets Purple where Orange was.
+        assertEquals(four.setup.playerColours(7), LocalSave.decode(four.encode())!!.setup.playerColours(7))
+        val now = LocalSave.decode(LocalSave(GameSetup(), 7, emptyList()).encode())!!
+        assertEquals(listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.PURPLE, SeatColour.WHITE), now.setup.playerColours(7))
+    }
+
+    @Test
     fun `a save whose players the ruleset refuses is not resumed, rather than crashing the app at every start`(@TempDir dir: File) {
         val two = chivalry.copy(seats = listOf(SeatSetup(SeatKind.FRIEND), SeatSetup(SeatKind.BOT), SeatSetup(SeatKind.EMPTY), SeatSetup(SeatKind.EMPTY)))
         val save = LocalSave.decode(LocalSave(two, 7L, emptyList()).encode())

@@ -669,6 +669,8 @@ fun WatchGameScreen(
     var stressNames by remember { mutableStateOf<List<String>?>(null) }
     // Each seat's theme name, or its colour (0.3.4); Watch mode names seat 0's bot too.
     val names = stressNames ?: net?.names ?: setup.playerNames(if (human) setup.name.ifBlank { "You" } else null, seed)
+    // Each player's cameo (0.3.5), by engine player; offline only until the room carries them.
+    val cameos = if (net != null || stressNames != null) emptyList() else setup.playerCameos(if (human) setup.name.ifBlank { "You" } else null)
     // This game's seat colours (0.3.4): the room's online, else the ones picked on New game or drawn from the seed.
     GameColours.use(net?.colours ?: setup.playerColours(seed))
     val seats = net?.players?.size ?: setup.players.size
@@ -1484,7 +1486,7 @@ fun WatchGameScreen(
           if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
               .heightIn(max = stripMaxHeight(with(LocalDensity.current) { screenHeight.toDp() }))
               .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
-              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false)
+              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false, cameos = cameos)
           if (net != null && !inventory) onlineView?.let { v ->
               Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                   OnlineConnectionStatus(v)
@@ -1579,6 +1581,7 @@ fun WatchGameScreen(
                       else -> room.next?.let { code -> onJoinRematch?.let { go -> { go(code) } } }
                   }
                   CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it }, rematch, onExit,
+                      cameos = cameos,
                       playAgainLabel = if (online != null && room?.host != online.uid) "Join rematch" else "Play again")
               }
           }

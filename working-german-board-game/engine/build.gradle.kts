@@ -14,6 +14,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // WGBG_TEST_SCALE=10 (nightly) multiplies the fuzz games and dice throws; a test input, so a new scale reruns.
+    systemProperty("wgbg.testScale", System.getenv("WGBG_TEST_SCALE") ?: "1")
     // CatanatronTraceTest writes these for tools/catanatron/diff.py (#12). As a declared output they come back with
     // the test results when Gradle reuses a cached run; otherwise a cached run left the folder empty.
     outputs.dir(layout.buildDirectory.dir("catanatron-traces"))
