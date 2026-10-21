@@ -65,7 +65,7 @@ requests, and skips changes that only touch Markdown or `docs/`.
 | `tools/test_perf_framestats.sh` | Checks the frame-stats parser |
 | `tools/record_showcase.sh`, `tools/record_screenshots.sh` | README media; they assert nothing, but they break when buttons move, so they double as a UI smoke check |
 | `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green; publishes the release APK, never a debuggable one; then closes the issues it shipped) |
-| `tools/ci/apk_check.sh` | Every APK has the stable key; the release one is not debuggable (no test hooks, #147). Run by CI's builds and by publish_release |
+| `tools/ci/apk_check.sh` | Every APK has the stable key; the release one is not debuggable (no test hooks, #147) and, with `--firebase`, carries the Firebase config (`google_app_id`; local builds never do). Run by CI's builds and by publish_release |
 | `tools/close_shipped.sh` | Run by the release: closes each issue a commit since the last release marks `Fixes #N` / `Closes #N`, with a "Shipped in X" note. A bare `#N` is progress and stays open (listed for review). `DRY_RUN=1` lists only. |
 
 ## Gaps
