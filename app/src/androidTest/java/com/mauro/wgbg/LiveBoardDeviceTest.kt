@@ -87,14 +87,21 @@ class LiveBoardDeviceTest {
             fun read() = all().filter { (x, y) -> x in w * .05f..w * .95f && y in h * .1f..h * .9f && inView(x, y) }
             var spots = read()
             val wait = SystemClock.uptimeMillis() + 15_000
+            var nudges = 0
             while (spots.isEmpty() && SystemClock.uptimeMillis() < wait) {
-                all().firstOrNull()?.let { (sx, sy) ->
+                val off = all().firstOrNull()
+                if (off != null) {
+                    val (sx, sy) = off
                     val dx = (w / 2 - sx).coerceIn(-w / 3, w / 3); val dy = (h / 2 - sy).coerceIn(-h / 3, h / 3)
                     gesture(false, { w / 2 - dx / 2 to h / 2 - dy / 2 }, { w / 2 + dx / 2 to h / 2 + dy / 2 })
+                } else if (++nudges % 3 == 0) {
+                    // No $type spots logged at all (CI once kept the homestead's line after the road moment began):
+                    // a small pan moves the camera, which logs the moment again with fresh spots.
+                    gesture(false, { w / 2 to h / 2 }, { w / 2 + 30f to h / 2 })
                 }
                 Thread.sleep(300); spots = read()
             }
-            assertTrue("no $type spot on screen: ${line.take(400)}", spots.isNotEmpty())
+            assertTrue("no $type spot on screen: ${line.take(400)} | now: ${phaseLine().take(200)}", spots.isNotEmpty())
             val (x, y) = spots[attempt % spots.size]
             tap(x, y); tap(x, y)
             val deadline = SystemClock.uptimeMillis() + 5_000
