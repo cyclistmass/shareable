@@ -438,4 +438,12 @@ class TradePanelTest {
         assertEquals("×3\n4:1", shortUnder("have 3\n4:1"), "the bank rate stays")
         for (same in listOf("4:1", "Choose", "have", "have four", "")) assertEquals(same, shortUnder(same))
     }
+
+    @Test
+    fun `a player still answering shows an hourglass after their name, never three dots that read as a cut-off name`() {
+        assertEquals("⌛", answerMark(null, answering = true))
+        assertEquals("", answerMark(null, answering = false))
+        for (a in listOf("✓", "✗", "⇄")) assertEquals(a, answerMark(a, answering = true), "an answer wins")
+        for (a in listOf(null, "✓", "✗", "⇄")) for (w in listOf(true, false)) assertFalse("…" in answerMark(a, w))
+    }
 }
