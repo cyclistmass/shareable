@@ -18,7 +18,7 @@ centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n
 tap_text() { local xy; xy=$(dump | grep "text=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 1.5; }
 box() { dump | grep 'class="android.widget.EditText"' | sed -n "${1}p" | centre; }
 on() { dump | grep -q "text=\"$1\""; }
-kb() { "$ADB" shell dumpsys input_method | grep -q "mInputShown=true"; }
+kb() { "$ADB" shell dumpsys input_method | grep -c "mInputShown=true" >/dev/null; }
 key() { "$ADB" shell input keyevent "KEYCODE_$1"; sleep 2; }
 bad() { echo "keyboard: FAILED: $*"; fail=1; "$ADB" exec-out screencap -p > "${OUT:-.}/keyboard-fail.png" 2>/dev/null; }
 open_box() { local xy; xy=$(box "$1"); [ -n "$xy" ] || { bad "$2: no text box $1"; return 1; }; "$ADB" shell input tap $xy; sleep 1.5

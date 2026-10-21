@@ -82,8 +82,8 @@ for ruleset in $RULESETS; do
     legal=$(echo "$line" | sed -n 's/.* legal=\([^ ]*\).*/\1/p' | tr ',' '\n')
     [ -z "$legal" ] && continue
     r=$(echo "$legal" | grep '^ROLL:' | head -1); [ -n "$r" ] && { move "$r"; continue; }
-    if [ "$phase" != PLAY_TURN ] || ! echo "$legal" | grep -q '^END_TURN:'; then move "$(echo "$legal" | grep -v -E '^(OFFER_TRADE|OFFER_TRADE_CK|COUNTER_TRADE)' | shuf -n 1)"; continue; fi
-    if ! echo "$legal" | grep -q '^MARITIME_TRADE:'; then move END_TURN:0; continue; fi
+    if [ "$phase" != PLAY_TURN ] || ! grep -q '^END_TURN:' <<< "$legal"; then move "$(echo "$legal" | grep -v -E '^(OFFER_TRADE|OFFER_TRADE_CK|COUNTER_TRADE)' | shuf -n 1)"; continue; fi
+    if ! grep -q '^MARITIME_TRADE:' <<< "$legal"; then move END_TURN:0; continue; fi
     # Only C left: open the chest only when two different cards can each pay a lot (screen reads are slow).
     gives=$(echo "$legal" | grep '^MARITIME_TRADE:' | cut -d: -f2 | awk '{print $1 % 256}' | sort -u | wc -l)
     if [ $done_ab = 1 ] && [ $done_d = 1 ] && [ "$gives" -lt 2 ]; then move END_TURN:0; continue; fi
@@ -104,7 +104,7 @@ for ruleset in $RULESETS; do
         { bad "A: bank trade didn't take (card $g: $before_g -> ${HELD[$g]}, card $w: $before_w -> ${HELD[$w]})"; break; }
       # #125: the new counts are shown after the trade ("Now: 4 Grain (+1) · 0 Stone (−3)").
       seen 'text="Now: ' 8; now=$(dump | grep -o 'text="Now: [^"]*"' | head -1)
-      echo "$now" | grep -q "(+1)" && echo "$now" | grep -q "(−$rate)" ||
+      grep -q "(+1)" <<< "$now" && grep -q "(−$rate)" <<< "$now" ||
         { bad "A: no new-counts line after the trade (#125): '${now:-none}'"; break; }
       # B: both cards just used must still answer: asking each shows +1.
       ask $g; ask $w
@@ -162,7 +162,7 @@ for ruleset in $RULESETS; do
         done
         [ "$("$ADB" logcat -d -s WGBG-TURN:I | wc -l)" -gt "$lines0" ] || { bad "D: the offer never left (Offer did nothing)"; break; }
         l=$(turn_line); say "D: after Offer: ${l:0:160}"
-        if echo "$l" | grep -q 'phase=DECIDE_ACCEPTEES'; then
+        if grep -q 'phase=DECIDE_ACCEPTEES' <<< "$l"; then
           # One button per taker, "Name ⇄" (countered) or "Name ✓": tap one to see its terms, then Trade.
           partner=$(dump | grep -o 'text="[A-Za-z]* [⇄✓]"' | head -1 | sed 's/text="\(.*\)"/\1/')
           if [ -n "$partner" ]; then
@@ -182,7 +182,7 @@ for ruleset in $RULESETS; do
     tap_text "Close" || true
     # End the turn and wait for a newer log line (re-reading this one raced the bots: "no Trade button").
     l=$(turn_line); ts_alive
-    if echo "$l" | grep -q 'phase=PLAY_TURN' && echo "$l" | grep -q 'END_TURN:'; then move END_TURN:0; else again=1; fi
+    if grep -q 'phase=PLAY_TURN' <<< "$l" && grep -q 'END_TURN:' <<< "$l"; then move END_TURN:0; else again=1; fi
   done
   crashed && bad "crash"
   [ $fail = 0 ] && [ $done_ab = 0 ] && bad "no bank trade came up in ${SECS}s"

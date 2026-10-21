@@ -21,14 +21,17 @@ ui_dump() {
   if [ "$UI_FAST" = 1 ]; then
     # The old answer goes first, so a broadcast nobody got can't hand back a stale screen.
     x=$(ui_adb shell "run-as $UI_PKG rm -f files/ui.txt 2>/dev/null; am broadcast -a $UI_PKG.UI -p $UI_PKG >/dev/null 2>&1; run-as $UI_PKG cat files/ui.txt 2>/dev/null")
-    case "$x" in *"</hierarchy>"*) printf '%s\n' "$x" | tr -d '\r'; return;; esac
+    # return 0: under pipefail, a `dump | grep -q` that quits at its first match would otherwise fail the pipe (SIGPIPE,
+    # 141) once the screen passes about 16 KB, and the check reads as "not on screen". Pipes of a big "$var" the same:
+    # `grep -q X <<< "$var"`, not `echo "$var" | grep -q X`.
+    case "$x" in *"</hierarchy>"*) printf '%s\n' "$x" | tr -d '\r'; return 0;; esac
     echo "uiread${UI_SERIAL:+ [$UI_SERIAL]}: no answer from the app, reading with uiautomator" >&2
   fi
   for _ in 1 2 3 4 5 6; do ui_adb shell rm -f /sdcard/ui.xml; ui_adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$(ui_adb shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
+    x=$(ui_adb shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return 0;; esac
     ui_adb shell pkill -f uiautomator 2>/dev/null; sleep 1   # one left over from a stopped run blocks new ones ("already registered")
   done
-  echo "uiautomator dump failed 6 times (busy device?)" >&2
+  echo "uiautomator dump failed 6 times (busy device?)" >&2; return 1
 }
 ui_centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 at() { local m; m=$(dump | grep "\(text\|content-desc\)=\"$1\""); { echo "$m" | grep 'clickable="true"'; echo "$m"; } | ui_centre; }

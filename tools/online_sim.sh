@@ -54,12 +54,12 @@ fill() {
   "$A" -s "$1" shell input keyevent KEYCODE_MOVE_END $(printf 'KEYCODE_DEL %.0s' $(seq 1 24))
   "$A" -s "$1" shell input text "$text"; "$A" -s "$1" shell input keyevent KEYCODE_ENTER; sleep 0.6  # Enter (IME Done) hides the keyboard; Back would leave the screen when it is already hidden
   # On a box with a Next key, Enter only moves on and the keyboard stays up over the next box: then Back closes it.
-  "$A" -s "$1" shell dumpsys input_method | grep -q "mInputShown=true" && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
+  "$A" -s "$1" shell dumpsys input_method | grep -c "mInputShown=true" >/dev/null && { "$A" -s "$1" shell input keyevent KEYCODE_BACK; sleep 0.6; }
   return 0
 }
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
 # Waits up to $3 s for text matching $2 on device $1.
-wait_for() { for _ in $(seq 1 "$3"); do texts "$1" | grep -q "$2" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
+wait_for() { for _ in $(seq 1 "$3"); do grep -q "$2" <<< "$(texts "$1")" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
 # A finger's swipe up inside each scrolling panel on device $1 (a wide screen shows two side by side; a swipe between
 # them moves nothing).
 swipe_panels() {
@@ -118,7 +118,7 @@ fill $GUEST 2 "$(echo "$CODE" | tr -d - | tr '[:upper:]' '[:lower:]')"
 tap_text $GUEST "Join"
 wait_for $GUEST "Erin" 20
 wait_for $HOST "Erin" 20
-texts $HOST | grep -q '"[^" ]\+Erin"' && { echo "FAIL: the guest's name came out wrong"; texts $HOST; exit 1; }
+grep -q '"[^" ]\+Erin"' <<< "$(texts $HOST)" && { echo "FAIL: the guest's name came out wrong"; texts $HOST; exit 1; }
 
 # Both ready; the host starts.
 tap_text $HOST "Not ready" 1

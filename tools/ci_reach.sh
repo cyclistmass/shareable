@@ -118,9 +118,9 @@ else
   x=""
   for gap in 0.12 0.06 0.2; do
     [ -n "$xy" ] && "$ADB" shell "input tap $xy & sleep $gap; input tap $xy; wait"; sleep 1.5
-    x=$(dump); echo "$x" | grep -q 'text="Event die"' && break
+    x=$(dump); grep -q 'text="Event die"' <<< "$x" && break
   done
-  echo "$x" | grep -q 'text="Event die"' || bad "double-tapping the dice didn't open the histogram"
+  grep -q 'text="Event die"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
   DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
 fi
 

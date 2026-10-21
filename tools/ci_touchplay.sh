@@ -53,8 +53,8 @@ for game in $GAMES; do
     if [ -n "$spots" ] && [ $((RANDOM % 4)) != 0 ]; then
       pick=$(echo "$spots" | shuf -n 1); xy=${pick#*@}
       tap "${xy%,*}" "${xy#*,}"; sleep 0.6; tap "${xy%,*}" "${xy#*,}"; taps=$((taps + 1))
-    elif echo "$legal" | grep -q '^ROLL:' && tap_text "Roll"; then taps=$((taps + 1))
-    elif echo "$legal" | grep -q '^END_TURN:' && [ $((RANDOM % 3)) != 0 ] && tap_text "End turn"; then taps=$((taps + 1))
+    elif grep -q '^ROLL:' <<< "$legal" && tap_text "Roll"; then taps=$((taps + 1))
+    elif grep -q '^END_TURN:' <<< "$legal" && [ $((RANDOM % 3)) != 0 ] && tap_text "End turn"; then taps=$((taps + 1))
     else
       mv=$(echo "$legal" | shuf -n 1)
       [ -n "$mv" ] && "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "$mv" >/dev/null && hooks=$((hooks + 1))

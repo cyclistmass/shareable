@@ -34,7 +34,7 @@ tap_text() {
   set -- "$1" $b; "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.8
 }
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
-wait_for() { for _ in $(seq 1 "$3"); do texts "$1" | grep -q "$2" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
+wait_for() { for _ in $(seq 1 "$3"); do grep -q "$2" <<< "$(texts "$1")" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
 # A finger's swipe up inside each scrolling panel on device $1 (a wide screen shows two side by side; a swipe between
 # them moves nothing).
 swipe_panels() {
@@ -83,7 +83,7 @@ tap_text $GUEST "Join rematch"
 wait_for $GUEST "Erin" 30
 wait_for $HOST "Erin" 30
 [ "$(room_code $GUEST)" = "$R2" ] || { echo "FAIL: the guest is in '$(room_code $GUEST)', not $R2"; exit 1; }
-texts $HOST | grep -q "$LABEL" || { echo "FAIL: the rematch isn't $LABEL"; texts $HOST; exit 1; }
+grep -q "$LABEL" <<< "$(texts $HOST)" || { echo "FAIL: the rematch isn't $LABEL"; texts $HOST; exit 1; }
 crashed || { echo "FAIL: the app crashed"; exit 1; }
 echo "PASS: rematch $R2 (after ${FIRST:-the first room})"
 
@@ -100,7 +100,7 @@ wait_for $HOST "Erin" 15
 tap_text $GUEST "Leave room"              # the guest's own Leave button (#72), then its confirm
 tap_text $GUEST "Leave room" 2
 wait_for $GUEST "New game" 15             # straight back to the start screen
-gone=; for _ in $(seq 1 15); do texts $HOST | grep -q "Erin" || { gone=1; break; }; sleep 1; done
+gone=; for _ in $(seq 1 15); do grep -q "Erin" <<< "$(texts $HOST)" || { gone=1; break; }; sleep 1; done
 [ -n "$gone" ] || { echo "FAIL: the guest left but still holds a seat"; texts $HOST; exit 1; }
 echo "PASS: the guest left $R2 by its Leave button and the seat opened"
 tap_text $HOST "Leave room"

@@ -49,11 +49,11 @@ reach() {
 # A slow emulator can stall a system app until Android asks to close it; ours not responding is a failure.
 system_anr() {
   local d="$1" xy
-  if echo "$d" | grep -q 'text="Live Caption"'; then
+  if grep -q 'text="Live Caption"' <<< "$d"; then
     xy=$(find_re "Got it" "$d"); [ -n "$xy" ] && { echo "COLOURS: closed the system's Live Caption popup"; tap $xy; return 0; }
   fi
-  echo "$d" | grep -q 'text="[^"]* isn.t responding"' || return 1
-  echo "$d" | grep -q 'text="Working German Board Game isn.t responding"' && fail "the game isn't responding (ANR)"
+  grep -q 'text="[^"]* isn.t responding"' <<< "$d" || return 1
+  grep -q 'text="Working German Board Game isn.t responding"' <<< "$d" && fail "the game isn't responding (ANR)"
   echo "COLOURS: closed a system app that wasn't responding"
   xy=$(find_re "Close app" "$d"); [ -n "$xy" ] && tap $xy
   return 0
@@ -65,9 +65,9 @@ launch() {
     [ -n "$("$ADB" shell pidof $PKG | tr -d '\r\n')" ] && break
   done
   local d
-  for _ in $(seq 1 20); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="Tap to skip"\|text="New game"' && break; sleep 2; done
-  if echo "$d" | grep -q 'text="Tap to skip"'; then tap $((W / 2)) $((H / 2)); sleep 2; fi
-  for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="New game"' && return 0; sleep 1; done
+  for _ in $(seq 1 20); do d=$(dump); system_anr "$d" && continue; grep -q 'text="Tap to skip"\|text="New game"' <<< "$d" && break; sleep 2; done
+  if grep -q 'text="Tap to skip"' <<< "$d"; then tap $((W / 2)) $((H / 2)); sleep 2; fi
+  for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; grep -q 'text="New game"' <<< "$d" && return 0; sleep 1; done
   fail "the start screen never appeared"
 }
 new_game() { tap $(find_re "New game") || fail "no New game"; for _ in $(seq 1 10); do dump | grep -q 'text="Play"' && return 0; sleep 1; done; fail "no game-start screen"; }
