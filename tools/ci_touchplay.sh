@@ -17,15 +17,8 @@ export MSYS_NO_PATHCONV=1
 fail=0
 
 tap() { "$ADB" shell input tap "$1" "$2" </dev/null; } # adb shell eats stdin inside a read loop otherwise
-tap_text() { # tap the on-screen element whose text is $1; false if it isn't there
-  "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local B
-  B=$("$ADB" shell cat /sdcard/ui.xml | tr '>' '\n' | grep -o "\(text\|content-desc\)=\"$1\"[^/]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]" |
-      grep -o '\[[0-9]*,[0-9]*\]' | tr -d '[]' | head -2 | tr '\n' ' ')
-  [ -n "$B" ] || return 1
-  set -- $B
-  tap $(( (${1%,*} + ${2%,*}) / 2 )) $(( (${1#*,} + ${2#*,}) / 2 ))
-}
+. "$(dirname "$0")/lib/uiread.sh"   # tap_text: the app's own screen read (0.2 s), uiautomator as the fallback
+UI_TAP_WAIT=0   # the turn lines say when the tap took
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 
 GAMES="${3:-base:3 chivalry:3 base:4 chivalry:4}"

@@ -13,14 +13,8 @@ export MSYS_NO_PATHCONV=1
 fail=0; rfail=0
 . "$(dirname "$0")/lib/turnstream.sh" # turn lines as they come + stall watchdog (#139)
 
-dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
+. "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-at() { dump | grep "\(text\|content-desc\)=\"$1\"" | centre; }
-tap_text() { local xy; xy=$(at "$1"); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
-# Taps the element whose test tag (resource-id) is $1: the chest's tabs go by tag, since the player list is also
-# labelled "Players" (0.3.4) and a tap by text hit it first.
-tap_id() { local xy; xy=$(dump | grep "resource-id=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
 # A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
 # wm size gives the portrait size; the app is landscape, so the long side is the width (a swipe from below the screen does nothing).
 panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
