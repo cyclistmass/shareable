@@ -18,8 +18,12 @@ fail=0
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 on() { dump | grep -q "text=\"$1\""; }
-# The failure screen lands in the working dir (or $OUT), like the other CI scripts: CI uploads *.png from there.
-bad() { echo "reach: FAILED: $*"; fail=1; "$ADB" exec-out screencap -p > "${OUT:-.}/reach-fail.png" 2>/dev/null; }
+# The failure's screen, screen read and log land in the working dir (or $OUT), like the other CI scripts: CI uploads
+# *.png, *.xml and *.logcat.txt from there. Numbered, so a second failure doesn't overwrite the first.
+nbad=0
+bad() { echo "reach: FAILED: $*"; fail=1; nbad=$((nbad + 1)); local f="${OUT:-.}/reach-fail-$nbad"
+  "$ADB" exec-out screencap -p > "$f.png" 2>/dev/null; dump > "$f.xml" 2>/dev/null; "$ADB" logcat -d > "$f.logcat.txt" 2>/dev/null
+  echo "  screen, screen read and log: $f.*"; }
 
 # The screen, as the app is laid out (landscape): width and height in pixels.
 read -r PW PH < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')

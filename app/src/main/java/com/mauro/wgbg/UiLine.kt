@@ -39,7 +39,9 @@ object UiLine {
     data class Node(val text: String, val tag: String, val desc: String, val clickable: Boolean, val editable: Boolean,
                     val l: Int, val t: Int, val r: Int, val b: Int, val scrollable: Boolean = false,
                     /** The window itself, listed first like uiautomator's root: ci_update reads the screen size from it. */
-                    val window: Boolean = false) {
+                    val window: Boolean = false,
+                    /** For the line: a button's own text is usually on a child, so its children's texts. */
+                    val label: String = "") {
         val cx get() = (l + r) / 2
         val cy get() = (t + b) / 2
     }
@@ -68,7 +70,7 @@ object UiLine {
         val sb = StringBuilder("screen=${screen.ifEmpty { "-" }} sheets=$sheets items=")
         val items = nodes.filter { it.clickable || it.tag.isNotEmpty() }
         items.forEachIndexed { i, n ->
-            val item = "${n.tag}|${n.text.ifEmpty { n.desc }.replace('\n', ' ').replace(';', ',')}@${n.cx},${n.cy}"
+            val item = "${n.tag}|${n.label.ifEmpty { n.text }.ifEmpty { n.desc }.replace('\n', ' ').replace(';', ',')}@${n.cx},${n.cy}"
             if (sb.length + item.length + 1 > max) { sb.append(" +${items.size - i} more"); return sb.toString() }
             if (i > 0) sb.append(';')
             sb.append(item)
@@ -138,11 +140,13 @@ object UiLine {
     }
 
     /**
-     * The merged tree, as accessibility (and so uiautomator) sees it. Topmost first, each node keeps the part of it no
-     * node drawn above covers, the way Compose's accessibility does; then they're listed in tree order.
+     * The unmerged tree, as accessibility (and so uiautomator) lists it: a clickable row's texts stay their own nodes
+     * (tap "Erin", not "☐ Erin 3 games together"), and the row is listed too, clickable, with its tag. Topmost first,
+     * each node keeps the part of it no node drawn above covers, the way Compose's accessibility does; then they're
+     * listed in tree order.
      */
     private fun nodes(root: ViewRootForTest): List<Node> {
-        val top = root.semanticsOwner.rootSemanticsNode
+        val top = root.semanticsOwner.unmergedRootSemanticsNode
         val at = IntArray(2).also { root.view.getLocationOnScreen(it) }
         val shown = HashMap<Int, Rect>()
         val free = Region(0, 0, root.view.width, root.view.height)
@@ -172,10 +176,16 @@ object UiLine {
             val scroll = SemanticsActions.ScrollBy in c && listOf(SemanticsProperties.VerticalScrollAxisRange, SemanticsProperties.HorizontalScrollAxisRange)
                 .any { k -> c.getOrNull(k)?.let { it.maxValue() > 0f } == true }
             if (text.isNotEmpty() || tag.isNotEmpty() || desc.isNotEmpty() || click || edit || scroll)
-                out += Node(text, tag, desc, click, edit, r.left + at[0], r.top + at[1], r.right + at[0], r.bottom + at[1], scroll)
+                out += Node(text, tag, desc, click, edit, r.left + at[0], r.top + at[1], r.right + at[0], r.bottom + at[1], scroll,
+                    label = if (click && text.isEmpty()) inner(n) else "")
             for (ch in n.children) list(ch)
         }
         list(top)
         return out
     }
+
+    /** The texts inside a clickable node, up to the next clickable one (a star on a row is its own button). */
+    private fun inner(n: SemanticsNode): String = n.children.filter { SemanticsActions.OnClick !in it.config }.joinToString(" ") { c ->
+        (c.config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text }.orEmpty() + " " + inner(c)).trim()
+    }.trim().replace(Regex(" +"), " ")
 }

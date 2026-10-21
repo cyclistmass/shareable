@@ -62,6 +62,9 @@ class UiLineTest {
             node(text = "just a label"),
             node(desc = "Trade", click = true, l = 90, t = 90, r = 110, b = 110)))
         assertEquals("screen=GAME sheets=trade-panel items=trade-panel|@50,25;tab-Players|Players@20,15;|Elizabeth I ⌛@60,15;|Trade@100,100", l)
+        // A button's text sits on its child (the unmerged tree, as accessibility lists it): the line shows the children's.
+        val roll = UiLine.Node("", "roll", "", true, false, 0, 0, 10, 10, label = "Roll")
+        assertEquals("screen=GAME sheets=- items=roll|Roll@5,5", UiLine.line("GAME", listOf(roll)))
     }
 
     @Test
