@@ -1,0 +1,7 @@
+# game	state hash	turn	winner (-1: turn limit). Regenerate with UPDATE_FIXTURES=1 (RegressionStackTest).
+base-2	6030937003858307953	161	1
+base-3	-5620141469395258788	362	2
+base-4	-3087342493120448352	371	3
+base-4-limit	3294121458406248328	60	-1
+chivalry-3	-889852366177128888	400	-1
+chivalry-4	8175031293046837555	400	-1

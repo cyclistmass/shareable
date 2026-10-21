@@ -12,10 +12,11 @@ class FuzzTest {
         var draws = 0
         var actions = 0L
         val types = IntArray(ActionType.entries.size)
+        val coverage = Coverage("fuzz")
         val buf = ActionBuffer()
         for (game in 0 until 2000 * testScale) {
             val config = GameConfig(
-                numPlayers = 3 + game % 2,
+                numPlayers = if (game % 10 == 3) 2 else 3 + game % 2,
                 layout = if (game % 5 == 0) BoardLayout.BEGINNER else BoardLayout.RANDOM,
                 avoidAdjacentRedNumbers = game % 3 != 0,
                 randomDiscard = game % 4 == 1,
@@ -37,6 +38,9 @@ class FuzzTest {
                 Rules.apply(s, a)
                 types[a.typeId]++
                 T.checkInvariants(s)
+                Coverage.base(coverage, game, s, a)
+                coverage.note("the Fortune deck ran out", game, s.devDeck.sum() == 0)
+                coverage.note("a 2-player game won", game, s.isOver && s.winner >= 0 && s.numPlayers == 2)
                 steps++
                 assertTrue(steps < 200_000, "game $game does not terminate")
             }
@@ -45,10 +49,13 @@ class FuzzTest {
         }
         println("fuzz: $wins wins, $draws draws, $actions actions")
         println("action mix: " + ActionType.entries.joinToString { "${it.name}=${types[it.ordinal]}" })
+        coverage.print()
         assertEquals(2000, wins + draws)
         assertTrue(wins > 1000, "random games should mostly finish")
         // Every action type must have been exercised.
         for (t in ActionType.entries) assertTrue(types[t.ordinal] > 0, "$t never played")
+        // And every rare state the rules have, not just every kind of move.
+        coverage.assertAll()
     }
 
     @Test
