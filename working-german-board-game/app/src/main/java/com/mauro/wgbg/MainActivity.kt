@@ -564,7 +564,7 @@ fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay:
                 }
             } ?: RejoiningOr(savedRoom) { screen = Screen.START }
             Screen.LOOK -> WatchGameScreen(Modifier.fillMaxSize().tableTop(), Camera.FIT,   // wood, not a black box (Fable T6)
-                setup, onExit = { screen = Screen.SETUP }, lookAndArt = true)
+                setup.viewable(), onExit = { screen = Screen.SETUP }, lookAndArt = true)
             Screen.GAME -> key(gameNo) {
                 // Back asks "Leave this game?" inside the game screen (same as Exit).
                 WatchGameScreen(Modifier.fillMaxSize().background(Color.Black), initialCamera, setup, onExit = { screen = Screen.START }, autoplay = autoplay, autoSetup = autoSetup, startWatching = watch, quickBots = quickBots,
