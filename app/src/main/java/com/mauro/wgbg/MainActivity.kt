@@ -2800,18 +2800,8 @@ private fun DrawScope.drawNumberToken(n: Int, t: Offset, scale: Float, measurer:
     val r = NUMBER_TOKEN_R * scale
     val k = NUMBER_TOKEN_R / 0.3f          // everything on the token shrinks with it
     drawCircle(Color.Black.copy(alpha = 0.3f), r, t + Offset(0.05f * k * scale, 0.07f * k * scale))
-    drawCircle(TOKEN_WOOD.shade(0.35f), r, t + Offset(0f, 0.04f * k * scale)) // token edge
-    drawCircle(wood.brush(TOKEN_WOOD_INDEX), r, t)
-    drawCircle(
-        Brush.radialGradient(
-            listOf(Color.White.copy(alpha = 0.4f), Color.Transparent),
-            center = t + Offset(-0.35f * r, -0.35f * r),
-            radius = 1.3f * r,
-        ),
-        r, t,
-    )
-    drawCircle(TOKEN_WOOD.shade(0.45f), r, t, style = Stroke(0.02f * k * scale))
-    val ink = if (n == 6 || n == 8) Color(0xFFC62828) else INK
+    drawBrassPlateFace(t, r, k, scale, wood.oldBrass)
+    val ink = numberPaint(n)
     val text = measurer.measure(
         n.toString(),
         // Mauro, 2026-10-10: bigger numbers, same disc (0.264 -> 0.34 hex units, about 30% larger).

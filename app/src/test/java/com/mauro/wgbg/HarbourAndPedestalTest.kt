@@ -60,7 +60,7 @@ class HarbourAndPedestalTest {
         assertEquals(KNIGHT_BAND_COLOR, liveTint(KNIGHT_BAND, "NumberPlate_PBR", -1))
         assertEquals(PLAYER_COLORS[2], liveTint("default_town", "WoodBody", 2))
         assertNull(liveTint("default_town", "BrassTrim", 2))
-        assertNull(liveTint("number_plate", "NumberPlate_PBR", -1))
+        assertEquals(BrassPlateLook.LIVE_COLOR, liveTint("number_plate", "NumberPlate_PBR", -1)) // option A: the plate is brass
         assertEquals("number_plate", liveModelFile(KNIGHT_RING)); assertEquals("default_town", liveModelFile("default_town"))
     }
 

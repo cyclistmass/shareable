@@ -249,6 +249,10 @@ internal class LiveBoardRenderer(private val surfaceView: SurfaceView, private v
                     val tint = tints.getOrPut(key) {
                         MaterialInstance.duplicate(material, "${p.model}-player-${p.owner}").apply {
                             setParameter("baseColorFactor", Colors.RgbaType.SRGB, color.red, color.green, color.blue, 1f)
+                            if (p.model == LIVE_PLATE_MODEL) {
+                                setParameter("metallicFactor", BrassPlateLook.LIVE_METALLIC)
+                                setParameter("roughnessFactor", BrassPlateLook.LIVE_ROUGHNESS)
+                            }
                         }
                     }
                     rm.setMaterialInstanceAt(renderable, primitive, tint)

@@ -102,6 +102,7 @@ internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || 
 /** The colour to paint [material] of [model] for [owner], or null to keep its own: wood in the player colour, the pedestal whole. */
 internal fun liveTint(model: String, material: String, owner: Int): androidx.compose.ui.graphics.Color? = when {
     model == KNIGHT_BAND -> KNIGHT_BAND_COLOR
+    model == LIVE_PLATE_MODEL -> BrassPlateLook.LIVE_COLOR
     model == KNIGHT_RING -> PLAYER_COLORS.getOrNull(owner)
     owner >= 0 && (woodTint(material) || material == "SailCloth" || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
     else -> null
