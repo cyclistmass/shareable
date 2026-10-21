@@ -46,6 +46,16 @@ class GameClientTest {
         t.reject()
         val back=c.view(); assertEquals(listOf(a1),back.actions); assertEquals(back.state!!.stateHash(),replay(back)); c.close()
     }
+    @Test fun `the rematch link on a finished room keeps its history (#72)`() {
+        // Firestore sends only new moves, so a room doc change that looks like another game would leave nothing to replay:
+        // the guest's board went back to the start and its "Join rematch" never showed.
+        val (_,t,c)=setup()
+        val a1=Rules.legalActions(c.view().state!!).first(); c.act(0,a1); t.commit()
+        val before=c.view(); assertEquals(listOf(a1),before.actions)
+        t.callback!!(t.latest!!.copy(room=t.latest!!.room.copy(status=Status.done,next="ROOM-2"),moves=emptyList()))
+        val after=c.view(); assertEquals("ROOM-2",after.room!!.next)
+        assertEquals(listOf(a1),after.actions); assertEquals(before.state!!.stateHash(),after.state!!.stateHash()); c.close()
+    }
     @Test fun `denial rolls back to confirmed state and restarts from last applied sequence`() {
         val (_,t,c)=setup();val before=c.view().state!!.stateHash()
         val result=c.act(0,Rules.legalActions(c.view().state!!).first());t.reject()

@@ -131,10 +131,13 @@ class SyncDriver {
     val state: GameState? get() = game?.state?.copy()
     val actions: List<Action> get() = game?.actions ?: emptyList()
     val rejected = mutableListOf<Long>()
+    /** What makes it the same game: a new move, the finish, or the rematch link ([Room.next], #72) on a done room
+     *  changes the room doc but not its game, so none of them may wipe the history. */
+    private fun gameKey(room: Room) = room.copy(nextSeq = 0, status = Status.playing, next = null)
     /** Hot path: only process newly received entries; retain gaps until their predecessor arrives. */
     fun acceptDelta(room: Room, moves: List<Move>) {
         if (room.status == Status.lobby) return
-        val key = room.copy(nextSeq = 0, status = Status.playing)
+        val key = gameKey(room)
         if (identity != key) {
             identity = key; prefix.clear(); buffered.clear(); rejected.clear()
             game = Game(room.config.copy(numPlayers = room.players.size), room.seed)
@@ -157,7 +160,7 @@ class SyncDriver {
         val room = snapshot.room
         if (room.status == Status.lobby) return
         val ordered = snapshot.moves.sortedBy { it.seq }
-        val key = room.copy(nextSeq = 0, status = Status.playing)
+        val key = gameKey(room)
         if (identity != key || ordered.take(prefix.size) != prefix) {
             identity = key; prefix.clear(); buffered.clear(); rejected.clear()
             game = Game(room.config.copy(numPlayers = room.players.size), room.seed)
