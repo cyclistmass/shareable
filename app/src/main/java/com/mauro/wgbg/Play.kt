@@ -260,8 +260,8 @@ fun HumanControls(
             // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
-                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp) { onMove(a) } }
-                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn") { onMove(a) } }
+                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp, onClick = moveTap { onMove(a) }) }
+                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn", onClick = moveTap { onMove(a) }) }
             }
         }
     }
@@ -329,8 +329,9 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
 @Composable
 private fun MoveButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
     // Primary (Roll / End turn): a big brass plate; the rest: wood with a brass rim.
-    if (primary) BrassButton(label, "move-$label", Modifier.fillMaxWidth().height(54.dp), size = 18.sp, onClick = onClick)
-    else WoodButton(label, "move-$label", Modifier.fillMaxWidth(), onClick = onClick)
+    // Behind the move guard: a double tap never sends a second move (or hits the button that took this one's place).
+    if (primary) BrassButton(label, "move-$label", Modifier.fillMaxWidth().height(54.dp), size = 18.sp, onClick = moveTap(onClick))
+    else WoodButton(label, "move-$label", Modifier.fillMaxWidth(), onClick = moveTap(onClick))
 }
 
 /** True when [acts] are the Transmuter's (Alchemist's) dice choices. */
@@ -353,9 +354,8 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
     val chosen = acts.firstOrNull { it.b == red && it.c == ivory }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         ChestButton("Back", CHEST_NO, "pick-back") { close() }
-        GoButton(if (chosen != null) "Set the dice: ${red + ivory}" else "Pick both dice", "dice-set", chosen != null, Modifier.height(44.dp)) {
-            chosen?.let { close(); onMove(it) }
-        }
+        GoButton(if (chosen != null) "Set the dice: ${red + ivory}" else "Pick both dice", "dice-set", chosen != null, Modifier.height(44.dp),
+            onClick = moveTap { chosen?.let { close(); onMove(it) } })
     }
 }
 
@@ -369,7 +369,7 @@ private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>
         for ((label, a) in options) {
             val cards = optionCards(a)
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { close(); onMove(a) }.testTag("pick-$label")) {
+                modifier = Modifier.clickable(onClick = moveTap { close(); onMove(a) }).testTag("pick-$label")) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
                     for (c in cards) Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
                 }
@@ -437,7 +437,7 @@ internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<St
                 if (who >= 0) Text("To ${names.getOrElse(who) { "player ${who + 1}" }}", color = CHEST_INK, fontSize = 12.sp,
                     fontWeight = FontWeight.Bold, modifier = Modifier.width(76.dp))
                 for (a in acts) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { onMove(a) }.testTag("pick-card-${a.a}-${a.b}")) {
+                    modifier = Modifier.clickable(onClick = moveTap { onMove(a) }).testTag("pick-card-${a.a}-${a.b}")) {
                     when (a.type) {
                         wgbg.engine.ChivalryActionType.TAKE_PROGRESS, wgbg.engine.ChivalryActionType.DISCARD_PROGRESS ->
                             ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
@@ -558,12 +558,12 @@ internal fun SpotPicker(choices: List<SpotChoice>, onPick: (Action) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((i, c) in choices.withIndex()) Row(
             // Capped so the box stays mid-screen, clear of the build buttons and the zoom/tilt bars (seen on device).
-            Modifier.widthIn(min = 260.dp, max = 400.dp).brassPlate().clickable { onPick(c.action) }
+            Modifier.widthIn(min = 260.dp, max = 400.dp).brassPlate().clickable(onClick = moveTap { onPick(c.action) })
                 .testTag("spot-choice-$i").semantics(mergeDescendants = true) { contentDescription = c.name }
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (c.icon != null) IconPlateButton(c.icon, c.name, "spot-icon-$i", width = 40.dp, height = 36.dp) { onPick(c.action) }
+            if (c.icon != null) IconPlateButton(c.icon, c.name, "spot-icon-$i", width = 40.dp, height = 36.dp, onClick = moveTap { onPick(c.action) })
             Text(c.name, color = Color(0xFF2A1A0C), fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
             val cost = c.cost
             if (cost == null) Text("free", color = Color(0xFF2A1A0C), fontSize = 14.sp)

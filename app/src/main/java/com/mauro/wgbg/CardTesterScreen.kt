@@ -106,6 +106,7 @@ private fun CardChecklistScreen(marks: Map<String, Pair<CheckState, String>>, pr
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("") }
     var confirmReset by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
     val states = marks.mapValues { it.value.first }
     val version = appVersion()
     fun report(): String {
@@ -119,7 +120,10 @@ private fun CardChecklistScreen(marks: Map<String, Pair<CheckState, String>>, pr
             Spacer(Modifier.weight(1f))
             val session = CardTestSession.results.size
             // Send goes like an in-app bug report: one per session, the fails' screenshots tiled into its two pictures.
-            GoButton(if (session == 0) "Send report" else "Send report ($session)", "card-test-send", enabled = session > 0, Modifier.height(44.dp)) {
+            // One report per tap, like the in-app report (#133: five copies of one run arrived within two seconds).
+            GoButton(if (session == 0) "Send report" else "Send report ($session)", "card-test-send", enabled = session > 0 && !sending, Modifier.height(44.dp)) {
+                if (sending) return@GoButton
+                sending = true
                 status = "Sending…"
                 val text = report()
                 val fails = CardTestSession.results.filter { !it.pass }.map { CardTestSession.shots[it.id] }
@@ -133,6 +137,7 @@ private fun CardChecklistScreen(marks: Map<String, Pair<CheckState, String>>, pr
                             n < pics.size -> "Sent (a picture didn't go)"
                             else -> "Sent, thank you"
                         }
+                        sending = false
                         if (ok) { CardTestSession.results.clear(); CardTestSession.shots.clear() }
                     }
                 }

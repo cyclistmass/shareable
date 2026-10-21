@@ -224,14 +224,20 @@ class TradePanelTest {
     }
 
     @Test
-    fun `one row of cards - top asks, bottom offers, the other half switches, hold takes one back`() {
+    fun `one row of cards - top counts up, bottom counts down through none to an offer, hold takes one back`() {
         val z = IntArray(5)
         var (g, v) = askOffer(z, z, 0, CardTap.ASK, have = 0)
         assertEquals(1, g[0]); assertEquals(0, v[0])
         askOffer(g, v, 0, CardTap.ASK, have = 0).let { g = it.first; v = it.second }
         assertEquals(2, g[0])
-        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }   // switch over
+        // Players: the other half counts back down to none first, then switches over.
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }
+        assertEquals(1, g[0]); assertEquals(0, v[0])
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }
+        assertEquals(0, g[0]); assertEquals(0, v[0])
+        askOffer(g, v, 0, CardTap.OFFER, have = 3).let { g = it.first; v = it.second }   // now it's offered
         assertEquals(0, g[0]); assertEquals(1, v[0])
+        askOffer(g, v, 0, CardTap.ASK, have = 3).let { assertEquals(0, it.first[0]); assertEquals(0, it.second[0]) }   // and back to none
         askOffer(g, v, 0, CardTap.OFFER, have = 1).let { g = it.first; v = it.second }   // can't offer more than held
         assertEquals(1, v[0])
         assertEquals(0, askOffer(z, z, 2, CardTap.OFFER, have = 0).second[2])              // nothing to offer
@@ -253,7 +259,14 @@ class TradePanelTest {
         assertEquals(0, askOffer(g, z, 0, CardTap.OFFER, have = 3, bankRate = 4).second[0])                 // can't pay 4 with 3
         askOffer(g, v, 1, CardTap.TAKE_BACK, have = 8, bankRate = 4).let { assertEquals(4, it.second[1]) }  // one lot back
         askOffer(g, v, 3, CardTap.TAKE_BACK, have = 0, bankRate = 4).let { assertEquals(1, it.first[3]) }   // one card back
-        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { assertEquals(0, it.second[1]); assertEquals(1, it.first[1]) } // switch over
+        // The top takes a lot back, down to none, before it asks for that card.
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { g = it.first; v = it.second }
+        assertEquals(4, v[1]); assertEquals(0, g[1])
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { g = it.first; v = it.second }
+        assertEquals(0, v[1]); assertEquals(0, g[1])
+        askOffer(g, v, 1, CardTap.ASK, have = 8, bankRate = 4).let { assertEquals(0, it.second[1]); assertEquals(1, it.first[1]) }
+        // And the bottom asks one less, down to none, before it pays a lot.
+        askOffer(g, v, 3, CardTap.OFFER, have = 4, bankRate = 4).let { assertEquals(1, it.first[3]); assertEquals(0, it.second[3]) }
     }
 
     /** A 3-player game at [seed] on a main-phase turn (rolled, END_TURN legal), driven there by bots. */

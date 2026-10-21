@@ -1510,7 +1510,7 @@ fun WatchGameScreen(
                   // Between the left panel and the move buttons (playtest: progress cards slid under End turn).
                   // It starts at the side panel's edge, not a fixed 384 dp, which left one card's room on a 640 dp screen.
                   Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = handStart(panelDp), end = 196.dp, bottom = 6.dp),
-                  fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { fortuneAsk = it },
+                  fortunePlayable = if (state.actingPlayer == me) fortunePlayable(legal) else emptySet(), onFortune = { c -> MoveTaps.wrap { fortuneAsk = c }() },   // a double tap on Sentinel played two
                   fortuneArt = { GuideArt.fortuneArt(it, env.art.pirate(ArtObject.KNIGHTS)) })
           }
           if (me >= 0 && !inventory) {
@@ -1564,7 +1564,7 @@ fun WatchGameScreen(
                       // Compact: a check to place it, a cross to cancel (Mauro: "just an x or check, save space, look cleaner");
                       // a choice that needs words (who to rob) keeps them after the check.
                       if (spotList == null) for (a in chosen) ColorButton(confirmLabel(state, a, names).let { if (it == "Confirm") "✓" else "✓ $it" }, Color(0xFF3E9B4F), "confirm",
-                          androidx.compose.ui.Modifier.confirmA11y("Confirm")) { send(a) }
+                          androidx.compose.ui.Modifier.confirmA11y("Confirm"), onClick = moveTap { send(a) })
                       ColorButton("✗", Color(0xFFC0392B), "cancel", androidx.compose.ui.Modifier.confirmA11y("Cancel")) {
                           pending = emptyList(); if (cardSecond) { cardPick = emptyList(); cardSecond = false } }
                   }
