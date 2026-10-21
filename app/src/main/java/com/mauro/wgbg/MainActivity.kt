@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -164,17 +165,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Debug builds: `am broadcast -a com.mauro.wgbg.UI` writes what's on screen to files/ui.txt ([UiLine]). */
+    private val debugUi = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: android.content.Intent) {
+            runCatching { UiLine.write(filesDir) }.onFailure { android.util.Log.w(UiLine.TAG, "couldn't write the screen: $it") }
+        }
+    }
+
     override fun onDestroy() {
-        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) runCatching { unregisterReceiver(debugMoves) }
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            runCatching { unregisterReceiver(debugMoves) }
+            runCatching { unregisterReceiver(debugUi) }
+        }
         super.onDestroy()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CrashReport.install(this)
-        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0)
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             androidx.core.content.ContextCompat.registerReceiver(this, debugMoves, android.content.IntentFilter(AgentHooks.ACTION),
                 androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+            androidx.core.content.ContextCompat.registerReceiver(this, debugUi, android.content.IntentFilter(UiLine.ACTION),
+                androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+        }
+        UiLine.install(this)   // debug builds only; before setContent, so the first screen is watched too
         enableEdgeToEdge()
         // Full screen: draw under the camera cutout and hide the system bars (swipe to peek).
         window.attributes = window.attributes.apply {
@@ -336,6 +351,7 @@ private enum class Screen { START, GAME, JOIN, ONLINE_LOBBY, ONLINE_GAME, LOOK, 
 fun AppRoot(initialCamera: Camera = Camera.FIT, start: String? = null, autoplay: Boolean = false, autoSetup: Boolean = false, watch: Boolean = false,
             crashTest: Boolean = false, players: Int = 0, inviteCode: String? = null, quickBots: Boolean = false) {
     var screen by rememberSaveable { mutableStateOf(if (start != null) Screen.GAME else if (inviteCode != null) Screen.JOIN else Screen.START) }
+    SideEffect { UiLine.screen = screen.name }   // read only by debug builds' WGBG-UI line
     val context0 = LocalContext.current.applicationContext
     // Your last game's settings and your name, kept across restarts (#68, #69); debug starts use the defaults.
     // Saved on every change on the game-start screen too (0.3.4), so closing the app before Play keeps them.

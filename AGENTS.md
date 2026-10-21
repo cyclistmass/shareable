@@ -94,6 +94,10 @@ honestly. Never call something done with failing or skipped tests.
 - Agent hooks: every turn logs `WGBG-TURN` lines (`turn= phase= player= prompt=".." legal=TYPE:PAYLOAD,...`);
   send a move with `adb shell am broadcast -a com.mauro.wgbg.MOVE -p com.mauro.wgbg --es move TYPE:PAYLOAD`.
   Each finished local game logs a `WGBG-GAME` line.
+- Reading the screen: a `WGBG-UI` line is logged whenever the tappable things on screen change (screen, open sheets,
+  `tag|text@x,y` for each). For the whole screen, source `tools/lib/uiread.sh` (`dump`, `at`, `tap_text`, `tap_id`):
+  it asks the app (`am broadcast -a com.mauro.wgbg.UI`) and reads `files/ui.txt` in uiautomator's format in about
+  0.2 s, falling back to `uiautomator dump` (2-15 s). Tap by test tag where there is one; a text can be on screen twice.
 - Before a release: `tools/release_check.sh` runs every automated check in order (unit, rules, APK and its key, then
   every device script on GitHub's runners: `wgbg-check.yml` on a `test/<branch>`; `STEPS="unit rules apk install lanes
   friends"` runs them on both local lanes instead) and prints one timed report plus the by-hand user-test list; a

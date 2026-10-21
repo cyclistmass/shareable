@@ -49,11 +49,17 @@ function Test-EmuReady {
 }
 # The emulator's console spews host-GL chatter (context preempted, ColorBuffer...) all session, so
 # it starts hidden with its output in a log file; the phone screen is a separate window and still shows.
-$emuLog = Join-Path $env:TEMP "wgbg-emulator-$Port.log"
+# A new log each start: netsimd (shared, outlives the emulator) inherits the last one's handles and keeps it open.
+$emuLog = Join-Path $env:TEMP "wgbg-emulator-$Port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 function Start-Emu([string[]]$extra) {
     if ($Gpu) { $extra += @("-gpu", $Gpu) }
-    Start-Process "$sdk\emulator\emulator.exe" -ArgumentList (@("-avd", $Avd, "-port", $Port) + $extra) -WindowStyle Hidden `
-        -RedirectStandardOutput $emuLog -RedirectStandardError "$emuLog.err"
+    Get-ChildItem (Join-Path $env:TEMP "wgbg-emulator-$Port*.log*") | Remove-Item -ErrorAction SilentlyContinue   # the ones still open stay
+    # cmd does the redirecting: Start-Process -RedirectStandardOutput hands the emulator our own stdout too, and a caller
+    # reading this script through a pipe (bash, an agent's shell) then waits until the emulator shuts down.
+    $cmd = '"' + "$sdk\emulator\emulator.exe" + '" ' + ((@("-avd", $Avd, "-port", $Port) + $extra) -join " ") + " > `"$emuLog`" 2> `"$emuLog.err`""
+    $p = Start-Process "cmd.exe" -ArgumentList @("/c", "`"$cmd`"") -WindowStyle Hidden -PassThru
+    Start-Sleep -Seconds 2
+    if ($p.HasExited) { "Emulator didn't start (cmd exit $($p.ExitCode)): $cmd" }
     "Emulator console output: $emuLog"
 }
 function Restart-Emulator {

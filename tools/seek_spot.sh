@@ -21,7 +21,7 @@ while [ $SECONDS -lt $end ]; do
   legal=$(echo "$line" | sed 's/.*legal=//; s/ spots=.*//' | tr ',' '\n')
   both=$(comm -12 <(echo "$legal" | sed -n 's/^BUILD_SETTLEMENT://p' | sort) <(echo "$legal" | sed -n 's/^BUILD_KNIGHT://p' | sort) | head -1)
   if [ -n "$both" ]; then echo "FOUND vertex $both"; echo "$line" | grep -o "spots=.*" | tr ' ,' '\n\n' | grep -E "(SETTLEMENT|KNIGHT):$both@" ; exit 0; fi
-  echo "$line" | grep -q "ROLL:" && trades=0
+  grep -q "ROLL:" <<< "$line" && trades=0
   pick=$(echo "$legal" | grep -m1 -E '^(ROLL|BUILD_CITY|BUILD_ROAD):')
   [ -z "$pick" ] && [ $trades -lt 3 ] && pick=$(echo "$legal" | grep '^MARITIME_TRADE:' | shuf -n1) && [ -n "$pick" ] && trades=$((trades+1))
   [ -z "$pick" ] && pick=$(echo "$legal" | grep -m1 '^END_TURN:')
