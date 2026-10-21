@@ -127,7 +127,13 @@ else
   fi
   # Hosting for a friend: seat 2 becomes a Friend seat.
   [ "$MODE" = host ] && { xy=$(all_text Friend "$(dump)" | head -1); [ -n "$xy" ] || fail "no Friend seat button"; tap $xy; sleep 0.6; }
-  [ "$RULESET" = chivalry ] && { tap_text "Age of Chivalry" || fail "no ruleset button"; }
+  # The Game row can sit below the fold (0.3.4's Colours rows): scroll the Players panel to it, then back to the top.
+  if [ "$RULESET" = chivalry ]; then
+    read -r sw sh < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$sw" -lt "$sh" ] && { t=$sw; sw=$sh; sh=$t; }
+    ok=0; for _ in 1 2 3 4 5 6; do tap_text "Age of Chivalry" && { ok=1; break; }; "$ADB" shell input swipe $((sw / 4)) $((sh * 3 / 4)) $((sw / 4)) $((sh / 3)) 400 </dev/null; sleep 0.6; done
+    [ $ok = 1 ] || fail "no ruleset button"
+    for _ in 1 2 3 4 5 6; do "$ADB" shell input swipe $((sw / 4)) $((sh / 3)) $((sw / 4)) $((sh * 3 / 4)) 300 </dev/null; done
+  fi
   if [ "$MODE" = online ] || [ "$MODE" = host ]; then
     xy=$(find_text "You") || true; [ -n "$xy" ] && { type_into $xy "Tester"; hide_keyboard; }
     tap_text "Host a room" || fail "no Host a room button"

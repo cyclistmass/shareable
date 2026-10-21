@@ -44,6 +44,16 @@ tap_text() {
   [ -n "$b" ] || { echo "[$1] '$2' not on screen"; return 1; }
   set -- "$1" $b; "$A" -s "$1" shell input tap $(( ($2 + $4) / 2 )) $(( ($3 + $5) / 2 )); sleep 0.8
 }
+# Taps $2 on device $1, scrolling the left (Players) panel to it as a player would: the game-start screen is taller
+# than a phone (0.3.4's Colours rows put the Game row below the fold). Scrolls back to the top afterwards.
+scroll_tap() {
+  local w h i; read -r w h < <("$A" -s "$1" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$w" -lt "$h" ] && { i=$w; w=$h; h=$i; }
+  for i in 1 2 3 4 5 6; do
+    tap_text "$1" "$2" 2>/dev/null >/dev/null && { for _ in 1 2 3 4 5 6; do "$A" -s "$1" shell input swipe $((w / 4)) $((h / 3)) $((w / 4)) $((h * 3 / 4)) 300; done; return 0; }
+    "$A" -s "$1" shell input swipe $((w / 4)) $((h * 3 / 4)) $((w / 4)) $((h / 3)) 400; sleep 0.6
+  done
+  echo "[$1] '$2' not on screen, even scrolled"; return 1
+}
 # Replaces the text of the Nth text box on device $1 with $3.
 fill() {
   local b; b=$(dump "$1" | grep 'class="android.widget.EditText"' | sed -n "$2p" | centre) || true
@@ -71,7 +81,8 @@ for d in $HOST $GUEST; do
   "$A" -s $d shell am start --activity-clear-task -n com.mauro.wgbg/.MainActivity $FB_EXTRA --ez autoplay true --ez quickbots true $EXTRA >/dev/null
 done
 sleep 5
-tap_text $GUEST "Got it" 2>/dev/null || true
+# Android's one-time "Viewing full screen" hint, on whichever phone is fresh (a new AVD shows it on the host too).
+for d in $HOST $GUEST; do tap_text $d "Got it" 2>/dev/null || true; done
 
 # The splash (#132) first: New game opens the game-start screen with Host and Join.
 for d in $HOST $GUEST; do wait_for $d "New game" 30 && tap_text $d "New game"; done
@@ -80,7 +91,7 @@ for d in $HOST $GUEST; do wait_for $d "New game" 30 && tap_text $d "New game"; d
 wait_for $HOST "Host a room" 20
 fill $HOST 1 Mauro
 tap_text $HOST "Friend" 1
-[ "$RULESET" = chivalry ] && tap_text $HOST "Age of Chivalry"
+[ "$RULESET" = chivalry ] && scroll_tap $HOST "Age of Chivalry"
 tap_text $HOST "Host a room"
 wait_for $HOST "Room [A-Z]*-[0-9]*" 20
 CODE=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 | cut -d' ' -f2) || true
