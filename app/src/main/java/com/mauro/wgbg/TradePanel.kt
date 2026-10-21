@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +36,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -257,10 +260,10 @@ fun TradePanel(
 
     if (mode == TradeMode.CLOSED) {
         Text(status(s, me, mode, names, false, false), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            modifier = modifier.chest().testTag("trade-panel"))
+            modifier = modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true })
         return
     }
-    Row(modifier.chest().testTag("trade-panel"), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Either tab starts clean: bank picks carried into a player offer made it unsendable (#122).
@@ -270,8 +273,13 @@ fun TradePanel(
                 // chest on a landscape phone.
                 if (!bankTab && s.currentPlayer == me) for (p in 0 until s.numPlayers) if (p != me) {
                     val mark = responses[p] ?: if (mode == TradeMode.WAITING && s.actingPlayer == p) "…" else ""
-                    Text("${names[p]} $mark", color = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) },
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.testTag("answer-$p"))
+                    // A long name ends in "…" and the answer mark always shows: three 16-letter names ran off the chest (0.3.4).
+                    val ink = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) }
+                    Row(Modifier.testTag("answer-$p"), verticalAlignment = Alignment.CenterVertically) {
+                        Text(names[p], Modifier.widthIn(max = 84.dp), color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(" $mark", color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                    }
                 }
             }
             Text(status(s, me, mode, names, countering, bankTab, pick), color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold,
@@ -485,7 +493,7 @@ internal fun cardChoiceTitle(s: GameState, names: List<String>): String = when (
 @Composable
 fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<String>, onMove: (Action) -> Unit, modifier: Modifier = Modifier) {
     val owner = if (s.phase == Phase.MASTER_MERCHANT) s.ck?.pendingTarget ?: me else me
-    Column(modifier.chest().testTag("card-choice"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.chest().testTag("card-choice").semantics { testTagsAsResourceId = true }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(cardChoiceTitle(s, names), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (a in choices.sortedBy { it.a }) Column(horizontalAlignment = Alignment.CenterHorizontally,

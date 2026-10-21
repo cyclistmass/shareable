@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +46,7 @@ fun FriendsScreen(
     modifier: Modifier = Modifier,
 ) {
     var picked by remember { mutableStateOf(emptySet<String>()) }
-    Box(modifier.fillMaxSize().tableTop().testTag("friends"), contentAlignment = Alignment.Center) {
+    Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("friends"), contentAlignment = Alignment.Center) {
         Column(Modifier.width(420.dp).padding(vertical = 10.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Quick game with friends", style = Wood.title(24.sp, Wood.BRASS_INK))

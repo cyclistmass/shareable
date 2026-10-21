@@ -107,7 +107,11 @@ else
   for _ in $(seq 1 20); do on "See the board" && break; sleep 3; done
   all "game over" "Play again" "See the board" "Exit"
   tap "See the board"
-  xy=$(dump | grep 'content-desc="Dice"' | centre)
+  x=$(dump); xy=$(echo "$x" | grep 'content-desc="Dice"' | centre)
+  # The dice row sits under the player list, never over the last player's row (0.3.4: a 110 dp floor pushed it up).
+  read -r _ _ _ pb < <(echo "$x" | grep 'content-desc="Players"' | bounds); read -r _ dt _ _ < <(echo "$x" | grep 'content-desc="Dice"' | bounds)
+  if [ -z "${pb:-}" ] || [ -z "${dt:-}" ]; then bad "the player list or the dice row is missing"
+  elif [ "$dt" -lt "$pb" ]; then bad "the dice row (top $dt) overlaps the player list (bottom $pb)"; fi
   # Both taps from one shell, close enough together to count as a double tap.
   [ -n "$xy" ] && "$ADB" shell "input tap $xy; input tap $xy"; sleep 1.5
   # One look serves both: over the moving board a dump takes about 15 s.

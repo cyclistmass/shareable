@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -75,7 +76,7 @@ fun LobbyScreen(
     var copied by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { kotlinx.coroutines.delay(2000); copied = false } }
-    Box(modifier.fillMaxSize().tableTop().testTag("lobby")) {
+    Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("lobby")) {
         Row(Modifier.fillMaxSize().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             // Both sides scroll when they can't fit: at 320 dp tall (CI's screen) four seats fill the left, and the Recent row
             // and the right side's last lines went off the bottom.

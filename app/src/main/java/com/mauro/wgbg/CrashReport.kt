@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -98,7 +99,7 @@ fun CrashReportScreen(report: String, onDone: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("") }
-    Box(Modifier.fillMaxSize().background(Color(0xFF14100C)).testTag("crash-report"), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF14100C)).displayCutoutPadding().testTag("crash-report"), contentAlignment = Alignment.Center) {
         Row(Modifier.brassEdgedWood().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
             QrCode(CrashReport.forQr(report), Modifier.size(220.dp))
             Column(Modifier.width(360.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

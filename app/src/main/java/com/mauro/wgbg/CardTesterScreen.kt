@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -111,7 +112,7 @@ private fun CardChecklistScreen(marks: Map<String, Pair<CheckState, String>>, pr
         val (device, screen) = Feedback.device(context)
         return CardTester.report(CardTestSession.results.toList(), states, version, appVersionCode(context), device, screen, System.currentTimeMillis())
     }
-    Column(Modifier.fillMaxSize().tableTop().padding(16.dp).testTag("card-tester"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().tableTop().displayCutoutPadding().padding(16.dp).testTag("card-tester"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Card tester", style = Wood.title(26.sp))
             Text(CardTester.progressLine(states), style = Wood.sans(14.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("card-test-progress"))
