@@ -242,11 +242,11 @@ class SeatNamesTest {
         LobbySession.host(ht, setup, 5, code = "ROVER-42").join()
         val erin = joinFirstOpenSeat(InMemoryTransport("e", store), GameSetup(name = "Erin"), "ROVER-42").join()
         val old = erin.client.view().room!!
-        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Blanche"), old.seats.map { it.name })
+        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Jeanne"), old.seats.map { it.name })
         val again = LobbySession.rematch(ht, setup, old, 6, code = "OTTER-7").join()
         val room = joinFirstOpenSeat(InMemoryTransport("e", store), GameSetup(name = "Erin"), "OTTER-7").join().client.view().room!!
         assertEquals("ROVER-42", room.rematchOf)
-        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Blanche"), room.seats.map { it.name }, "Erin back in her seat, the bots as they were")
-        assertEquals(listOf(null, null, "Marguerite", "Blanche"), again.model(room).seats.map { it.botName })
+        assertEquals(listOf("Mauro", "Erin", "Marguerite", "Jeanne"), room.seats.map { it.name }, "Erin back in her seat, the bots as they were")
+        assertEquals(listOf(null, null, "Marguerite", "Jeanne"), again.model(room).seats.map { it.botName })
     }
 }
