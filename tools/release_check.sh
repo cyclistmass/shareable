@@ -40,7 +40,9 @@ fbconfig() {   # a firebase.json for a private pair of emulators, so a peer's 80
     "$(pwd)/firestore.rules" "$FS_PORT" "$AUTH_PORT" > "$OUT/firebase.json"
 }
 
-on unit && check unit bash ./gradlew :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest
+# The instrumented tests are compiled too: assembleDebug never touches them, and 0.3.4 reached CI with one that no
+# longer compiled.
+on unit && check unit bash ./gradlew :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
 
 if on rules; then
   fbconfig
