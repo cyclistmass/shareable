@@ -29,7 +29,9 @@ move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "
 # Steps are kept and printed when a ruleset fails, so a CI log says why without a rerun.
 TRAIL=(); say() { TRAIL+=("$(date +%T) $*"); [ ${#TRAIL[@]} -gt 25 ] && TRAIL=("${TRAIL[@]:1}"); [ -n "${VERBOSE:-}" ] && echo "  · $*"; return 0; }
 bad() { echo "withdraw $ruleset: FAILED: $*"; fail=1; rfail=1; [ -n "${VERBOSE:-}" ] || printf "  · %s\n" "${TRAIL[@]}"; TRAIL=()
-  "$ADB" exec-out screencap -p > "${OUT:-.}/withdraw-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/withdraw-fail-$ruleset.png"; }
+  "$ADB" exec-out screencap -p > "${OUT:-.}/withdraw-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/withdraw-fail-$ruleset.png"
+  # The screen as uiautomator saw it, so a tap that went astray (whose bounds, which element first) can be traced.
+  dump > "${OUT:-.}/withdraw-fail-$ruleset.xml" 2>/dev/null && echo "  dump: ${OUT:-.}/withdraw-fail-$ruleset.xml"; }
 
 for ruleset in $RULESETS; do
   rfail=0; TRAIL=()

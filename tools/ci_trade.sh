@@ -22,7 +22,7 @@ fail=0
 dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
 centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-tap_text() { local xy; xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] || return 1; "$ADB" shell input tap $xy; sleep 0.8; }
+tap_text() { local xy; xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] || return 1; say "tap '$1' at $xy"; "$ADB" shell input tap $xy; sleep 0.8; }
 # A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
 # wm size gives the portrait size; the app is landscape, so the long side is the width (a swipe from below the screen does nothing).
 panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
@@ -45,7 +45,9 @@ ask() { "$ADB" shell input tap "${CARDX[$1]}" $(( TOP + (BOT - TOP) / 4 )); slee
 pay() { "$ADB" shell input tap "${CARDX[$1]}" $(( BOT - (BOT - TOP) / 4 )); sleep 0.6; }   # bottom half pays / offers
 say() { [ "${VERBOSE:-0}" = 1 ] && echo "  · $*"; return 0; }
 bad() { echo "trade $ruleset: FAILED: $*"; echo "  cards x=${CARDX[*]} held=${HELD[*]} rate=${RATE[*]} rows=$TOP..$BOT"; fail=1
-  "$ADB" exec-out screencap -p > "${OUT:-.}/trade-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/trade-fail-$ruleset.png"; }
+  "$ADB" exec-out screencap -p > "${OUT:-.}/trade-fail-$ruleset.png" 2>/dev/null && echo "  screen: ${OUT:-.}/trade-fail-$ruleset.png"
+  # The screen as uiautomator saw it, so a tap that went astray (whose bounds, which element first) can be traced.
+  dump > "${OUT:-.}/trade-fail-$ruleset.xml" 2>/dev/null && echo "  dump: ${OUT:-.}/trade-fail-$ruleset.xml"; }
 
 for ruleset in $RULESETS; do
   "$ADB" shell am force-stop $PKG
