@@ -42,6 +42,12 @@ class WoodPieces(res: Resources, colors: List<Color>) {
     /** The stained-wood fill for color [i], for drawing other wooden things (tokens). */
     fun brush(i: Int): Brush = stains[i]
 
+    /** The worn brass of the panel edges (`old_brass.jpg`), for the brass number plates; loaded the first time one is drawn. */
+    val oldBrass: Brush by lazy {
+        ShaderBrush(ImageShader(BitmapFactory.decodeResource(res, R.drawable.old_brass, BitmapFactory.Options().apply { inScaled = false }).asImageBitmap(),
+            TileMode.Repeated, TileMode.Repeated))
+    }
+
     /** [degrees] turns the house about [at] (a supply piece facing its owner); its shadow stays on the board's one sun (#129). */
     fun DrawScope.settlement(at: Offset, player: Int, scale: Float, degrees: Float = 0f) {
         val u = 0.1955f * scale // 15% bigger than the first pass

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.compose.ui.graphics.toArgb
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -26,7 +27,7 @@ internal fun liveNumberGlb(context: Context, number: Int): ByteBuffer {
     val canvas = Canvas(image)
     val perUnit = px / (2f * NUMBER_TOKEN_R)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (number == 6 || number == 8) 0xFFC62828.toInt() else 0xFF2B2118.toInt()
+        color = numberPaint(number).toArgb()
         textSize = NUMBER_TEXT * perUnit
         textAlign = Paint.Align.CENTER
         typeface = android.graphics.Typeface.DEFAULT_BOLD
