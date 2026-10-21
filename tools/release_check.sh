@@ -11,6 +11,9 @@
 #            colours on the other
 #   friends  friends_sim on both lanes against a private pair of Firebase emulators (FS_PORT, AUTH_PORT)
 #   layout   ci_layout on lane 1 (slow: ~25 min; CI runs it too)
+#   remote   instead of install/lanes/friends/layout: all of them, plus the update from the last release, on GitHub's
+#            runners (wgbg-check.yml on a test/<branch> Bosun pushes); waits for the run and reports each shard.
+#            STEPS="unit rules remote" leaves only the user test on a local emulator.
 #
 # Usage (Git Bash, project root): [STEPS="unit rules apk install lanes friends"] [RULESETS="base chivalry"]
 #   [HOST_SERIAL=emulator-5554] [GUEST_SERIAL=emulator-5556] [FS_PORT=8187 AUTH_PORT=9197] tools/release_check.sh
@@ -63,6 +66,39 @@ if on apk; then
   }
 fi
 
+# remote: every device step on GitHub's runners (shareable's wgbg-check.yml, one emulator per shard). This script
+# can't push: it names the branch for Bosun to push, then waits for that branch's run and adds its jobs to the report.
+if on remote; then
+  BRANCH="${REMOTE_BRANCH:-test/$(git branch --show-current | tr '/' '-')}"
+  SUBJECT=$(git log -1 --format=%s); WAIT="${REMOTE_WAIT:-150}"   # minutes
+  REPO=cyclistmass/shareable
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || echo "!! uncommitted changes: the remote run tests the commit, not them"
+  echo "== remote: ask Bosun to push $BRANCH at $(git rev-parse --short HEAD) (\"$SUBJECT\"); waiting up to $WAIT min"
+  # GitHub's API: Mauro's token helper when there is one (no rate limit worries), else gh, else anonymous (public repo).
+  GH_API="${GH_API:-$HOME/.claude/tools/gh_api.sh}"
+  api() { if [ -x "$GH_API" ]; then "$GH_API" GET "/$1"; elif command -v gh >/dev/null; then gh api "$1"; else curl -s "https://api.github.com/$1"; fi; }
+  PY=$(for p in python3 python; do "$p" -c 1 >/dev/null 2>&1 && { echo "$p"; break; }; done)
+  t0=$SECONDS; run=""; state=""
+  while [ $((SECONDS - t0)) -lt $((WAIT * 60)) ]; do
+    # The newest run of wgbg-check.yml on that branch whose commit carries this commit's subject (the subtree publish
+    # gives the shareable commit its own SHA, but keeps the message).
+    read -r run state < <(api "repos/$REPO/actions/workflows/${REMOTE_WORKFLOW:-wgbg-check.yml}/runs?branch=$BRANCH&per_page=5" | SUBJECT="$SUBJECT" "$PY" -c '
+import json, os, sys
+runs = [r for r in json.load(sys.stdin).get("workflow_runs", []) if r["head_commit"]["message"].split("\n")[0] == os.environ["SUBJECT"]]
+print(runs[0]["id"], runs[0]["status"]) if runs else print("", "")' 2>/dev/null | tr -d '\r') || true
+    [ "$state" = completed ] && break
+    m=$(( (SECONDS - t0) / 60 ))
+    [ -n "$run" ] && echo "   run $run $state, $m min" || { [ $((m % 10)) = 0 ] && echo "   no run on $BRANCH yet ($m min): pushed?"; }
+    sleep 60
+  done
+  if [ "$state" = completed ]; then
+    mapfile -t -O "${#REPORT[@]}" REPORT < <(api "repos/$REPO/actions/runs/$run/jobs?per_page=100" | "$PY" tools/ci/run_report.py --plain | tr -d '\r')
+    REPORT+=("      https://github.com/$REPO/actions/runs/$run   (then ask Bosun to delete $BRANCH)")
+  else
+    REPORT+=("FAIL  $(printf '%5d' $((SECONDS - t0))) s  remote: no finished run on $BRANCH within $WAIT min${run:+ (run $run: $state)}")
+  fi
+fi
+
 if [ -f "$APK" ]; then
   SHA=$(sha256sum < "$APK" | cut -c1-64)
   if on install; then
@@ -98,7 +134,7 @@ if [ -f "$APK" ]; then
     kill $FB 2>/dev/null; wait $FB 2>/dev/null
   fi
   on layout && ANDROID_SERIAL="$HOST" check layout bash tools/ci_layout.sh
-else
+elif on install || on lanes || on friends || on layout; then
   REPORT+=("SKIP      0 s  device checks: no APK at $APK")
 fi
 
