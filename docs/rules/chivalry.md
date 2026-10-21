@@ -28,9 +28,9 @@ what this page changes.
 | Town | 2 |
 | Capital | 2 more (a Capital is worth 4 in all) |
 | Grand Highway | 2 |
-| Shield of the Isle (one per card) | 1 |
+| Defender of the Realm (one per card) | 1 |
 | Printing Press, Charter of Rights | 1 each |
-| Holding the Peddler's merchant | 1 |
+| Holding the Trader | 1 |
 
 ## Commodities and production
 
@@ -145,7 +145,7 @@ Each player has 6 knights: 2 basic (strength 1), 2 strong (2) and 2 mighty (3).
 
 | With the bank | Rate |
 |---|---|
-| Resources | 4:1, 3:1 at a 3-for-1 harbour, 2:1 at that resource's harbour, or 2:1 for the tile the Peddler's merchant stands on, while it's yours |
+| Resources | 4:1, 3:1 at a 3-for-1 harbour, 2:1 at that resource's harbour, or 2:1 for the tile the Trader stands on, while it's yours |
 | Commodities | 4:1, 3:1 at a 3-for-1 harbour, 2:1 with Guilds level 3 |
 | Swift Hulls | the named card 2:1 for the rest of the turn |
 
@@ -159,8 +159,8 @@ You can take commodities from the bank, and trades between players can include t
 
 **If the knights are as strong or stronger**, the island holds:
 
-- The one player who gave the most strength gets a **Shield of the Isle** (1 point; 6 in the box).
-- If several players tie for most, or the Shields have run out, each of them draws a progress card from a deck of their
+- The one player who gave the most strength gets a **Defender of the Realm** card (1 point; 6 in the box).
+- If several players tie for most, or those cards have run out, each of them draws a progress card from a deck of their
   choice.
 - If nobody gave any strength, nobody is rewarded.
 

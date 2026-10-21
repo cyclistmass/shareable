@@ -13,6 +13,9 @@ import wgbg.engine.Track
 /** Improvement tracks / progress decks by engine track index: Guilds (trade), Crown (politics), Academy (science). */
 val DECK_NAMES = listOf("Guilds", "Crown", "Academy")
 
+/** The Raiders' reward card: 1 point for the one player whose knights did most to beat them (Mauro, 0.3.5). */
+const val DEFENDER = "Defender of the Realm"
+
 /** Progress cards in engine order, with our own names (never the original game's). */
 val PROGRESS_NAMES = listOf(
     // Academy
@@ -39,7 +42,7 @@ val PROGRESS_HINTS = listOf(
     // Guilds
     "Offer each other player a resource; each must give you a commodity back.",
     "Pick a player ahead of you on points: see their hand and take 2 cards.",
-    "Put the merchant on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.",
+    "Put the Trader on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.",
     "This turn, trade one card type with the bank 2 for 1.",
     "Name a resource: each other player hands you 2 of it, or all they have.",
     "Name a commodity: each other player hands you 1 of it, if they have one.",

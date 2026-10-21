@@ -932,26 +932,26 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply { progress(0, P.MASTER_MERCHANT); blocked(P.MASTER_MERCHANT, "Everyone has 3 points, as you do. ") }
     }
     // Peddler: the merchant by your pieces: 1 point and 2:1 for its resource.
-    add("peddler.place", P.MERCHANT, "place the merchant: 1 point and 2:1") {
+    add("peddler.place", P.MERCHANT, "place the Trader: 1 point and 2:1") {
         opening(true).apply {
             progress(0, P.MERCHANT)
             val h = (0 until b.hexCount).first { b.hexResource[it] >= 0 && touches(it, 0) && CitiesAndKnights.tradeRate(s, 0, b.hexResource[it]) > 2 }
             val r = b.hexResource[h]
             howTo = "Tap Play ${name(P.MERCHANT)}… and tap ${tile(h)}."
-            expect = "The merchant stands on ${tile(h)}: 1 point for you, and you trade ${RESOURCE_NAMES[r]} with the bank 2 for 1."
+            expect = "The Trader stands on ${tile(h)}: 1 point for you, and you trade ${RESOURCE_NAMES[r]} with the bank 2 for 1."
             change("Your points", +1) { it.victoryPoints(0) }
             becomes("${RESOURCE_NAMES[r]} you give the bank for 1 card", 2) { CitiesAndKnights.tradeRate(it, 0, r) }
             then(play(P.MERCHANT, h))
         }
     }
-    add("peddler.take-it-over", P.MERCHANT, "take the merchant from another player") {
+    add("peddler.take-it-over", P.MERCHANT, "take the Trader from another player") {
         opening(true).apply {
             progress(0, P.MERCHANT)
             val hb = (0 until b.hexCount).first { b.hexResource[it] >= 0 && touches(it, 1) && !touches(it, 0) }
             ck.merchantHex = hb; ck.merchantOwner = 1
             val h = (0 until b.hexCount).first { it != hb && b.hexResource[it] >= 0 && touches(it, 0) }
-            howTo = "Blue's merchant stands on ${tile(hb)}. Tap Play ${name(P.MERCHANT)}… and tap ${tile(h)}."
-            expect = "The merchant comes to you: you gain its point and Blue loses it."
+            howTo = "Blue's Trader stands on ${tile(hb)}. Tap Play ${name(P.MERCHANT)}… and tap ${tile(h)}."
+            expect = "The Trader comes to you: you gain its point and Blue loses it."
             change("Your points", +1) { it.victoryPoints(0) }
             change("Blue's points", -1) { it.victoryPoints(1) }
             then(play(P.MERCHANT, h))

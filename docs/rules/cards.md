@@ -121,9 +121,9 @@ theirs. Stop whenever you like. You need a resource to give.
 Resources or commodities, your choice. Fewer if they hold fewer.
 
 #### Peddler (6)
-> Put the merchant on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.
+> Put the Trader on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.
 
-There is one merchant. It goes on a land tile, not the desert, touching your Homestead or Town. Whoever plays the next
+There is one Trader. It goes on a land tile, not the desert, touching your Homestead or Town. Whoever plays the next
 Peddler takes it, with the point.
 
 #### Swift Hulls (2)
@@ -188,7 +188,7 @@ Knights supplied this way can't act this turn.
 
 Resources or commodities. All they have, if that's fewer than 2.
 
-## Shield of the Isle (Age of Chivalry, 6)
+## Defender of the Realm (Age of Chivalry, 6)
 
-Not drawn from a deck. When the knights beat the Raiders, the one player who gave the most strength takes a Shield:
-1 point, kept for good. If players tie, or the Shields are gone, each of them draws a progress card instead.
+Not drawn from a deck. When the knights beat the Raiders, the one player who gave the most strength takes a Defender of the Realm card:
+1 point, kept for good. The turn report names who won it. If players tie, or the cards are gone, each of them draws a progress card instead.

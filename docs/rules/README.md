@@ -27,4 +27,5 @@ here, a card or a line in the game log uses another game's names.
 | The invaders | the Raiders |
 | A level-4 town | Capital |
 | Town defences | Ramparts |
-| The Raiders' reward card | Shield of the Isle (named for these pages; the app shows it only as a point) |
+| The Raiders' reward card | Defender of the Realm |
+| The Peddler's piece | the Trader |
