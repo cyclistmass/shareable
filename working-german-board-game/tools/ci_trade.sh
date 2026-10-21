@@ -9,23 +9,21 @@
 #   D. an open ask by taps on the Players tab (#135: ask a card, offer nothing); the bots counter it; a taker's
 #      button shows their terms and Trade takes them (Cancel withdraws when nobody answered).
 # Fails on a crash, a step that doesn't take, or no turn with two lots within the time.
-# Usage: tools/ci_trade.sh [seconds per ruleset] [rulesets, default "base chivalry"]
+# Usage: [DICE="3,3 4,4 ..."] tools/ci_trade.sh [seconds per ruleset] [rulesets, default "base chivalry"]
 set -uo pipefail
 SECS="${1:-420}"
 RULESETS="${2:-base chivalry}"
+# The dice, in order and over again (debug --es dice, 0.3.5): every number but 7 once a round, so every hex you touch
+# pays each round and no 7 ever halves your hand. Two lots then always come (random dice missed them within 420 s on
+# CI, run 39656897375). DICE="" plays real dice, C included; a build before 0.3.5 ignores the extra and skips C.
+DICE="${DICE-3,3 4,4 2,3 4,5 1,3 4,6 1,2 5,6 1,1 6,6}"
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
 fail=0
 . "$(dirname "$0")/lib/turnstream.sh" # turn lines as they come + stall watchdog (#139)
 
-dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
-centre() { grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' ' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-tap_text() { local xy; xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] || return 1; say "tap '$1' at $xy"; "$ADB" shell input tap $xy; sleep 0.8; }
-# Taps the element whose test tag (resource-id) is $1: the chest's tabs go by tag, since the player list is also
-# labelled "Players" (0.3.4) and a tap by text hit it first.
-tap_id() { local xy; xy=$(dump | grep "resource-id=\"$1\"" | centre); [ -n "$xy" ] || return 1; say "tap #$1 at $xy"; "$ADB" shell input tap $xy; sleep 0.8; }
+. "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 # A Settings row below the fold (CI's 320 dp tall screen) is scrolled to in the open panel, as a player would.
 # wm size gives the portrait size; the app is landscape, so the long side is the width (a swipe from below the screen does nothing).
 panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
@@ -58,12 +56,16 @@ for ruleset in $RULESETS; do
   "$ADB" shell am force-stop $PKG
   "$ADB" shell pm clear $PKG >/dev/null
   ts_open; "$ADB" logcat -b crash -c 2>/dev/null || true
-  timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
+  timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players 3 --ez quickbots true ${DICE:+--es dice "'$DICE'"} >/dev/null || { bad "the app didn't start in 60 s (window manager wedged? reboot the emulator)"; continue; }
   sleep 4
   # Bots at full speed (Menu › Settings › This game, the speed button cycles 2× 4× 8× Max, by touch), so a turn with two lots comes up sooner.
   tap_text "Menu" && tap_text "Settings" && panel_tap "This game" && panel_tap "2×" && panel_tap "4×" && panel_tap "8×" ||
     say "couldn't set full speed in Settings"; tap_text "Hide" || true
   done_ab=0; done_c=0; done_d=0; again=0; games=1; start=$(date +%s); ts_alive
+  # Step C needs the fixed dice (0.3.5's debug --es dice; the app logs WGBG-DICE when it takes them). A build without
+  # them plays random dice, where two lots may never come: C is left out there, said plainly, not left to a coin toss.
+  if [ -n "$DICE" ] && ! "$ADB" logcat -d -s WGBG-DICE:I | grep -q 'fixed dice'; then
+    echo "trade $ruleset: C skipped: this build takes no --es dice (before 0.3.5), and on random dice two lots may never come"; done_c=1; fi
   while [ $(( $(date +%s) - start )) -lt "$SECS" ] && { [ $done_c = 0 ] || [ $done_d = 0 ]; } && [ $fail = 0 ]; do
     crashed && { bad "crash"; break; }
     # The bots won (this seat never builds): play again, by touch.
@@ -80,8 +82,8 @@ for ruleset in $RULESETS; do
     legal=$(echo "$line" | sed -n 's/.* legal=\([^ ]*\).*/\1/p' | tr ',' '\n')
     [ -z "$legal" ] && continue
     r=$(echo "$legal" | grep '^ROLL:' | head -1); [ -n "$r" ] && { move "$r"; continue; }
-    if [ "$phase" != PLAY_TURN ] || ! echo "$legal" | grep -q '^END_TURN:'; then move "$(echo "$legal" | grep -v -E '^(OFFER_TRADE|OFFER_TRADE_CK|COUNTER_TRADE)' | shuf -n 1)"; continue; fi
-    if ! echo "$legal" | grep -q '^MARITIME_TRADE:'; then move END_TURN:0; continue; fi
+    if [ "$phase" != PLAY_TURN ] || ! grep -q '^END_TURN:' <<< "$legal"; then move "$(echo "$legal" | grep -v -E '^(OFFER_TRADE|OFFER_TRADE_CK|COUNTER_TRADE)' | shuf -n 1)"; continue; fi
+    if ! grep -q '^MARITIME_TRADE:' <<< "$legal"; then move END_TURN:0; continue; fi
     # Only C left: open the chest only when two different cards can each pay a lot (screen reads are slow).
     gives=$(echo "$legal" | grep '^MARITIME_TRADE:' | cut -d: -f2 | awk '{print $1 % 256}' | sort -u | wc -l)
     if [ $done_ab = 1 ] && [ $done_d = 1 ] && [ "$gives" -lt 2 ]; then move END_TURN:0; continue; fi
@@ -102,7 +104,7 @@ for ruleset in $RULESETS; do
         { bad "A: bank trade didn't take (card $g: $before_g -> ${HELD[$g]}, card $w: $before_w -> ${HELD[$w]})"; break; }
       # #125: the new counts are shown after the trade ("Now: 4 Grain (+1) · 0 Stone (−3)").
       seen 'text="Now: ' 8; now=$(dump | grep -o 'text="Now: [^"]*"' | head -1)
-      echo "$now" | grep -q "(+1)" && echo "$now" | grep -q "(−$rate)" ||
+      grep -q "(+1)" <<< "$now" && grep -q "(−$rate)" <<< "$now" ||
         { bad "A: no new-counts line after the trade (#125): '${now:-none}'"; break; }
       # B: both cards just used must still answer: asking each shows +1.
       ask $g; ask $w
@@ -160,7 +162,7 @@ for ruleset in $RULESETS; do
         done
         [ "$("$ADB" logcat -d -s WGBG-TURN:I | wc -l)" -gt "$lines0" ] || { bad "D: the offer never left (Offer did nothing)"; break; }
         l=$(turn_line); say "D: after Offer: ${l:0:160}"
-        if echo "$l" | grep -q 'phase=DECIDE_ACCEPTEES'; then
+        if grep -q 'phase=DECIDE_ACCEPTEES' <<< "$l"; then
           # One button per taker, "Name ⇄" (countered) or "Name ✓": tap one to see its terms, then Trade.
           partner=$(dump | grep -o 'text="[A-Za-z]* [⇄✓]"' | head -1 | sed 's/text="\(.*\)"/\1/')
           if [ -n "$partner" ]; then
@@ -180,7 +182,7 @@ for ruleset in $RULESETS; do
     tap_text "Close" || true
     # End the turn and wait for a newer log line (re-reading this one raced the bots: "no Trade button").
     l=$(turn_line); ts_alive
-    if echo "$l" | grep -q 'phase=PLAY_TURN' && echo "$l" | grep -q 'END_TURN:'; then move END_TURN:0; else again=1; fi
+    if grep -q 'phase=PLAY_TURN' <<< "$l" && grep -q 'END_TURN:' <<< "$l"; then move END_TURN:0; else again=1; fi
   done
   crashed && bad "crash"
   [ $fail = 0 ] && [ $done_ab = 0 ] && bad "no bank trade came up in ${SECS}s"

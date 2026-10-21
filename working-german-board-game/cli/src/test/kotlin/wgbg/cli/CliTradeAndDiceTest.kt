@@ -75,7 +75,7 @@ class CliTradeAndDiceTest {
     @Test
     fun `the client's true-random dice are fair over 10,000 throws`() {
         val r = Record(dir, listOf("Ann", "bot"), 1, 10, mutableListOf())
-        val rolls = List(10_000) { r.roll() }
+        val rolls = List(10_000 * (System.getProperty("wgbg.testScale")?.toIntOrNull()?.coerceAtLeast(1) ?: 1)) { r.roll() }
         assertTrue(rolls.all { it.type == ActionType.ROLL && it.a in 1..6 && it.b in 1..6 })
         val text = DiceFairness.check(rolls.map { it.a + it.b }, rolls.map { it.a }, rolls.map { it.b })
         File("build/dice-fairness").apply { mkdirs() }.resolve("cli.txt").writeText(text)

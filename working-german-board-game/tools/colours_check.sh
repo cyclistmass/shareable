@@ -14,7 +14,7 @@ EVENTS="${1:-2000}"
 : "${ANDROID_SERIAL:?set ANDROID_SERIAL to the device to drive}"
 export ANDROID_SERIAL MSYS_NO_PATHCONV=1
 ADB="${ADB:-adb}"; PKG=com.mauro.wgbg
-OUT="${OUT:-$TEMP/wgbg-colours/$ANDROID_SERIAL}"; mkdir -p "$OUT"
+OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-colours/$ANDROID_SERIAL}"; mkdir -p "$OUT"
 TAG=colours
 
 if [ "${SMALL:-0}" = 1 ]; then
@@ -23,15 +23,7 @@ if [ "${SMALL:-0}" = 1 ]; then
 fi
 read -r W H < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$W" -lt "$H" ] && { t=$W; W=$H; H=$t; }
 
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
-    "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
-  done
-  echo "uiautomator dump failed 6 times (busy device?)" >&2
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
 # Centre of the first element whose text matches the regex $1 (whole text), in dump $2 or a fresh one.
 find_re() {
   local d="${2:-$(dump)}"
@@ -57,11 +49,11 @@ reach() {
 # A slow emulator can stall a system app until Android asks to close it; ours not responding is a failure.
 system_anr() {
   local d="$1" xy
-  if echo "$d" | grep -q 'text="Live Caption"'; then
+  if grep -q 'text="Live Caption"' <<< "$d"; then
     xy=$(find_re "Got it" "$d"); [ -n "$xy" ] && { echo "COLOURS: closed the system's Live Caption popup"; tap $xy; return 0; }
   fi
-  echo "$d" | grep -q 'text="[^"]* isn.t responding"' || return 1
-  echo "$d" | grep -q 'text="Working German Board Game isn.t responding"' && fail "the game isn't responding (ANR)"
+  grep -q 'text="[^"]* isn.t responding"' <<< "$d" || return 1
+  grep -q 'text="Working German Board Game isn.t responding"' <<< "$d" && fail "the game isn't responding (ANR)"
   echo "COLOURS: closed a system app that wasn't responding"
   xy=$(find_re "Close app" "$d"); [ -n "$xy" ] && tap $xy
   return 0
@@ -73,9 +65,9 @@ launch() {
     [ -n "$("$ADB" shell pidof $PKG | tr -d '\r\n')" ] && break
   done
   local d
-  for _ in $(seq 1 20); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="Tap to skip"\|text="New game"' && break; sleep 2; done
-  if echo "$d" | grep -q 'text="Tap to skip"'; then tap $((W / 2)) $((H / 2)); sleep 2; fi
-  for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; echo "$d" | grep -q 'text="New game"' && return 0; sleep 1; done
+  for _ in $(seq 1 20); do d=$(dump); system_anr "$d" && continue; grep -q 'text="Tap to skip"\|text="New game"' <<< "$d" && break; sleep 2; done
+  if grep -q 'text="Tap to skip"' <<< "$d"; then tap $((W / 2)) $((H / 2)); sleep 2; fi
+  for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; grep -q 'text="New game"' <<< "$d" && return 0; sleep 1; done
   fail "the start screen never appeared"
 }
 new_game() { tap $(find_re "New game") || fail "no New game"; for _ in $(seq 1 10); do dump | grep -q 'text="Play"' && return 0; sleep 1; done; fail "no game-start screen"; }

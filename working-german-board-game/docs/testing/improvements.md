@@ -9,9 +9,6 @@ move it to **Done** with the commit when it lands.
   `ci_monkey.sh`): source `tools/lib/turnstream.sh` like the trade scripts. (Bosun, 2026-10-13)
 - **A long Chivalry game in the report-size test**: reports are capped at 190 000 characters; check a real
   300-turn replay fits whole. (Bosun, 2026-10-13)
-- A uiautomator dump takes ~4.5 s in a game (the animated sea never lets it go idle), so scripts can't read the screen
-  between two bot answers. A debug "pause the sea" extra or reading the tree from the app's own log would make every
-  touch script several times faster. Bosun, 2026-10-13 (#139).
 - emulator-5556 wedges after installs (am start -W never returns, blank screen, no focus); a reboot fixes it for a while.
   Every `am start -W` in tools/ now has a 60 s timeout so a script fails fast instead of hanging. Bosun, 2026-10-13 (#134?).
 - **userplay.sh online on a local build needs `app/google-services.json`**: a worktree without it builds an offline-only
@@ -23,6 +20,10 @@ move it to **Done** with the commit when it lands.
 
 ## Done
 
+- The app reads its own screen (debug builds, `UiLine.kt` + `tools/lib/uiread.sh`): about 0.2 s a look instead of
+  uiautomator's 2-15 s. On lane 2: ci_reach 405 s to 99 s; ci_trade 632 s to 471 s (games to a two-lot turn vary);
+  ci_withdraw 114 s for both rulesets. All touch and check scripts use it except ci_layout (layout_check.py needs the
+  nested tree) and the record_* scripts (after the 0.3.4 re-record). (36, 2026-10-21)
 - Two flaky CI checks fixed in the tests (#138): `ci_withdraw.sh` takes a missing "withdrew" line as a lost race
   (every bot said no before the tap; a refusal adds no log line) and offers again, up to 3 times; LiveBoardDeviceTest
   reads off-screen spots (negative pixels) and drags one into view, and waits 30 s for the first frame report.
@@ -54,9 +55,6 @@ move it to **Done** with the commit when it lands.
 - 2026-10-19, bugs: every cold start skips about 43 frames (~0.7 s) on the main thread while the start screen first
   draws, before any game opens (Pixel6 API34, `Choreographer: Skipped 43 frames`). Profile it with a frame or method trace
   (Splash, fonts, wood textures, Firebase setup) and move what it finds off the main thread; saves a visible stall on launch.
-- 2026-10-20, bugs: `tools/ci_reach.sh` takes about 8 min on lane 2, nearly all of it `uiautomator dump` (~2 s each, it
-  waits for the animated board to idle). Read the screen from a cheaper source (one dump per screen and computed scroll
-  offsets, or a debug-only semantics dump) to bring it under 2 min; CI's slower emulator will feel it most.
 - 2026-10-20, bugs: checking the knight pick on a device took about an hour of driven Age of Chivalry games (bots usually
   win before seat 0 has an active knight with a free corner to move to). A debug-only launch extra that loads a stored
   position (a seed plus a move list, as the save store already records) would reach any mid-game state in seconds for
@@ -79,3 +77,7 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, WGBG: two files held literal backspace bytes where `\b` was meant (SeatNamesTest's card-tester name check
   and tools/userplay.sh's menu-build check), so neither check could ever fire. Cause: `\b` passed through a non-raw
   string (Python, printf) in an edit script. Write edit scripts to a file and grep for [\x00-\x08] after scripted edits.
+- 2026-10-21, Bosun: slow local device runs move to CI shards (the repo is public, so Actions minutes are free):
+  friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
+  :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.
+- layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d

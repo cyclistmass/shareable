@@ -12,7 +12,7 @@
 # once never share files or taps.
 # Usage: ANDROID_SERIAL=emulator-5554 tools/userplay.sh <base|chivalry> <local|online|host|join> [players=3] [minutes=40]
 #   RESUME=1 finishes the saved game instead (the splash's Resume game); ruleset and players are then the save's.
-#   host/join meet through ROOM_FILE (default $TEMP/wgbg-userplay/room-code); start the host first.
+#   host/join meet through ROOM_FILE (default ${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/room-code); start the host first.
 set -uo pipefail
 RULESET="$1"; MODE="$2"; PLAYERS="${3:-3}"; MINUTES="${4:-40}"
 : "${ANDROID_SERIAL:?set ANDROID_SERIAL to the device to drive (lane 1 emulator-5554, lane 2 emulator-5556)}"
@@ -20,8 +20,8 @@ export ANDROID_SERIAL
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
-OUT="${OUT:-$TEMP/wgbg-userplay/$ANDROID_SERIAL}"; mkdir -p "$OUT"
-ROOM_FILE="${ROOM_FILE:-$TEMP/wgbg-userplay/room-code}"
+OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/$ANDROID_SERIAL}"; mkdir -p "$OUT"
+ROOM_FILE="${ROOM_FILE:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-userplay/room-code}"
 TAG="$RULESET-$MODE-${PLAYERS}p"
 # One run per device: a second run on the same device would tap over this one.
 if [ -f "$OUT/run.pid" ] && kill -0 "$(cat "$OUT/run.pid")" 2>/dev/null; then
@@ -33,16 +33,7 @@ echo $$ > "$OUT/run.pid"; trap 'rm -f "$OUT/run.pid"' EXIT
 PARENT=$PPID
 orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (the shell that started it is gone)"; exit 1; }; }
 
-# The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
-dump() {
-  local x
-  for _ in 1 2 3 4 5 6; do
-    "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
-    "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
-  done
-  echo "uiautomator dump failed 6 times (busy device?)" >&2
-}
+. "$(dirname "$0")/lib/uiread.sh"   # dump: the app's own screen read (0.2 s), uiautomator as the fallback
 # Centre of the first on-screen text exactly $1 (optionally in $2 = a dump already taken).
 find_text() {
   local d="${2:-$(dump)}"
@@ -69,7 +60,7 @@ all_text() { echo "$2" | grep -o "\(text\|content-desc\)=\"$1\"[^/]*bounds=\"\[[
 # closes the keyboard AND the app (0.2.9 test, 2026-10-13).
 # Enter first (a player's Done key); if it only moved to the next box, Back closes the keyboard. Back only while
 # it's still up, or it would close the screen. Check it's really gone: a box hidden under it gets the wrong text.
-kb_up() { "$ADB" shell dumpsys input_method | grep -q "mInputShown=true"; }
+kb_up() { "$ADB" shell dumpsys input_method | grep -c "mInputShown=true" >/dev/null; }
 hide_keyboard() { sleep 0.5; for k in ENTER BACK; do kb_up || return 0; "$ADB" shell input keyevent KEYCODE_$k; sleep 1; done
   kb_up && fail "the keyboard won't close"; return 0; }
 # Type into a text box (tap it, clear it, type).
@@ -93,19 +84,19 @@ done
 [ -n "$("$ADB" shell pidof $PKG | tr -d '
 ')" ] || fail "the app wouldn't start"
 # Wait for the app to open (a slow phone shows the launch splash for a while): the intro or the splash (#132).
-for _ in $(seq 1 15); do d=$(dump); echo "$d" | grep -q 'text="Tap to skip"\|text="New game"' && break; sleep 2; done
+for _ in $(seq 1 15); do d=$(dump); grep -q 'text="Tap to skip"\|text="New game"' <<< "$d" && break; sleep 2; done
 # First launch plays the intro fly-over; a player taps to skip it.
-if echo "$d" | grep -q 'text="Tap to skip"'; then tap 1200 540; sleep 2
-  for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="New game"' && break; sleep 1; done; fi
-echo "$d" | grep -q 'text="New game"' || fail "the splash never appeared"
+if grep -q 'text="Tap to skip"' <<< "$d"; then tap 1200 540; sleep 2
+  for _ in $(seq 1 10); do d=$(dump); grep -q 'text="New game"' <<< "$d" && break; sleep 1; done; fi
+grep -q 'text="New game"' <<< "$d" || fail "the splash never appeared"
 shot splash
 if [ -n "${RESUME:-}" ]; then
   tap_text "Resume game" "$d" || fail "no Resume game button"
 else
 # The splash's New game opens the game-start screen (players, ruleset, Play, Host and Join).
 tap_text "New game" "$d" || fail "no New game button"
-for _ in $(seq 1 10); do d=$(dump); echo "$d" | grep -q 'text="Play"' && break; sleep 1; done
-echo "$d" | grep -q 'text="Play"' || fail "the game-start screen never appeared"
+for _ in $(seq 1 10); do d=$(dump); grep -q 'text="Play"' <<< "$d" && break; sleep 1; done
+grep -q 'text="Play"' <<< "$d" || fail "the game-start screen never appeared"
 if [ "$MODE" = join ]; then
   # The friend: Join a room, their name and the code the host read out, Join, then mark themselves ready.
   for _ in $(seq 1 90); do [ -s "$ROOM_FILE" ] && break; sleep 2; done
@@ -154,7 +145,7 @@ else
         orphaned
         "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break
         [ -e "$ROOM_FILE.failed" ] && break
-        d=$(dump); echo "$d" | grep -q 'text="Duo"' && tap_text "Start game" "$d"; sleep 3
+        d=$(dump); grep -q 'text="Duo"' <<< "$d" && tap_text "Start game" "$d"; sleep 3
       done
       rm -f "$ROOM_FILE"
       # A friend who never made it in would leave the host sitting in the lobby until its time limit.
@@ -225,7 +216,7 @@ while true; do
     if tap_desc "$label"; then
       sleep 0.6; xy=${menu_pick#*@}; tap "${xy%,*}" "${xy#*,}"; sleep 0.6; tap "${xy%,*}" "${xy#*,}"
       for _ in $(seq 1 10); do sleep 0.5; after=$("$ADB" logcat -d -s WGBG-TURN:I | tail -1); [ "$after" != "$line" ] && break; done
-      if echo "$after" | grep -q "legal=[^ ]*\b$mv_\b"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
+      if grep -q "legal=[^ ]*\b$mv_\b" <<< "$after"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
       else echo "MENUBUILD ok $label $mv_"; MENU_OK=$((${MENU_OK:-0} + 1)); fi
     else echo "MENUBUILD FAIL $label: no $label button in the build menu while $mv_ is legal"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-nobutton-$label"; fi
   elif [ -n "$spots" ] && [ $((RANDOM % 5)) != 0 ]; then
@@ -237,7 +228,7 @@ while true; do
     # A trade offered to you: answer it like a person, Yes or No (Counter is left out on purpose).
     if echo ",$legal" | grep -q ',ACCEPT_TRADE:' && [ $((RANDOM % 3)) = 0 ]; then tap_text "Yes" || tap_text "No"; else tap_text "No" || tap_text "Yes"; fi
   elif [ "$phase" != DISCARD ] && echo ",$legal" | grep -q ',END_TURN:' && { [ "$tries" -ge 3 ] || [ $((RANDOM % 3)) = 0 ]; } && tap_at "End turn"; then :
-  elif d=$(dump); echo "$d" | grep -q 'text="Discard [0-9]'; then
+  elif d=$(dump); grep -q 'text="Discard [0-9]' <<< "$d"; then
     # The discard sheet, the way a person does it: look once, tap cards you hold until enough are chosen, press
     # Discard. ("choose 5 to discard (2 chosen)"; each card shows "have N" under it.)
     echo "$(date +%T) discard sheet seen (${phase})" >&2
@@ -259,14 +250,14 @@ while true; do
     done
     tap_text "$(echo "$d" | grep -o 'text="Discard [0-9]*"' | head -1 | cut -d'"' -f2)" "$d" || true
   elif tap_text "Roll" "$d"; then :
-  elif echo "$d" | grep -q 'text="Card guide"' && echo "$d" | grep -q 'text="Close"'; then
+  elif grep -q 'text="Card guide"' <<< "$d" && grep -q 'text="Close"' <<< "$d"; then
     tap_text "Close" "$d" || true   # the card guide got opened: close it, as a player would
-  elif echo "$d" | grep -q 'text="Hide"'; then
+  elif grep -q 'text="Hide"' <<< "$d"; then
     # The menu is open (a stray tap on the gear): carry on playing if it got paused, then close it, as a player would.
     echo "$(date +%T) menu open, closing it" >&2
-    echo "$d" | grep -q 'text="Play"' && tap_text "Play" "$d"
+    grep -q 'text="Play"' <<< "$d" && tap_text "Play" "$d"
     tap_text "Hide" "$d" || true
-  elif echo ",$legal" | grep -q ',CHOOSE_CARD:' && echo "$d" | grep -q 'text="ha[sv]e [0-9]'; then
+  elif echo ",$legal" | grep -q ',CHOOSE_CARD:' && grep -q 'text="ha[sv]e [0-9]' <<< "$d"; then
     # A one-card picker (Harbour Charter's give-back, Grand Factor's take): the cards are pictures with "have N"
     # (yours) or "has N" (theirs) under them
     # and no text button, so tap one card you hold, as a person would.
@@ -277,7 +268,7 @@ while true; do
            END{for(i=1;i<=n;i++) for(k=1;k<=m;k++) if(h[k]>0 && hx[k]>=x1[i] && hx[k]<=x2[i] && hy[k]>=y2[i]-10 && hy[k]<=y2[i]+60) print int((x1[i]+x2[i])/2), int((y1[i]+y2[i])/2)}' |
       shuf -n 1)
     if [ -n "$xy" ]; then tap "${xy% *}" "${xy#* }"; else echo "$(date +%T) card picker: no held card found" >&2; fi
-  elif echo "$d" | grep -q 'text="Back"' && echo "$d" | grep -q 'text="Play [^"]*: '; then
+  elif grep -q 'text="Back"' <<< "$d" && grep -q 'text="Play [^"]*: ' <<< "$d"; then
     # A card's player picker ("Play Grand Factor: ... Blue / White / Back"): pick one of the named players. The
     # general list below leaves player names out because the scores panel shows them too.
     who=$(echo "$d" | grep -o 'text="\(Red\|Blue\|Orange\|White\|Yellow\|Purple\|Black\)"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' |

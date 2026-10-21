@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Self-play in the real app (#46): bots play back-to-back games at Max speed in each ruleset. Fails on any app
 # crash or ANR, or if fewer than MIN_GAMES games finish in SECS seconds. Runs after tools/ci_monkey.sh in CI.
-# Usage: tools/ci_selfplay.sh [max seconds per ruleset] [min games per ruleset]
+# Usage: [RULESETS="base chivalry"] tools/ci_selfplay.sh [max seconds per ruleset] [min games per ruleset]
 # Stops a ruleset as soon as MIN_GAMES games have finished (it used to sleep the whole SECS).
 set -euo pipefail
 SECS="${1:-90}"
@@ -11,7 +11,7 @@ PKG=com.mauro.wgbg
 export MSYS_NO_PATHCONV=1
 fail=0
 "$ADB" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
-for ruleset in base chivalry; do
+for ruleset in ${RULESETS:-base chivalry}; do
   "$ADB" shell am force-stop "$PKG"
   "$ADB" logcat -c
   "$ADB" logcat -b crash -c 2>/dev/null || true
@@ -21,7 +21,7 @@ for ruleset in base chivalry; do
     live_ready=0
     for attempt in $(seq 1 15); do
       "$ADB" shell am broadcast -a com.mauro.wgbg.FILAMENT_VIEW -p "$PKG" --ez live true >/dev/null
-      if "$ADB" logcat -d -s WGBG-3D-VIEW:I | grep -q 'live=true'; then live_ready=1; break; fi
+      if "$ADB" logcat -d -s WGBG-3D-VIEW:I | grep -c 'live=true' >/dev/null; then live_ready=1; break; fi
       sleep 1
     done
     if [ "$live_ready" != 1 ]; then echo "Live board receiver did not start"; exit 1; fi

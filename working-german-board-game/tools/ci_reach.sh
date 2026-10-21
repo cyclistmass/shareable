@@ -14,13 +14,16 @@ MODE="${1:-screens}"
 export MSYS_NO_PATHCONV=1
 fail=0
 
-dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
+. "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 on() { dump | grep -q "text=\"$1\""; }
-# The failure screen lands in the working dir (or $OUT), like the other CI scripts: CI uploads *.png from there.
-bad() { echo "reach: FAILED: $*"; fail=1; "$ADB" exec-out screencap -p > "${OUT:-.}/reach-fail.png" 2>/dev/null; }
+# The failure's screen, screen read and log land in the working dir (or $OUT), like the other CI scripts: CI uploads
+# *.png, *.xml and *.logcat.txt from there. Numbered, so a second failure doesn't overwrite the first.
+nbad=0
+bad() { echo "reach: FAILED: $*"; fail=1; nbad=$((nbad + 1)); local f="${OUT:-.}/reach-fail-$nbad"
+  "$ADB" exec-out screencap -p > "$f.png" 2>/dev/null; dump > "$f.xml" 2>/dev/null; "$ADB" logcat -d > "$f.logcat.txt" 2>/dev/null
+  echo "  screen, screen read and log: $f.*"; }
 
 # The screen, as the app is laid out (landscape): width and height in pixels.
 read -r PW PH < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' ')
@@ -58,7 +61,7 @@ reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$no
 all() { local where=$1 l n=0 x; shift; x=${DUMP:-$(dump)}
   for l in "$@"; do { shown "$l" "$x" || reach "$l"; } && n=$((n + 1)) || bad "$where: \"$l\" can't be reached by scrolling"; done
   echo "reach: $where: $n of $# reached (${SECONDS} s)"; }
-tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(dump | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
+tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
 # The Leave dialog: "Leave for now" keeps a saved game, "Leave" when there's nothing to keep.
 leave() { on "Leave for now" && { tap "Leave for now"; return; }; on "Leave" && tap "Leave"; }
 # Taps a button and checks the screen it opens (marked by $2); stops the run if it didn't, since what follows is moot.
@@ -95,6 +98,8 @@ if [ "$MODE" = screens ]; then
   on "Players" || go "New game" "Players"
   # Age of Chivalry: its eight cards are the card guide's widest row.
   tap "Age of Chivalry"; go "Play" "Menu"; sleep 3
+  # Only Age of Chivalry has the Raiders' track: a base game here has no Silver to find, so say so, not "can't be reached".
+  on "Raiders" || bad "the game started as the base game, not Age of Chivalry"
   go "Menu" "Card guide"; all "game menu" "Leave game" "Card guide" "Fit the board" "Settings" "Report a bug or idea"
   go "Card guide" "Cards"; all "card guide" "Close" "Silver"; tap "Close"
   go "Menu" "Card guide"; go "Report a bug or idea" "Include this game"; all "game Report" "Include this game" "Send" "Share" "Close"; tap "Close"
@@ -119,9 +124,9 @@ else
   x=""
   for gap in 0.12 0.06 0.2; do
     [ -n "$xy" ] && "$ADB" shell "input tap $xy & sleep $gap; input tap $xy; wait"; sleep 1.5
-    x=$(dump); echo "$x" | grep -q 'text="Event die"' && break
+    x=$(dump); grep -q 'text="Event die"' <<< "$x" && break
   done
-  echo "$x" | grep -q 'text="Event die"' || bad "double-tapping the dice didn't open the histogram"
+  grep -q 'text="Event die"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
   DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
 fi
 
