@@ -42,7 +42,8 @@ fail() { echo "NAMES $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | gr
 # Find a regex on screen, scrolling the panel under x=$2 (the left one by default) a little at a time, as a player would.
 reach() {
   local x="${2:-$((W / 4))}" xy d
-  for i in $(seq 0 8); do
+  # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
+  for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)   # no dump (a busy device) says nothing about the screen: look again first
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
