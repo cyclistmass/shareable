@@ -19,9 +19,9 @@ LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 FB_EXTRA="--es firebase emu"; [ "${FIREBASE:-emu}" = live ] && FB_EXTRA=""
 # EXTRA: more launch extras for both phones, e.g. "--ez fakegoogle true" (tools/friends_sim.sh).
 EXTRA="${EXTRA:-}"
-HOST=emulator-5554
-GUEST=emulator-5556
-A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+HOST="${HOST_SERIAL:-emulator-5554}"
+GUEST="${GUEST_SERIAL:-emulator-5556}"
+A="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 export MSYS_NO_PATHCONV=1
 
 # The screen of device $1 as one element per line. A busy host makes uiautomator answer "null root node" now and then:

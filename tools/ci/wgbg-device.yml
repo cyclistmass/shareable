@@ -1,0 +1,151 @@
+name: wgbg device shards
+
+# Reusable: builds the debug APK (stable key) and runs the given device shards side by side, one emulator each
+# (tools/ci/shard.sh says what each shard runs). Called by the nightly full playtest (wgbg-nightly.yml) and the remote
+# release check (wgbg-check.yml). Lives in shareable's .github/workflows; drafted in catan-android tools/ci/.
+on:
+  workflow_call:
+    inputs:
+      shards:
+        description: 'JSON list of {"shard": name, "minutes": job timeout}'
+        type: string
+        required: true
+
+defaults:
+  run:
+    working-directory: working-german-board-game
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK packages
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - uses: gradle/actions/setup-gradle@v4
+      # No Firebase config: the shards play online against the Firebase emulators only (--es firebase emu).
+      - name: Stable debug signing key
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+            echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
+          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard will fail: phones refuse a new key)"; fi
+      - name: Build debug APK (and the instrumented test APK)
+        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shards-apk
+          path: |
+            working-german-board-game/app/build/outputs/apk/debug/app-debug.apk
+            working-german-board-game/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+  device:
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.shards) }}
+    name: ${{ matrix.shard }}
+    env:
+      SHARD: ${{ matrix.shard }}
+      NEEDS_FIREBASE: ${{ startsWith(matrix.shard, 'online') || startsWith(matrix.shard, 'friends') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: shards-apk
+          path: working-german-board-game/apk-out
+      - name: APKs where the scripts look
+        run: mkdir -p apk && find apk-out -name '*.apk' -exec mv {} apk/ \; && ls -l apk
+
+      # Firebase emulators on the runner for online and friends; the Android emulator reaches them at 10.0.2.2.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@v4
+        if: env.NEEDS_FIREBASE == 'true'
+        with:
+          node-version: "24"
+      - name: Start Firebase emulators (Firestore + Auth, demo project)
+        if: env.NEEDS_FIREBASE == 'true'
+        run: |
+          npm install --global firebase-tools@15.33.0 > /dev/null
+          nohup firebase emulators:start --only firestore,auth --project demo-wgbg > fbemu.log 2>&1 &
+          for i in $(seq 1 60); do curl -s localhost:9099 > /dev/null && curl -s localhost:8080 > /dev/null && { echo "emulators up after $((i*2)) s"; break; }; sleep 2; done
+          tail -5 fbemu.log
+      - uses: actions/setup-python@v5
+        if: startsWith(matrix.shard, 'layout')
+        with:
+          python-version: '3.12'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # The same snapshot cache as wgbg-ci.yml, so a nightly or check run reuses the per-push boot.
+      - name: Emulator snapshot cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-33-aosp_atd-x86_64-v1
+      - name: Boot once and save the snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: aosp_atd
+          cores: 3
+          ram-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "emulator snapshot saved for the cache"
+
+      - name: Shard ${{ matrix.shard }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          target: aosp_atd
+          cores: 3
+          ram-size: 4096M
+          force-avd-creation: false
+          disable-animations: true
+          # friends runs a second copy of this AVD beside it (tools/ci_friends.sh), so both copies boot read-only.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save ${{ startsWith(matrix.shard, 'friends') && '-read-only' || '' }}
+          working-directory: working-german-board-game
+          # One line: the action runs each script line on its own with sh. shard.sh keeps its own shard.log.
+          script: bash tools/ci/shard.sh "$SHARD"
+
+      - name: Upload shard logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          if-no-files-found: ignore
+          path: |
+            working-german-board-game/shard.log
+            working-german-board-game/monkey.txt
+            working-german-board-game/crash.txt
+            working-german-board-game/fbemu.log
+            working-german-board-game/emu2.log
+            working-german-board-game/*.png
+            working-german-board-game/*.xml

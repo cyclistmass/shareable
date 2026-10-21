@@ -79,3 +79,6 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, WGBG: two files held literal backspace bytes where `\b` was meant (SeatNamesTest's card-tester name check
   and tools/userplay.sh's menu-build check), so neither check could ever fire. Cause: `\b` passed through a non-raw
   string (Python, printf) in an edit script. Write edit scripts to a file and grep for [\x00-\x08] after scripted edits.
+- 2026-10-21, Bosun: slow local device runs move to CI shards (the repo is public, so Actions minutes are free):
+  friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
+  :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.

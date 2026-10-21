@@ -13,7 +13,7 @@ class FuzzTest {
         var actions = 0L
         val types = IntArray(ActionType.entries.size)
         val buf = ActionBuffer()
-        for (game in 0 until 2000) {
+        for (game in 0 until 2000 * testScale) {
             val config = GameConfig(
                 numPlayers = 3 + game % 2,
                 layout = if (game % 5 == 0) BoardLayout.BEGINNER else BoardLayout.RANDOM,
