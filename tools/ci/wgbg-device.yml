@@ -96,6 +96,17 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # The emulator runner below downloads the emulator and system image on every run, and one bad download ("Error on
+      # ZipFile unknown archive", release check run 39657882276's update) failed a whole shard. Fetch them here first, up
+      # to three tries; the runner then finds them installed.
+      - name: Emulator and system image (retried)
+        working-directory: .
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          for i in 1 2 3; do
+            "$SDKM" --install emulator "system-images;android-33;aosp_atd;x86_64" > /dev/null && { echo "installed (try $i)"; break; }
+            echo "try $i failed"; sleep 15
+          done
       # The same snapshot cache as wgbg-ci.yml, so a nightly or check run reuses the per-push boot.
       - name: Emulator snapshot cache
         uses: actions/cache@v4
