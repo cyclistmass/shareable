@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signed() { return request.auth != null; }
     function seated(g) { return signed() && (g.seats['0'].uid == request.auth.uid || g.seats['1'].uid == request.auth.uid || g.seats['2'].uid == request.auth.uid || g.seats['3'].uid == request.auth.uid); }
-    function seat(s) { return s.keys().hasOnly(['uid','name','bot','open','ready','google']) && (s.uid == null || s.uid is string) && s.name is string && s.name.size() <= 80 && (s.bot == null || s.bot in ['EASY','GREEDY','STRONG']) && s.open is bool && s.ready is bool && s.get('google', false) is bool; }
+    function seat(s) { return s.keys().hasOnly(['uid','name','bot','open','ready','google']) && (s.uid == null || (s.uid is string && s.uid.size() <= 128)) && s.name is string && s.name.size() <= 80 && (s.bot == null || s.bot in ['EASY','GREEDY','STRONG']) && s.open is bool && s.ready is bool && s.get('google', false) is bool; }
     // A room and its moves expire at expireAt (#72); the host's app then deletes them (see delete below). The app sets at most 30 days
     // ahead by the phone's clock; 60 here leaves room for a clock that is off, so its moves are never refused.
     function expiry(d) { return d.get('expireAt', request.time) is timestamp && d.get('expireAt', request.time) <= request.time + duration.value(60, 'd'); }
@@ -11,7 +11,34 @@ service cloud.firestore {
     function expired(d) { return d.get('expireAt', null) is timestamp && d.expireAt < request.time; }
     // #72: who the host invited (seen on their start screen), the room this one plays again, and its own rematch.
     function links(g) { return g.get('invited', []) is list && g.get('invited', []).size() <= 3 && code(g.get('rematchOf', '')) && code(g.get('next', '')); }
-    function valid(g) { return g.keys().hasOnly(['host','status','seed','nextSeq','decks','seats','options','version','createdAt','lastMove','invited','rematchOf','next','expireAt']) && g.host is string && g.status in ['lobby','playing','done'] && g.seed is string && g.version in [1, 2, 3] && expiry(g) && links(g) && g.nextSeq is int && g.nextSeq >= 0 && g.decks is int && g.decks >= 0 && g.decks <= 4 && g.options is map && g.createdAt is timestamp && g.seats.keys().hasAll(['0','1','2','3']) && g.seats.size() == 4 && seat(g.seats['0']) && seat(g.seats['1']) && seat(g.seats['2']) && seat(g.seats['3']) && g.seats['0'].uid == g.host; }
+    // (Checked only when written: every rule here shares a budget of 1000 expressions per request.)
+    // The game settings every app version writes (randomFirstPlayer from 0.2.10, colours from 0.3.4), each typed and
+    // bounded: a malformed room would fail to load on the other phones, and an oversized one would be downloaded by all.
+    // Colours are SeatColour names; a new colour needs its name here, deployed before the app that uses it.
+    function opts(o) { return o.keys().hasOnly(['expansion','numPlayers','vpToWin','layout','avoidAdjacentRedNumbers','discardLimit','maxTurns','randomDiscard','generateTradeOffers','randomFirstPlayer','colours']) &&
+      o.expansion is string && o.expansion.size() <= 30 && o.numPlayers is int && o.vpToWin is int && o.layout is string && o.layout.size() <= 30 &&
+      o.avoidAdjacentRedNumbers is bool && o.discardLimit is int && o.maxTurns is int && o.randomDiscard is bool && o.generateTradeOffers is bool &&
+      o.get('randomFirstPlayer', false) is bool && o.get('colours', []) is list && o.get('colours', []).size() <= 6 &&
+      o.get('colours', []).hasOnly(['RED','BLUE','ORANGE','WHITE','YELLOW','PURPLE','BLACK']); }
+    function valid(g) { return g.keys().hasOnly(['host','status','seed','nextSeq','decks','seats','options','version','createdAt','lastMove','invited','rematchOf','next','expireAt']) && g.host is string && g.host.size() <= 128 && g.status in ['lobby','playing','done'] && g.seed is string && g.seed.size() <= 24 && g.get('lastMove', '') is string && g.get('lastMove', '').size() <= 20 && g.version in [1, 2, 3] && expiry(g) && links(g) && g.nextSeq is int && g.nextSeq >= 0 && g.decks is int && g.decks >= 0 && g.decks <= 4 && g.options is map && g.createdAt is timestamp && g.seats.keys().hasAll(['0','1','2','3']) && g.seats.size() == 4 && seat(g.seats['0']) && seat(g.seats['1']) && seat(g.seats['2']) && seat(g.seats['3']) && g.seats['0'].uid == g.host; }
+    // A seat says its player signed in with Google only for the player themselves, and only when they really did; others'
+    // phones put that player on their list of people played with (#72). A mark already there may stay as it is.
+    function googleUser() { let f = request.auth.token.get('firebase', {}); return f.get('sign_in_provider', '') == 'google.com' || f.get('identities', {}).keys().hasAny(['google.com']); }
+    // A new room seats only its host, so only seat 0 can carry a mark (an empty seat's mark names nobody).
+    function hostMark() { return !request.resource.data.seats['0'].get('google', false) || googleUser(); }
+    function markNew(k) { let b = request.resource.data.seats[k]; return !b.get('google', false) || (b.uid == request.auth.uid && googleUser()); }
+    function markKept(k) { let a = resource.data.seats[k]; let b = request.resource.data.seats[k]; return markNew(k) || (a.get('google', false) == true && a.uid == b.uid); }
+    function marksKept() { return markKept('0') && markKept('1') && markKept('2') && markKept('3'); }
+    // The host invites only people who played with them, so strangers can't be sent invites: each invitee has the host on
+    // their own list (#72), or sat in the host's room that this one plays again (a rematch invites everyone back, Google or not).
+    function players(g) { let r = get(/databases/$(database)/documents/games/$(g.rematchOf)).data;
+      return r.host == request.auth.uid ? [r.seats['1'].uid, r.seats['2'].uid, r.seats['3'].uid] : []; }
+    function knows(g, u) { return exists(/databases/$(database)/documents/users/$(u)/met/$(request.auth.uid)) || (g.get('rematchOf', '') != '' && u in players(g)); }
+    function invitesOk(g) { let l = g.get('invited', []); return l.size() == 0 || (g.get('rematchOf', '') != '' && players(g).hasAll(l)) ||
+      ((l.size() < 1 || knows(g, l[0])) && (l.size() < 2 || knows(g, l[1])) && (l.size() < 3 || knows(g, l[2]))); }
+    function changes(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+    // A new expiry is always in the future, so nobody can make a running game deletable at once.
+    function fresh() { return !changes(['expireAt']) || request.resource.data.expireAt > request.time; }
     function selfSeat(k) {
       let a = resource.data.seats[k]; let b = request.resource.data.seats[k];
       return resource.data.seats.diff(request.resource.data.seats).affectedKeys().hasOnly([k]) &&
@@ -46,7 +73,7 @@ service cloud.firestore {
     // A report's screenshots (#128): a base64 JPEG each, pointing at its report; write-only, like the reports.
     match /shots/{id} {
       allow create: if signed() && request.resource.data.keys().hasOnly(['uid','crash','n','image','createdAt']) &&
-        request.resource.data.uid == request.auth.uid && request.resource.data.crash is string &&
+        request.resource.data.uid == request.auth.uid && request.resource.data.crash is string && request.resource.data.crash.size() <= 40 &&
         request.resource.data.n is int && request.resource.data.n >= 0 && request.resource.data.n < 2 &&
         request.resource.data.image is string && request.resource.data.image.size() <= 450000 &&
         request.resource.data.createdAt == request.time;
@@ -63,13 +90,16 @@ service cloud.firestore {
     match /games/{game} {
       // A missing room is readable (it only says the code is free): creating a room checks that in a transaction.
       // An invited player may see the room in any state: their start screen asks for the rooms that invite them (#72).
-      // The host finds their own rooms by query to clear the expired ones.
-      allow read: if signed() && (resource == null || resource.data.status == 'lobby' || seated(resource.data) ||
+      // The host finds their own rooms by query to clear the expired ones. Open lobbies are read by code only, never
+      // listed: a list would hand out every waiting player's id and name.
+      allow get: if signed() && (resource == null || resource.data.status == 'lobby' || seated(resource.data) ||
         request.auth.uid in resource.data.get('invited', []) || resource.data.host == request.auth.uid);
+      allow list: if signed() && (seated(resource.data) || request.auth.uid in resource.data.get('invited', []) || resource.data.host == request.auth.uid);
       // No TTL without billing: the host's app deletes its own rooms once expireAt is past (moves first, below).
       allow delete: if signed() && resource.data.host == request.auth.uid && expired(resource.data);
-      allow create: if signed() && valid(request.resource.data) && request.resource.data.host == request.auth.uid && request.resource.data.status == 'lobby' && request.resource.data.nextSeq == 0 && request.resource.data.createdAt == request.time && request.resource.data.seats['1'].uid == null && request.resource.data.seats['2'].uid == null && request.resource.data.seats['3'].uid == null;
-      allow update: if signed() && valid(request.resource.data) && (
+      allow create: if signed() && valid(request.resource.data) && request.resource.data.host == request.auth.uid && request.resource.data.status == 'lobby' && request.resource.data.nextSeq == 0 && request.resource.data.createdAt == request.time && request.resource.data.seats['1'].uid == null && request.resource.data.seats['2'].uid == null && request.resource.data.seats['3'].uid == null && opts(request.resource.data.options) && hostMark() && invitesOk(request.resource.data);
+      allow update: if signed() && valid(request.resource.data) && fresh() && (!changes(['options']) || opts(request.resource.data.options)) &&
+        (!changes(['seats']) || marksKept()) && (!changes(['invited']) || invitesOk(request.resource.data)) && (
         (resource.data.status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats','status','options','invited','expireAt']) &&
           ((resource.data.host == request.auth.uid && request.resource.data.status in ['lobby','playing']) ||
            (request.resource.data.status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seats']) && selfChange()))) ||
