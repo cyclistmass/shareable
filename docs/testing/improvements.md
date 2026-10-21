@@ -87,3 +87,4 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, Bosun: slow local device runs move to CI shards (the repo is public, so Actions minutes are free):
   friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
   :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.
+- layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d
