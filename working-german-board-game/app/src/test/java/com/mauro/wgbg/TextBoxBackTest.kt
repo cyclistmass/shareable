@@ -17,7 +17,7 @@ class TextBoxBackTest {
 
     @Test
     fun `the helper asks the window whether the keyboard is up, not Compose's inset`() {
-        val helper = File(src, "NewGameScreen.kt").readText().substringAfter("fun Modifier.backPutsKeyboardAway()").substringBefore("\n}\n")
+        val helper = File(src, "NewGameScreen.kt").readText().replace("\r\n", "\n").substringAfter("fun Modifier.backPutsKeyboardAway()").substringBefore("\n}\n")
         // The inset could still read "up" after the keyboard went (Android 14), costing an extra Back (#146).
         assertTrue("WindowInsets.ime" !in helper, "the IME inset lags the keyboard")
         assertTrue("isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())" in helper)
@@ -34,7 +34,7 @@ class TextBoxBackTest {
     @Test
     fun `every text box uses the helper`() {
         val boxes = src.listFiles()!!.filter { it.extension == "kt" }.sumOf { f ->
-            Regex("""BasicTextField\(""").findAll(f.readText()).count()
+            Regex("""BasicTextField\(""").findAll(f.readText().replace("\r\n", "\n")).count()
         }
         val helped = src.listFiles()!!.filter { it.extension == "kt" }.sumOf { f ->
             f.readLines().count { ".backPutsKeyboardAway()" in it && "fun " !in it }

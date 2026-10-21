@@ -45,6 +45,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 
 /** Where settings are kept: SharedPreferences on device, a map in tests. */
+/** A saved list index, or -1 when the saved value is broken (roundToInt throws on NaN, which crashed the art getter). */
+internal fun Float.savedIndex(): Int = if (isFinite()) roundToInt() else -1
+
 interface FloatStore {
     fun get(key: String, default: Float): Float
     fun put(key: String, value: Float)
@@ -107,18 +110,11 @@ class EnvSettings(private val store: FloatStore) {
         get() = seeThroughState.floatValue > 0.5f
         set(v) { seeThroughState.floatValue = if (v) 1f else 0f; store.put(SEE_THROUGH, seeThroughState.floatValue) }
 
-    private val animationsState = mutableFloatStateOf(store.get(ANIMATIONS, 1f))
-
     /**
-     * Scenery animations (sea, clouds, birds, boats, the rolling dice). Off, or Density at 0, and none of that code
-     * runs at all, so a bug in it can't stop a game (Mauro, 2026-10-11). Saved.
+     * True when the scenery animates (sea, clouds, birds, boats, the rolling dice): Density above 0. At 0 none of that
+     * code runs at all, so a bug in it can't stop a game (Mauro, 2026-10-11).
      */
-    var animations: Boolean
-        get() = animationsState.floatValue > 0.5f
-        set(v) { animationsState.floatValue = if (v) 1f else 0f; store.put(ANIMATIONS, animationsState.floatValue) }
-
-    /** True when the scenery animates: the switch is on and Density is above 0. */
-    val animating: Boolean get() = animations && density > 0f
+    val animating: Boolean get() = density > 0f
 
     private val tiles3dState = mutableFloatStateOf(store.get(TILES_3D, 0f))
 
@@ -159,8 +155,8 @@ class EnvSettings(private val store: FloatStore) {
 
     /** The chosen theme and any pieces swapped to another set on the Inventory screen. Saved. */
     var art: ArtChoice
-        get() = ArtChoice(ArtSet.entries.getOrElse(themeState.floatValue.roundToInt()) { ArtSet.DEFAULT },
-            swapStates.mapNotNull { (o, v) -> ArtSet.entries.getOrNull(v.floatValue.roundToInt())?.let { o to it } }.toMap()).tidy()
+        get() = ArtChoice(ArtSet.entries.getOrElse(themeState.floatValue.savedIndex()) { ArtSet.DEFAULT },
+            swapStates.mapNotNull { (o, v) -> ArtSet.entries.getOrNull(v.floatValue.savedIndex())?.let { o to it } }.toMap()).tidy()
         set(v) {
             val tidy = v.tidy()
             themeState.floatValue = tidy.theme.ordinal.toFloat(); store.put(THEME, themeState.floatValue)
@@ -180,6 +176,13 @@ class EnvSettings(private val store: FloatStore) {
         get() = TileEdge.entries.getOrElse(edge.floatValue.toInt()) { TileEdge.THIN }
         set(v) { edge.floatValue = v.ordinal.toFloat(); store.put(EDGE, edge.floatValue) }
 
+    private val palette = mutableFloatStateOf(store.get(PALETTE, 0f))
+
+    /** Board terrain colours (#86): each palette grades the terrain art its own way. Saved; not used in Space. */
+    var terrainPalette: TerrainPalette
+        get() = TerrainPalette.entries.getOrElse(palette.floatValue.toInt()) { TerrainPalette.TODAY }
+        set(v) { palette.floatValue = v.ordinal.toFloat(); store.put(PALETTE, palette.floatValue) }
+
     private val eventDie = mutableFloatStateOf(store.get(EVENT_DIE, 0f))
 
     /** Pirate event die art, an index into DiceArt.EVENT_STYLES (Mauro: all four as options). Saved. */
@@ -187,8 +190,12 @@ class EnvSettings(private val store: FloatStore) {
         get() = eventDie.floatValue.toInt().coerceIn(0, DiceArt.EVENT_STYLES.size - 1)
         set(v) { eventDie.floatValue = v.coerceIn(0, DiceArt.EVENT_STYLES.size - 1).toFloat(); store.put(EVENT_DIE, eventDie.floatValue) }
 
-    /** Back to the defaults (saved). */
-    fun reset() { for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; animations = true; pirateTheme = false; tileEdge = TileEdge.THIN; eventDieStyle = 0; liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false }
+    /** Every setting back to its default (saved): scenery, board, look and play. */
+    fun reset() {
+        for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; pirateTheme = false; tileEdge = TileEdge.THIN; terrainPalette = TerrainPalette.TODAY; eventDieStyle = 0
+        liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false
+        art = ArtChoice(ArtSet.DEFAULT); tiles3d = false; seeThrough = false; bugButton = false
+    }
 
     val clouds get() = this[Item.CLOUDS]
     val birds get() = this[Item.BIRDS]
@@ -201,13 +208,13 @@ class EnvSettings(private val store: FloatStore) {
         fun artKey(o: ArtObject) = "art-${o.name.lowercase()}"
         const val EDGE = "tile-edge"
         const val EVENT_DIE = "event-die-style"
+        const val PALETTE = "terrain-palette"
         const val DENSITY = "env-density"
         const val VIEW_BARS = "view-bars"
         const val TILES_3D = "tiles-3d"
         const val LIVE_BOARD = "live-board"
         const val LIVE_LOD = "live-board-lod"
         const val FACE_PIECES = "live-face-pieces"
-        const val ANIMATIONS = "animations"
         const val AI_PACE = "ai-pace"
         const val AI_PACE_DEFAULT = 1f
         const val AI_PACE_MIN = 1f
@@ -223,17 +230,17 @@ object Pace {
     fun fallMs(factor: Float = 1f): Int = (DiceSprites.FALL_S * 1000 * factor).toInt()
 }
 
-/** The 3D board (test) On/Off switch and its detail level; in the game's Menu, and in Settings on Look & art. */
+/** The 3D board On/Off switch and its detail level (High = the full models, Low = the lighter ones), in Settings. */
 @Composable
 fun LiveBoardChoice(env: EnvSettings) {
-    Text("3D board (test)", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
+    Text("3D board", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Choice("On", selected = env.liveBoard, tag = "live-board-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = true }
         Choice("Off", selected = !env.liveBoard, tag = "live-board-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.liveBoard = false }
     }
     if (env.liveBoard) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Choice("Detail: LOD0", selected = env.liveLod == 0, tag = "live-lod-0", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 0 }
-        Choice("Detail: LOD1", selected = env.liveLod == 1, tag = "live-lod-1", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 1 }
+        Choice("Detail: High", selected = env.liveLod == 0, tag = "live-lod-0", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 0 }
+        Choice("Detail: Low", selected = env.liveLod == 1, tag = "live-lod-1", modifier = Modifier.height(36.dp).width(140.dp), size = 13.sp) { env.liveLod = 1 }
     }
     if (env.liveBoard) {
         Text("Buildings face me when I turn the board", style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
@@ -258,9 +265,8 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
         verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Settings", style = Wood.title(18.sp), modifier = Modifier.weight(1f))
-            ResetButton { env.reset(); sound.reset() }
+            ResetButton("Reset all") { env.reset(); sound.reset() }
         }
-        AccountSection()
         // In a game: Pause, speed and Watch bots first (Mauro, 2026-10-12: "should be under the gear menu").
         if (gameControls != null) SettingsGroup("This game", "game") { gameControls() }
         SettingsGroup("Sound", "sound") { SoundBody(sound) }
@@ -305,6 +311,16 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                         Choice(e.label, selected = env.tileEdge == e, tag = "edge-${e.name.lowercase()}", modifier = Modifier.height(36.dp).width(100.dp), size = 13.sp) { env.tileEdge = e }
                 }
             }
+            // Terrain colours grade the painted and 3D tiles; Space has its own board, so the row hides there.
+            if (!env.art.space(ArtObject.BOARD)) Setting("Terrain colours") {
+                // Two by two, as the event die: four in a row ran past the panel's edge.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (pair in TerrainPalette.entries.chunked(2)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (p in pair) Choice(p.label, selected = env.terrainPalette == p, tag = "palette-${p.name.lowercase()}",
+                            modifier = Modifier.height(36.dp).width(122.dp), size = 13.sp) { env.terrainPalette = p }
+                    }
+                }
+            }
             LiveBoardChoice(env)
             Setting("Side panel") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -334,18 +350,17 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                         EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7)
                 }
             }
-            Setting("Animations", "Off, or Density at 0: nothing moves.") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Choice("On", selected = env.animations, tag = "animations-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = true }
-                    Choice("Off", selected = !env.animations, tag = "animations-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.animations = false }
-                }
-            }
             Setting("Report button", "On the game screen: a bug report with a screenshot, in one tap.") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Choice("Show", selected = env.bugButton, tag = "bug-button-on", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = true }
                     Choice("Hide", selected = !env.bugButton, tag = "bug-button-off", modifier = Modifier.height(36.dp).width(110.dp), size = 13.sp) { env.bugButton = false }
                 }
             }
+        }
+        // #85: the trademark notice, where players look for it in a game too (the full About board is on the start screen).
+        SettingsGroup("About", "about") {
+            Text("Working German Board Game ${appVersion()} · GPL-3.0", style = Wood.sans(13.sp))
+            Text(Splash.TRADEMARK, style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("settings-trademark"))
         }
     }
 }
@@ -477,8 +492,27 @@ class SoundSettings(private val store: FloatStore) {
     fun songOn(i: Int): Boolean = songOn.getOrNull(i)?.floatValue?.let { it > 0.5f } ?: false
     fun setSongOn(i: Int, on: Boolean) { val v = if (on) 1f else 0f; songOn[i].floatValue = v; store.put(songKey(SONGS[i]), v) }
 
+    private val turn = mutableFloatStateOf(store.get(TURN_ALERT, 1f))
+    /** A bell and a buzz when it becomes your turn. */
+    var turnAlert: Boolean
+        get() = turn.floatValue > 0.5f
+        set(v) { turn.floatValue = if (v) 1f else 0f; store.put(TURN_ALERT, turn.floatValue) }
+    private val raiders = mutableFloatStateOf(store.get(RAIDERS_ALERT, 1f))
+    /** A horn when the Raiders' ship moves to within [raidersSteps] steps of the island (Age of Chivalry). */
+    var raidersAlert: Boolean
+        get() = raiders.floatValue > 0.5f
+        set(v) { raiders.floatValue = if (v) 1f else 0f; store.put(RAIDERS_ALERT, raiders.floatValue) }
+    private val steps = mutableFloatStateOf(store.get(RAIDERS_STEPS, DEFAULT_RAIDERS_STEPS.toFloat()))
+    /** How close (steps left on the Raiders' track, [RAIDERS_STEPS_RANGE]) the ship comes before the horn sounds. */
+    var raidersSteps: Int
+        get() = steps.floatValue.takeIf { it.isFinite() }?.roundToInt()?.coerceIn(RAIDERS_STEPS_RANGE) ?: DEFAULT_RAIDERS_STEPS
+        set(v) { steps.floatValue = v.coerceIn(RAIDERS_STEPS_RANGE).toFloat(); store.put(RAIDERS_STEPS, steps.floatValue) }
+
     /** Back to the defaults (saved); every song ticked again. */
-    fun reset() { musicVolume = DEFAULT_MUSIC; soundVolume = DEFAULT_SOUNDS; SONGS.indices.forEach { setSongOn(it, true) } }
+    fun reset() {
+        musicVolume = DEFAULT_MUSIC; soundVolume = DEFAULT_SOUNDS; SONGS.indices.forEach { setSongOn(it, true) }
+        turnAlert = true; raidersAlert = true; raidersSteps = DEFAULT_RAIDERS_STEPS
+    }
 
     companion object {
         const val DEFAULT_MUSIC = 0.6f
@@ -486,6 +520,11 @@ class SoundSettings(private val store: FloatStore) {
         const val MUSIC = "vol-music"
         const val SOUNDS = "vol-sounds"
         const val MUSIC_PAUSED = "music-paused"
+        const val TURN_ALERT = "alert-turn"
+        const val RAIDERS_ALERT = "alert-raiders"
+        const val RAIDERS_STEPS = "alert-raiders-steps"
+        const val DEFAULT_RAIDERS_STEPS = 3
+        val RAIDERS_STEPS_RANGE = 1..10
         fun songKey(song: Song) = "song-on:" + song.title
         /** The set list (#17, #58), our own recordings; more shanties to come. */
         val SONGS: List<Song> = listOf(
@@ -516,6 +555,23 @@ fun SoundBody(sound: SoundSettings) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Sounds ${(sound.soundVolume * 100).roundToInt()}%", style = Wood.sans(12.sp), modifier = Modifier.width(96.dp))
                 VolumeSlider(sound.soundVolume, "vol-sounds", 200.dp) { sound.soundVolume = it }
+            }
+            // Alerts (0.3.4): each its own sound, so you know which it is without looking.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Your turn: bell and buzz", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp))
+                Choice("On", selected = sound.turnAlert, tag = "alert-turn-on", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.turnAlert = true }
+                Choice("Off", selected = !sound.turnAlert, tag = "alert-turn-off", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.turnAlert = false }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Raiders close: horn", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp))
+                Choice("On", selected = sound.raidersAlert, tag = "alert-raiders-on", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.raidersAlert = true }
+                Choice("Off", selected = !sound.raidersAlert, tag = "alert-raiders-off", modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { sound.raidersAlert = false }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val n = sound.raidersSteps
+                Text("Horn at $n step${if (n == 1) "" else "s"} away", style = Wood.sans(12.sp), modifier = Modifier.width(150.dp).testTag("alert-raiders-steps"))
+                Choice("−", selected = false, tag = "alert-raiders-fewer", modifier = Modifier.height(36.dp).width(70.dp), size = 15.sp) { sound.raidersSteps = n - 1 }
+                Choice("+", selected = false, tag = "alert-raiders-more", modifier = Modifier.height(36.dp).width(70.dp), size = 15.sp) { sound.raidersSteps = n + 1 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Choice(if (sound.musicPaused) "▶ Play" else "⏸ Pause", selected = sound.musicPaused, tag = "music-pause",
@@ -552,13 +608,15 @@ private fun SongTick(sound: SoundSettings, i: Int) {
     }
 }
 
-/** Reset to defaults: the brass circular-arrow icon (Mauro's art), darker while pressed. */
+/** Reset to defaults: the brass circular-arrow icon (Mauro's art), darker while pressed, with its [label] beside it (#91). */
 @Composable
-private fun ResetButton(onClick: () -> Unit) {
+private fun ResetButton(label: String, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    Image(
-        painterResource(if (pressed) R.drawable.reset_arrow_pressed else R.drawable.reset_arrow), "Reset to defaults",
-        Modifier.size(44.dp).clickable(interactionSource = source, indication = null, onClick = onClick).testTag("settings-reset"),
-    )
+    Row(Modifier.clickable(interactionSource = source, indication = null, onClick = onClick).testTag("settings-reset"),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = Wood.sans(13.sp, color = Wood.BRASS_EDGE))
+        Image(painterResource(if (pressed) R.drawable.reset_arrow_pressed else R.drawable.reset_arrow), "Reset every setting to its default",
+            Modifier.size(44.dp))
+    }
 }

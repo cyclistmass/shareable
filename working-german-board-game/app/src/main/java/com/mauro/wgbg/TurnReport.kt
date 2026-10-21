@@ -66,14 +66,14 @@ class TurnTracker(private val names: List<String>) {
 
     /** Per player: cards by kind, then roads, knights and progress cards held. */
     private fun holdings(s: GameState): Array<IntArray> = Array(s.numPlayers) { p ->
-        val kinds = if (s.ck != null) wgbg.engine.CK_CARD_TYPES else CARD_TYPES
-        val ck = s.ck
+        val kinds = if (s.chivalry != null) wgbg.engine.CHIVALRY_CARD_TYPES else CARD_TYPES
+        val chivalry = s.chivalry
         IntArray(kinds + 3) { i ->
             when {
                 i < kinds -> s.card(p, i)
                 i == kinds -> s.edgeOwner.count { it == p }
-                i == kinds + 1 -> ck?.knightOwner?.count { it == p } ?: 0
-                else -> ck?.progressCount(p) ?: 0
+                i == kinds + 1 -> chivalry?.knightOwner?.count { it == p } ?: 0
+                else -> chivalry?.progressCount(p) ?: 0
             }
         }
     }
@@ -90,7 +90,7 @@ class TurnTracker(private val names: List<String>) {
         var d1 = 0
         var d2 = 0
         var ev = -1
-        val alchemist = action.type == wgbg.engine.CkActionType.PLAY_PROGRESS && (action.payload and 0xff).toInt() == wgbg.engine.Progress.ALCHEMIST
+        val alchemist = action.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && (action.payload and 0xff).toInt() == wgbg.engine.Progress.ALCHEMIST
         if (action.type == ActionType.ROLL && action.payload != 0L) {
             d1 = action.a; d2 = action.b // dice thrown outside the engine travel in the action
             ev = ((action.payload ushr 16) and 0xff).toInt() - 1
@@ -99,18 +99,20 @@ class TurnTracker(private val names: List<String>) {
             val peek = s.rng.copy()
             d1 = peek.nextInt(6) + 1
             d2 = peek.nextInt(6) + 1
-            if (s.ck != null) ev = peek.nextInt(6)
+            if (s.chivalry != null) ev = peek.nextInt(6)
         } else if (alchemist) {
             // The Transmuter (Alchemist) is this turn's roll: the player picked both number dice, the event die is thrown.
             d1 = ((action.payload ushr 8) and 0xff).toInt(); d2 = ((action.payload ushr 16) and 0xff).toInt()
             ev = s.rng.copy().nextInt(6)
         }
+        // #26: a No from a player who couldn't pay says why in the turn's history (the offer is gone after the move).
+        val lacked = if (action.type == ActionType.REJECT_TRADE && wgbg.engine.Rules.cantPayOffer(s, who)) shortfallText(s, who) else null
         applyFn()
         val heldAfter = holdings(s)
         noteHits(s, owner, who, action, held, heldAfter, phaseBefore)
         // Every card kind the hand holds, commodities too: with resources only, a discarded, stolen or traded commodity
         // never showed (reports Mnmfs73, jpRLBzr, 0.3.0: "not showing Commodities that were discarded").
-        val kinds = if (s.ck != null) wgbg.engine.CK_CARD_TYPES else CARD_TYPES
+        val kinds = if (s.chivalry != null) wgbg.engine.CHIVALRY_CARD_TYPES else CARD_TYPES
         val gained = Array(s.numPlayers) { p -> IntArray(kinds) { c -> heldAfter[p][c] - held[p][c] } }
         val r = current!!
         val n = names[who]
@@ -125,8 +127,11 @@ class TurnTracker(private val names: List<String>) {
                     .ifEmpty { listOf("Nobody produced anything.") },
             )
             action.type == ActionType.END_TURN -> r
+            // One line per offer for everyone who couldn't pay, so a big table doesn't push the turn's other lines out.
+            action.type == ActionType.REJECT_TRADE && lacked != null -> r.events.lastOrNull()?.takeIf { it.startsWith(CANT_PAY) }
+                ?.let { r.copy(events = r.events.dropLast(1) + "$it, $n ($lacked)") } ?: r.plus("$CANT_PAY$n ($lacked)")
             action.type == ActionType.REJECT_TRADE || action.type == ActionType.ACCEPT_TRADE ||
-                action.type == ActionType.COUNTER_TRADE || action.type == wgbg.engine.CkActionType.COUNTER_TRADE_CK -> r
+                action.type == ActionType.COUNTER_TRADE || action.type == wgbg.engine.ChivalryActionType.COUNTER_TRADE_CK -> r
             action.type == ActionType.MOVE_ROBBER -> {
                 val victim = action.robberVictim
                 val card = if (victim >= 0) gained[victim].indexOfFirst { it < 0 } else -1
@@ -150,7 +155,7 @@ class TurnTracker(private val names: List<String>) {
                 }
             }
             action.type == ActionType.MARITIME_TRADE -> r.plus("$n traded with the bank: ${tradeText(gained[who])}")
-            action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.CkActionType.OFFER_TRADE_CK -> r.plus("$n offered a trade")
+            action.type == ActionType.OFFER_TRADE || action.type == wgbg.engine.ChivalryActionType.OFFER_TRADE_CK -> r.plus("$n offered a trade")
             action.type == ActionType.CONFIRM_TRADE -> {
                 val partner = action.payload.toInt()
                 r.plus("$n traded with ${names[partner]}: ${tradeText(gained[who])}")
@@ -158,7 +163,7 @@ class TurnTracker(private val names: List<String>) {
             action.type == ActionType.CANCEL_TRADE -> r.plus("$n withdrew the trade offer")
             action.type == ActionType.PLAY_YEAR_OF_PLENTY || action.type == ActionType.PLAY_MONOPOLY ->
                 r.plus("$n played ${describe(action.type)} and got ${changes(gained[who]) ?: "nothing"}")
-            action.type == wgbg.engine.CkActionType.CHOOSE_VERTEX -> r.plus(when (phaseBefore) {
+            action.type == wgbg.engine.ChivalryActionType.CHOOSE_VERTEX -> r.plus(when (phaseBefore) {
                 Phase.BARBARIAN_LOSS -> "$n lost a town to the Raiders"
                 Phase.DESERTER_REMOVE -> "$n gave up a knight to Turncoat"
                 else -> "$n ${describe(action.type)}"
@@ -214,6 +219,8 @@ class TurnTracker(private val names: List<String>) {
     companion object {
         /** How many finished turns the info box keeps. */
         const val HISTORY = 40
+        /** Starts the one line per offer that lists who said No because they couldn't pay (#26). */
+        private const val CANT_PAY = "Said No, couldn't pay: "
         init { check(Resource.COUNT == RESOURCE_NAMES.size) }
     }
 }

@@ -11,15 +11,15 @@ import java.io.File
  */
 class SmallScreenTest {
     private val src = File("src/main/java/com/mauro/wgbg")
-    private fun text(name: String) = File(src, name).readText()
+    private fun text(name: String) = File(src, name).readText().replace("\r\n", "\n")
 
     @Test
     fun `the game-start screen's panels scroll and its buttons wrap`() {
         val screen = text("NewGameScreen.kt")
         assertTrue("Panel(Modifier.weight(1f), scroll = true)" in screen, "the left panel (players, game, Points, Report) scrolls")
         assertTrue("Panel(Modifier.width(300.dp), scroll = true)" in screen, "the right panel (dice, Play, Host, Join) scrolls")
-        val buttons = screen.substringAfter("FlowRow(").substringBefore("\n            }\n")
-        for (b in listOf("\"Report\"", "\"Intro\"", "\"Look & art\"", "\"Card tester\"")) assertTrue(b in buttons, "$b wraps with the others")
+        val buttons = screen.substringAfter("FlowRow(Modifier.fillMaxWidth(),").substringBefore("\n            }\n")
+        for (b in listOf("\"Report a bug or idea\"", "\"Intro\"", "\"Look & art\"", "\"Card tester\"")) assertTrue(b in buttons, "$b wraps with the others")
         // Points shares that row, so on a phone the panel needs no scroll to show the buttons.
         assertTrue("\"Points\"" in buttons)
     }

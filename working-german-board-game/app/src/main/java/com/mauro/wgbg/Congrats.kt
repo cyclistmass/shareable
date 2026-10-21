@@ -1,5 +1,7 @@
 package com.mauro.wgbg
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -59,6 +61,8 @@ internal fun congratsTitle(winner: Int, me: Int, names: List<String>): String = 
 internal fun CongratsScreen(
     players: List<PlayerInfo>, names: List<String>, winner: Int, me: Int, turns: Int,
     folded: Boolean, onFold: (Boolean) -> Unit, onPlayAgain: (() -> Unit)?, onExit: () -> Unit,
+    /** Online, a guest: "Join rematch" once the host has opened one (#72). */
+    playAgainLabel: String = "Play again",
 ) {
     if (folded) {
         Box(Modifier.fillMaxSize()) {
@@ -66,7 +70,7 @@ internal fun CongratsScreen(
         }
         return
     }
-    Box(Modifier.fillMaxSize().background(Color(0x66000000)).testTag("congrats")) {
+    Box(Modifier.fillMaxSize().background(Color(0x66000000)).displayCutoutPadding().testTag("congrats")) {
         if (winner >= 0) Confetti(PLAYER_COLORS[winner])
         // Scrolls: four players and the buttons just fit 320 dp tall (CI's screen); six (v3) would not.
         Column(
@@ -91,14 +95,15 @@ internal fun CongratsScreen(
                 Box(Modifier.size(14.dp).background(PLAYER_COLORS[pl.seat], CircleShape))
                 Spacer(Modifier.width(8.dp))
                 Text(names[pl.seat] + if (pl.seat == me && names[pl.seat] != "You") " (you)" else "", Modifier.weight(1f), color = Color(0xFFEDE6D8),
-                    fontWeight = if (pl.winner) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                    // A 16-letter name ends in "…" before the award tags, which it ran into (0.3.4).
+                    fontWeight = if (pl.winner) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(listOfNotNull("Highway".takeIf { pl.road }, "Watch".takeIf { pl.army }).joinToString(" · "),
-                    color = Color(0xFFF1D58A), fontSize = 12.sp)
+                    Modifier.padding(start = 6.dp), color = Color(0xFFF1D58A), fontSize = 12.sp, maxLines = 1, softWrap = false)
                 Text("${pl.vp} VP", Modifier.padding(start = 10.dp), color = Color(0xFFEDE6D8), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (onPlayAgain != null) BrassButton("Play again", "play-again", Modifier.height(44.dp), onClick = onPlayAgain)
+                if (onPlayAgain != null) BrassButton(playAgainLabel, "play-again", Modifier.height(44.dp), onClick = onPlayAgain)
                 WoodButton("See the board", "congrats-board") { onFold(true) }
                 WoodButton("Exit", "game-over-exit", onClick = onExit)
             }

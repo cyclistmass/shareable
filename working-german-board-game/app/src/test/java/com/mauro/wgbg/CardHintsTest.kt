@@ -12,7 +12,7 @@ import wgbg.engine.Progress
 import wgbg.engine.Rules
 
 class CardHintsTest {
-    private val board = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 1).board
+    private val board = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 1).board
 
     @Test
     fun `every card has a hint`() {
@@ -50,7 +50,7 @@ class CardHintsTest {
 
     @Test
     fun `a Tinkerer pick from a real game offers every movable tile and only legal swaps`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 7)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 7)
         val swaps = (0 until s.board.hexCount).flatMap { h1 -> (h1 + 1 until s.board.hexCount).map { h2 -> h1 to h2 } }
             .filter { (h1, h2) -> s.numberAt(h1) != s.numberAt(h2) && Progress.inventorMovable(s.numberAt(h1)) && Progress.inventorMovable(s.numberAt(h2)) }
             .map { (h1, h2) -> Action.playProgress(Progress.INVENTOR, h1, h2) }
@@ -63,7 +63,7 @@ class CardHintsTest {
 
     @Test
     fun `player choices show names, not numbers`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 1)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), 1)
         assertEquals("Blue", progressOption(s, Action.playProgress(Progress.SPY, 1), listOf("You", "Blue", "Orange")))
     }
 }

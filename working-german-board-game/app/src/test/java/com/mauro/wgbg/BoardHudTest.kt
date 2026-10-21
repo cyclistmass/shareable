@@ -18,8 +18,8 @@ class BoardHudTest {
 
     @Test
     fun `raiders countdown`() {
-        assertEquals(wgbg.engine.CkPiece.BARBARIAN_TRACK, raidersStepsLeft(0))
-        assertEquals(0, raidersStepsLeft(wgbg.engine.CkPiece.BARBARIAN_TRACK))
+        assertEquals(wgbg.engine.ChivalryPiece.BARBARIAN_TRACK, raidersStepsLeft(0))
+        assertEquals(0, raidersStepsLeft(wgbg.engine.ChivalryPiece.BARBARIAN_TRACK))
         assertEquals(0, raidersStepsLeft(99))
     }
 
@@ -28,10 +28,10 @@ class BoardHudTest {
         val base = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 1)
         base.hands[0] += 3
         assertEquals("3", cardsLabel(base, 0))
-        val ck = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 1)
-        ck.hands[0] += 2
-        ck.ck!!.progressHand[0] += 1
-        assertEquals("2/1", cardsLabel(ck, 0))
+        val chivalry = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 1)
+        chivalry.hands[0] += 2
+        chivalry.chivalry!!.progressHand[0] += 1
+        assertEquals("2/1", cardsLabel(chivalry, 0))
     }
 
     @Test
@@ -85,14 +85,14 @@ class BoardHudTest {
 
     @Test
     fun `progress cards you can't play now are named with the reason (#117)`() {
-        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 3)
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 3)
         val rnd = kotlin.random.Random(3)
         while (!(s.phase == wgbg.engine.Phase.PLAY_TURN && !s.hasRolled && s.turn > 0))
             wgbg.engine.Rules.applyChecked(s, wgbg.engine.Rules.legalActions(s).random(rnd))
         val me = s.currentPlayer; val other = (me + 1) % s.config.numPlayers
-        val ck = s.ck!!
-        ck.progressHand[me * wgbg.engine.Progress.COUNT + wgbg.engine.Progress.ALCHEMIST] += 1
-        ck.progressHand[me * wgbg.engine.Progress.COUNT + wgbg.engine.Progress.SABOTEUR] += 1
+        val chivalry = s.chivalry!!
+        chivalry.progressHand[me * wgbg.engine.Progress.COUNT + wgbg.engine.Progress.ALCHEMIST] += 1
+        chivalry.progressHand[me * wgbg.engine.Progress.COUNT + wgbg.engine.Progress.SABOTEUR] += 1
         val now = playableProgress(s, me)
         assertTrue(wgbg.engine.Progress.ALCHEMIST in now, "the Alchemist is for before the roll")
         assertTrue(wgbg.engine.Progress.SABOTEUR !in now, "the Wrecker waits for the roll (Mauro's report)")
@@ -104,8 +104,8 @@ class BoardHudTest {
 
     @Test
     fun `a knight's corner glows round its base, an empty corner gets the usual dot (#118)`() {
-        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 2)
-        s.ck!!.knightOwner[7] = 1
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 2)
+        s.chivalry!!.knightOwner[7] = 1
         assertTrue(knightAt(s, 7) && pieceAt(s, 7))
         assertTrue(!knightAt(s, 8))
         assertTrue(!knightAt(wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 2), 7))   // base game: no knights
@@ -114,18 +114,18 @@ class BoardHudTest {
 
     @Test
     fun `the Raiders warning shows on your turn from 3 steps out, with both strengths (#92)`() {
-        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CITIES_AND_KNIGHTS), 5)
-        val ck = s.ck!!
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 5)
+        val chivalry = s.chivalry!!
         val me = s.currentPlayer
-        ck.barbarianPos = wgbg.engine.CkPiece.BARBARIAN_TRACK - 4
+        chivalry.barbarianPos = wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - 4
         assertEquals(null, raidersWarning(s, me))                                   // 4 out: quiet
-        ck.barbarianPos = wgbg.engine.CkPiece.BARBARIAN_TRACK - 3
+        chivalry.barbarianPos = wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - 3
         val w = raidersWarning(s, me)!!
         assertTrue(w.startsWith("Raiders 3 steps away!"), w)
-        val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
+        val raiders = wgbg.engine.Chivalry.barbarianStrength(s)
         assertTrue("\n$raiders vs " in w, w)   // Raiders first, like the track line
         assertEquals(null, raidersWarning(s, (me + 1) % s.numPlayers))              // not your turn
-        ck.barbarianPos = wgbg.engine.CkPiece.BARBARIAN_TRACK - 1
+        chivalry.barbarianPos = wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - 1
         assertTrue(raidersWarning(s, me)!!.startsWith("Raiders 1 step away!"))
         assertEquals(null, raidersWarning(wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 5), 0))   // base game
     }

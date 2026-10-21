@@ -5,9 +5,9 @@ import wgbg.engine.ActionBuffer
 import wgbg.engine.ActionType
 import wgbg.engine.BoardLayout
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CitiesAndKnights
-import wgbg.engine.CkActionType
-import wgbg.engine.CkPiece
+import wgbg.engine.Chivalry
+import wgbg.engine.ChivalryActionType
+import wgbg.engine.ChivalryPiece
 import wgbg.engine.Commodity
 import wgbg.engine.DevCard
 import wgbg.engine.Expansion
@@ -186,8 +186,10 @@ object CardTester {
     fun setupFor(state: GameState, name: String): GameSetup = GameSetup(
         name = name.ifBlank { "You" },
         seats = listOf(SeatSetup(SeatKind.FRIEND)) + List(GameSetup.MAX_SEATS - 1) { SeatSetup(SeatKind.BOT, BotLevel.GREEDY) },
-        ruleset = if (state.ck != null) Ruleset.CHIVALRY else Ruleset.BASE,
+        ruleset = if (state.chivalry != null) Ruleset.CHIVALRY else Ruleset.BASE,
         points = state.config.vpToWin.coerceIn(GameSetup.POINTS_RANGE),
+        // The scenarios name the bots by colour ("Blue gives you 3 Grain"), so the tester's game always does too.
+        theme = NameTheme.COLOURS,
     )
 
     // ------------------------------------------------------------ the scenarios
@@ -197,9 +199,10 @@ object CardTester {
 
 // ------------------------------------------------------------------ building positions
 
-private val NAMES = listOf("you", "Blue", "Orange", "White")
-private fun who(p: Int) = NAMES[p]
-private fun Who(p: Int) = NAMES[p].replaceFirstChar { it.uppercase() }
+/** The bots by the names the tester's game shows (colours, [CardTester.setupFor]); the scenario texts use these. */
+internal val TESTER_NAMES = listOf("you") + (1 until GameSetup.MAX_SEATS).map(::colourName)
+private fun who(p: Int) = TESTER_NAMES[p]
+private fun Who(p: Int) = TESTER_NAMES[p].replaceFirstChar { it.uppercase() }
 
 /** A position under construction, with the helpers the scenarios share. Everything goes through the bank or a deck. */
 internal class Bench(val s: GameState) {
@@ -208,7 +211,7 @@ internal class Bench(val s: GameState) {
     val facts = mutableListOf<Fact>()
     val script = mutableListOf<(GameState) -> Action>()
     val b get() = s.board
-    val ck get() = s.ck!!
+    val chivalry get() = s.chivalry!!
 
     fun change(label: String, d: Int, read: (GameState) -> Int) { facts += Fact(label, read) { it + d } }
     fun becomes(label: String, v: Int, read: (GameState) -> Int) { facts += Fact(label, read) { v } }
@@ -219,15 +222,15 @@ internal class Bench(val s: GameState) {
     fun prepared() = Prepared(s, howTo, expect, facts.toList(), script.toList())
 
     // Cards.
-    fun bankOf(c: Int) = if (c < Resource.COUNT) s.bank[c] else ck.commodityBank[c - Resource.COUNT]
+    fun bankOf(c: Int) = if (c < Resource.COUNT) s.bank[c] else chivalry.commodityBank[c - Resource.COUNT]
     fun give(p: Int, c: Int, n: Int) {
         require(bankOf(c) >= n) { "bank short of card $c" }
         if (c < Resource.COUNT) { s.bank[c] -= n; s.hands[p * CARD_TYPES + c] += n }
-        else { ck.commodityBank[c - Resource.COUNT] -= n; ck.commodities[p * Commodity.COUNT + c - Resource.COUNT] += n }
+        else { chivalry.commodityBank[c - Resource.COUNT] -= n; chivalry.commodities[p * Commodity.COUNT + c - Resource.COUNT] += n }
     }
     fun empty(p: Int) {
         for (r in 0 until Resource.COUNT) { s.bank[r] += s.hands[p * CARD_TYPES + r]; s.hands[p * CARD_TYPES + r] = 0 }
-        s.ck?.let { ck -> for (l in 0 until Commodity.COUNT) { ck.commodityBank[l] += ck.commodities[p * Commodity.COUNT + l]; ck.commodities[p * Commodity.COUNT + l] = 0 } }
+        s.chivalry?.let { chivalry -> for (l in 0 until Commodity.COUNT) { chivalry.commodityBank[l] += chivalry.commodities[p * Commodity.COUNT + l]; chivalry.commodities[p * Commodity.COUNT + l] = 0 } }
     }
     fun emptyCard(p: Int, c: Int) { val n = s.card(p, c); give(p, c, -n) }
     /** Hands the bank's whole pile of [c] (but [keep]) to the opponents, round the table. */
@@ -245,19 +248,19 @@ internal class Bench(val s: GameState) {
     fun progress(p: Int, card: Int) { stack(card); draw(p, card) }
     private fun draw(p: Int, card: Int) {
         val t = Progress.track(card)
-        ck.deckHead[t] = (ck.deckHead[t] + 1) % Progress.PER_DECK
-        ck.deckSize[t]--
-        ck.progressHand[p * Progress.COUNT + card]++
+        chivalry.deckHead[t] = (chivalry.deckHead[t] + 1) % Progress.PER_DECK
+        chivalry.deckSize[t]--
+        chivalry.progressHand[p * Progress.COUNT + card]++
     }
     /** Puts [card] on top of its deck. */
     fun stack(card: Int) {
         val t = Progress.track(card)
         val per = Progress.PER_DECK
-        for (i in 0 until ck.deckSize[t]) {
-            val idx = t * per + (ck.deckHead[t] + i) % per
-            if (ck.deck[idx] == card) {
-                val top = t * per + ck.deckHead[t]
-                ck.deck[idx] = ck.deck[top]; ck.deck[top] = card
+        for (i in 0 until chivalry.deckSize[t]) {
+            val idx = t * per + (chivalry.deckHead[t] + i) % per
+            if (chivalry.deck[idx] == card) {
+                val top = t * per + chivalry.deckHead[t]
+                chivalry.deck[idx] = chivalry.deck[top]; chivalry.deck[top] = card
                 return
             }
         }
@@ -308,18 +311,18 @@ internal class Bench(val s: GameState) {
     }
     /** An empty corner on [p]'s roads (where a knight can stand); [skip] corners already taken by the scenario. */
     fun knightSpot(p: Int, skip: Set<Int> = emptySet()): Int? =
-        (0 until b.vertexCount).firstOrNull { it !in skip && s.vertexOwner[it] < 0 && (s.ck == null || ck.knightOwner[it] < 0) && Rules.hasRoadAt(s, p, it) }
+        (0 until b.vertexCount).firstOrNull { it !in skip && s.vertexOwner[it] < 0 && (s.chivalry == null || chivalry.knightOwner[it] < 0) && Rules.hasRoadAt(s, p, it) }
     fun knight(p: Int, v: Int, level: Int = 1, active: Boolean = false) {
-        require(ck.knightOwner[v] < 0 && s.vertexOwner[v] < 0)
-        ck.knightOwner[v] = p; ck.knightLevel[v] = level; ck.knightFlags[v] = if (active) wgbg.engine.CkState.ACTIVE else 0
-        ck.knightsLeft[p * CkPiece.MAX_KNIGHT_LEVEL + level - 1]--
+        require(chivalry.knightOwner[v] < 0 && s.vertexOwner[v] < 0)
+        chivalry.knightOwner[v] = p; chivalry.knightLevel[v] = level; chivalry.knightFlags[v] = if (active) wgbg.engine.ChivalryState.ACTIVE else 0
+        chivalry.knightsLeft[p * ChivalryPiece.MAX_KNIGHT_LEVEL + level - 1]--
         recompute()
     }
     fun level(p: Int, track: Int, level: Int) {
-        ck.trackLevel[p * Track.COUNT + track] = level
-        if (level >= Track.METROPOLIS_LEVEL && ck.metroOwner[track] < 0) {
-            ck.metroOwner[track] = p
-            ck.metroVertex[track] = (0 until b.vertexCount).first { s.vertexOwner[it] == p && s.vertexBuilding[it] == Piece.CITY && !ck.isMetropolis(it) }
+        chivalry.trackLevel[p * Track.COUNT + track] = level
+        if (level >= Track.METROPOLIS_LEVEL && chivalry.metroOwner[track] < 0) {
+            chivalry.metroOwner[track] = p
+            chivalry.metroVertex[track] = (0 until b.vertexCount).first { s.vertexOwner[it] == p && s.vertexBuilding[it] == Piece.CITY && !chivalry.isMetropolis(it) }
         }
     }
     /** Reseeds the game's dice so the next event die the engine rolls itself shows [face] (a Transmuter's roll). */
@@ -336,7 +339,7 @@ internal class Bench(val s: GameState) {
     }
     fun touches(h: Int, p: Int) = (0 until 6).any { s.vertexOwner[b.hexVerts[h * 6 + it]] == p }
     fun touchesAny(h: Int) = (0 until 6).any { s.vertexOwner[b.hexVerts[h * 6 + it]] >= 0 }
-    fun victims(h: Int): Int = if (s.ck != null) CitiesAndKnights.robberVictims(s, 0, h) else Rules.robberVictims(s, 0, h)
+    fun victims(h: Int): Int = if (s.chivalry != null) Chivalry.robberVictims(s, 0, h) else Rules.robberVictims(s, 0, h)
 }
 
 /** Pips under a number: how many of the 36 rolls make it. */
@@ -347,7 +350,7 @@ private fun pips(n: Int) = if (n == 0) 0 else 6 - kotlin.math.abs(7 - n)
  * be steered by [mine]), then your turn after the roll with an empty hand and three cards per opponent.
  */
 private fun opening(chivalry: Boolean, vpToWin: Int? = null, mine: (GameState, Int) -> Boolean = { _, _ -> true }): Bench {
-    val exp = if (chivalry) Expansion.CITIES_AND_KNIGHTS else Expansion.BASE
+    val exp = if (chivalry) Expansion.CHIVALRY else Expansion.BASE
     val config = GameConfig(expansion = exp, numPlayers = CardTester.PLAYERS, layout = BoardLayout.BEGINNER,
         vpToWin = vpToWin ?: if (chivalry) 13 else 10)
     val s = Rules.newGame(config, CardTester.SEED)
@@ -365,7 +368,7 @@ private fun opening(chivalry: Boolean, vpToWin: Int? = null, mine: (GameState, I
     s.phase = Phase.PLAY_TURN
     s.currentPlayer = 0; s.actingPlayer = 0
     s.turn = 8; s.hasRolled = true; s.lastRoll = 8
-    s.ck?.let { it.lastRed = 4; it.lastEvent = 3 }
+    s.chivalry?.let { it.lastRed = 4; it.lastEvent = 3 }
     return bench
 }
 
@@ -379,7 +382,7 @@ private fun scenario(id: String, card: String, mode: String, chivalry: Boolean, 
     CardScenario(id, card, mode, chivalry, playable, isPlay, rule) { build().prepared() }
 
 private fun isType(t: wgbg.engine.ActionKind): (Action) -> Boolean = { it.type == t }
-private fun isProgress(card: Int): (Action) -> Boolean = { it.type == CkActionType.PLAY_PROGRESS && it.a == card }
+private fun isProgress(card: Int): (Action) -> Boolean = { it.type == ChivalryActionType.PLAY_PROGRESS && it.a == card }
 private fun firstOf(t: wgbg.engine.ActionKind): (GameState) -> Action = { s -> Rules.legalActions(s).first { it.type == t } }
 
 private val NOT_OFFERED = "Tap Pass if there's no way to play it (and its card says why); Fail if it can be played."
@@ -517,7 +520,7 @@ private fun baseScenarios(): List<CardScenario> {
                 give(1, Resource.WHEAT, 3); give(2, Resource.WHEAT, 2)
                 dev(0, DevCard.MONOPOLY)
                 howTo = "Tap Play Corner the Market… and name Grain."
-                expect = "Blue gives you 3 Grain and Orange 2 (all they have); White has none."
+                expect = "Blue gives you 3 Grain and Purple 2 (all they have); White has none."
                 change("Your Grain", +5) { it.hand(0, Resource.WHEAT) }
                 change("The others' Grain", -5) { s -> (1..3).sumOf { s.hand(it, Resource.WHEAT) } }
                 then(Action.monopoly(Resource.WHEAT))
@@ -597,15 +600,15 @@ private fun chivalryScenarios(): List<CardScenario> {
     fun play(card: Int, a1: Int = 0, a2: Int = 0) = Action.playProgress(card, a1, a2)
     fun Bench.city() = buildings(0, Piece.CITY).first()
     fun Bench.homestead() = buildings(0, Piece.SETTLEMENT).first()
-    fun Bench.knights(p: Int) = (0 until b.vertexCount).count { ck.knightOwner[it] == p }
+    fun Bench.knights(p: Int) = (0 until b.vertexCount).count { chivalry.knightOwner[it] == p }
     fun Bench.blocked(card: Int, how: String) {
         howTo = "${how}Look for a way to play ${name(card)}. $NOT_OFFERED"
         expect = "${name(card)} can't be played: ${progressBlocked(s, 0, card)}."
-        same("${name(card)} cards in your hand") { it.ck!!.progressHand[card] }
+        same("${name(card)} cards in your hand") { it.chivalry!!.progressHand[card] }
     }
-    fun knightCount(p: Int): (GameState) -> Int = { s -> s.ck!!.knightOwner.count { it == p } }
-    fun strength(p: Int): (GameState) -> Int = { s -> (0 until s.board.vertexCount).sumOf { if (s.ck!!.knightOwner[it] == p) s.ck!!.knightLevel[it] else 0 } }
-    fun progressCount(p: Int): (GameState) -> Int = { it.ck!!.progressCount(p) }
+    fun knightCount(p: Int): (GameState) -> Int = { s -> s.chivalry!!.knightOwner.count { it == p } }
+    fun strength(p: Int): (GameState) -> Int = { s -> (0 until s.board.vertexCount).sumOf { if (s.chivalry!!.knightOwner[it] == p) s.chivalry!!.knightLevel[it] else 0 } }
+    fun progressCount(p: Int): (GameState) -> Int = { it.chivalry!!.progressCount(p) }
     val list = mutableListOf<CardScenario>()
     fun add(id: String, card: Int, mode: String, playable: Boolean = true, rule: ((GameState, List<Action>) -> Boolean)? = null,
             build: () -> Bench) { list += scenario(id, name(card), mode, true, playable, isProgress(card), rule, build) }
@@ -646,7 +649,7 @@ private fun chivalryScenarios(): List<CardScenario> {
                 expect = "The ${name(card)} is laid open at once (never held) and is worth 1 point."
                 change("Your points", +1) { it.victoryPoints(0) }
                 change("Progress cards in your hand (the ${name(P.ALCHEMIST)} goes)", -1, progressCount(0))
-                change("Point cards laid open", +1) { it.ck!!.progressVp[0] }
+                change("Point cards laid open", +1) { it.chivalry!!.progressVp[0] }
                 then(play(P.ALCHEMIST, 1, 1))
             }
         }
@@ -657,7 +660,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.CRANE); level(0, Track.TRADE, 1); give(0, Commodity.CLOTH, 1)
             howTo = "Tap Play ${name(P.CRANE)}… and pick Guilds (it should say 1 Fabric instead of 2)."
             expect = "Guilds goes from level 1 to 2 for 1 Fabric."
-            change("Guilds level", +1) { it.ck!!.level(0, Track.TRADE) }
+            change("Guilds level", +1) { it.chivalry!!.level(0, Track.TRADE) }
             change("Your Fabric", -1) { it.card(0, Commodity.CLOTH) }
             then(play(P.CRANE, Track.TRADE, 0))
         }
@@ -667,7 +670,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.CRANE)
             howTo = "You hold no commodities. Tap Play ${name(P.CRANE)}… and pick Academy (0 Parchment instead of 1)."
             expect = "Academy goes to level 1 for nothing."
-            change("Academy level", +1) { it.ck!!.level(0, Track.SCIENCE) }
+            change("Academy level", +1) { it.chivalry!!.level(0, Track.SCIENCE) }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.CRANE, Track.SCIENCE, 0))
         }
@@ -678,7 +681,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             val v = city()
             howTo = "Academy is at level 3. Tap Play ${name(P.CRANE)}… and pick Academy to level 4 (3 Parchment instead of 4)."
             expect = "Academy reaches level 4 and your town becomes the Academy Capital: 2 more points."
-            change("Academy level", +1) { it.ck!!.level(0, Track.SCIENCE) }
+            change("Academy level", +1) { it.chivalry!!.level(0, Track.SCIENCE) }
             change("Your points", +2) { it.victoryPoints(0) }
             change("Your Parchment", -3) { it.card(0, Commodity.PAPER) }
             then(play(P.CRANE, Track.SCIENCE, v + 1))
@@ -702,8 +705,8 @@ private fun chivalryScenarios(): List<CardScenario> {
             val v = city()
             howTo = "Tap Play ${name(P.ENGINEER)}… and tap your town."
             expect = "Ramparts go on your town for free, and you may hold 2 more cards on a 7."
-            change("Your Ramparts", +1) { CkPiece.WALLS - it.ck!!.wallsLeft[0] }
-            change("Cards you may hold on a 7", +2) { CitiesAndKnights.discardLimit(it, 0) }
+            change("Your Ramparts", +1) { ChivalryPiece.WALLS - it.chivalry!!.wallsLeft[0] }
+            change("Cards you may hold on a 7", +2) { Chivalry.discardLimit(it, 0) }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.ENGINEER, v))
         }
@@ -711,7 +714,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("mason.all-walled", P.ENGINEER, "every town already has Ramparts", playable = false) {
         opening(true).apply {
             progress(0, P.ENGINEER)
-            ck.wall[city()] = 1; ck.wallsLeft[0]--
+            chivalry.wall[city()] = 1; chivalry.wallsLeft[0]--
             blocked(P.ENGINEER, "Your only town has Ramparts already. ")
         }
     }
@@ -734,13 +737,13 @@ private fun chivalryScenarios(): List<CardScenario> {
             then(play(P.INVENTOR, lo, hi))
         }
     }
-    // Waterworks (Grain) and Deep Shafts (Stone): 2 per field / mountain by your pieces.
+    // Waterworks (Grain) and Deep Shafts (Stone): 2 per Grainfield / Quarry by your pieces.
     for ((card, r) in listOf(P.IRRIGATION to Resource.WHEAT, P.MINING to Resource.ORE)) {
         val key = if (card == P.IRRIGATION) "waterworks" else "deep-shafts"
-        val land = if (card == P.IRRIGATION) "field" else "mountain"
+        val land = TERRAIN_NAMES[r].lowercase()
         val res = RESOURCE_NAMES[r]
         fun Bench.lands() = (0 until b.hexCount).count { b.hexResource[it] == r && touches(it, 0) }
-        add("$key.by-your-$land", card, "2 $res per $land by your pieces") {
+        add("$key.by-your-$land", card, "2 $res per ${TERRAIN_NAMES[r]} by your pieces") {
             opening(true, mine = near(r)).apply {
                 progress(0, card)
                 val k = lands()
@@ -812,7 +815,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             expect = "You may stop after one road; the second is given up and your turn goes on."
             change("Your roads on the board", +1) { it.piecesOnBoard(0, Piece.ROAD) }
             becomes("Free roads still to place", 0) { it.freeRoads }
-            then(play(P.ROAD_BUILDING)); then(firstOf(ActionType.BUILD_ROAD)); then(Action.CK_DONE)
+            then(play(P.ROAD_BUILDING)); then(firstOf(ActionType.BUILD_ROAD)); then(Action.CHIVALRY_DONE)
         }
     }
     add("pathfinders.one-piece-left", P.ROAD_BUILDING, "only one road piece left") {
@@ -847,7 +850,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             howTo = "One basic and one strong knight, and no Fortress (Crown level 3). Tap Play ${name(P.SMITH)}, then tap the basic knight."
             expect = "The basic knight goes up to strong; the strong one can't become mighty without the Fortress, so the second promotion is dropped."
             change("Your knights' strength", +1, strength(0))
-            becomes("Free promotions still to use", 0) { it.ck!!.freePromotions }
+            becomes("Free promotions still to use", 0) { it.chivalry!!.freePromotions }
             then(play(P.SMITH)); then(Action.promoteKnight(a))
         }
     }
@@ -870,14 +873,14 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.COMMERCIAL_HARBOR)
             give(0, Resource.WHEAT, 3)
             for (q in 1..3) give(q, Commodity.PAPER + q - 1, 1)
-            howTo = "Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue, Orange and White in turn, then tap Done."
+            howTo = "Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue, Purple and White in turn, then tap Done."
             expect = "Each of them takes a Grain and gives you a commodity back: 3 resources out, 3 commodities in."
             change("Your resources", -3) { it.handSize(0) }
-            change("Your commodities", +3) { it.ck!!.commodityCount(0) }
+            change("Your commodities", +3) { it.chivalry!!.commodityCount(0) }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.COMMERCIAL_HARBOR))
             for (q in 1..3) then(Action.commercialHarborOffer(Resource.WHEAT, q))
-            then(Action.CK_DONE)
+            then(Action.CHIVALRY_DONE)
         }
     }
     add("charter.skips-empty", P.COMMERCIAL_HARBOR, "an opponent with no commodity is skipped",
@@ -886,15 +889,15 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.COMMERCIAL_HARBOR)
             give(0, Resource.WHEAT, 3)
             give(1, Commodity.PAPER, 1); give(2, Commodity.CLOTH, 1)
-            howTo = "White holds no commodity. Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue and Orange (White mustn't be offered), then Done."
+            howTo = "White holds no commodity. Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue and Purple (White mustn't be offered), then Done."
             expect = "Two swaps; White can't be picked."
             change("Your resources", -2) { it.handSize(0) }
-            change("Your commodities", +2) { it.ck!!.commodityCount(0) }
+            change("Your commodities", +2) { it.chivalry!!.commodityCount(0) }
             then(play(P.COMMERCIAL_HARBOR))
             then(Action.commercialHarborOffer(Resource.WHEAT, 1))
-            then { s -> require(Rules.legalActions(s).none { it.type == CkActionType.COMMERCIAL_HARBOR_OFFER && it.b == 3 }) { "White was offered" }
+            then { s -> require(Rules.legalActions(s).none { it.type == ChivalryActionType.COMMERCIAL_HARBOR_OFFER && it.b == 3 }) { "White was offered" }
                 Action.commercialHarborOffer(Resource.WHEAT, 2) }
-            then(Action.CK_DONE)
+            then(Action.CHIVALRY_DONE)
         }
     }
     add("charter.no-commodities", P.COMMERCIAL_HARBOR, "nobody else has a commodity", playable = false) {
@@ -914,7 +917,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             expect = "You see Blue's hand and take the 2 cards you choose."
             change("Your cards", +2) { it.cardCount(0) }
             change("Blue's cards", -2) { it.cardCount(1) }
-            then(play(P.MASTER_MERCHANT, 1)); then(firstOf(CkActionType.CHOOSE_CARD)); then(firstOf(CkActionType.CHOOSE_CARD))
+            then(play(P.MASTER_MERCHANT, 1)); then(firstOf(ChivalryActionType.CHOOSE_CARD)); then(firstOf(ChivalryActionType.CHOOSE_CARD))
         }
     }
     add("factor.one-card", P.MASTER_MERCHANT, "the leader holds only 1 card") {
@@ -925,7 +928,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             expect = "You take Blue's only card, and the card is done."
             change("Your cards", +1) { it.cardCount(0) }
             becomes("Blue's cards", 0) { it.cardCount(1) }
-            then(play(P.MASTER_MERCHANT, 1)); then(firstOf(CkActionType.CHOOSE_CARD))
+            then(play(P.MASTER_MERCHANT, 1)); then(firstOf(ChivalryActionType.CHOOSE_CARD))
         }
     }
     add("factor.nobody-ahead", P.MASTER_MERCHANT, "nobody has more points", playable = false) {
@@ -935,12 +938,12 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("peddler.place", P.MERCHANT, "place the merchant: 1 point and 2:1") {
         opening(true).apply {
             progress(0, P.MERCHANT)
-            val h = (0 until b.hexCount).first { b.hexResource[it] >= 0 && touches(it, 0) && CitiesAndKnights.tradeRate(s, 0, b.hexResource[it]) > 2 }
+            val h = (0 until b.hexCount).first { b.hexResource[it] >= 0 && touches(it, 0) && Chivalry.tradeRate(s, 0, b.hexResource[it]) > 2 }
             val r = b.hexResource[h]
             howTo = "Tap Play ${name(P.MERCHANT)}… and tap ${tile(h)}."
             expect = "The merchant stands on ${tile(h)}: 1 point for you, and you trade ${RESOURCE_NAMES[r]} with the bank 2 for 1."
             change("Your points", +1) { it.victoryPoints(0) }
-            becomes("${RESOURCE_NAMES[r]} you give the bank for 1 card", 2) { CitiesAndKnights.tradeRate(it, 0, r) }
+            becomes("${RESOURCE_NAMES[r]} you give the bank for 1 card", 2) { Chivalry.tradeRate(it, 0, r) }
             then(play(P.MERCHANT, h))
         }
     }
@@ -948,7 +951,7 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.MERCHANT)
             val hb = (0 until b.hexCount).first { b.hexResource[it] >= 0 && touches(it, 1) && !touches(it, 0) }
-            ck.merchantHex = hb; ck.merchantOwner = 1
+            chivalry.merchantHex = hb; chivalry.merchantOwner = 1
             val h = (0 until b.hexCount).first { it != hb && b.hexResource[it] >= 0 && touches(it, 0) }
             howTo = "Blue's merchant stands on ${tile(hb)}. Tap Play ${name(P.MERCHANT)}… and tap ${tile(h)}."
             expect = "The merchant comes to you: you gain its point and Blue loses it."
@@ -961,7 +964,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("hulls.resource", P.MERCHANT_FLEET, "a resource 2 for 1") {
         opening(true).apply {
             progress(0, P.MERCHANT_FLEET)
-            val r = (0 until Resource.COUNT).first { CitiesAndKnights.tradeRate(s, 0, it) > 2 && it != Resource.WHEAT }
+            val r = (0 until Resource.COUNT).first { Chivalry.tradeRate(s, 0, it) > 2 && it != Resource.WHEAT }
             give(0, r, 2)
             howTo = "Tap Play ${name(P.MERCHANT_FLEET)}… and pick ${RESOURCE_NAMES[r]}; then trade 2 ${RESOURCE_NAMES[r]} with the bank for 1 Grain."
             expect = "${RESOURCE_NAMES[r]} goes 2 for 1 this turn: 2 ${RESOURCE_NAMES[r]} buy 1 Grain."
@@ -984,11 +987,11 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("field.up-to-two", P.RESOURCE_MONOPOLY, "up to 2 from each player") {
         opening(true).apply {
             progress(0, P.RESOURCE_MONOPOLY); give(1, Resource.WHEAT, 3); give(2, Resource.WHEAT, 1)
-            howTo = "Blue holds 3 Grain, Orange 1, White none. Tap Play ${name(P.RESOURCE_MONOPOLY)}… and name Grain."
-            expect = "Blue gives 2 (no more than 2), Orange its 1: 3 Grain for you."
+            howTo = "Blue holds 3 Grain, Purple 1, White none. Tap Play ${name(P.RESOURCE_MONOPOLY)}… and name Grain."
+            expect = "Blue gives 2 (no more than 2), Purple its 1: 3 Grain for you."
             change("Your Grain", +3) { it.hand(0, Resource.WHEAT) }
             change("Blue's Grain", -2) { it.hand(1, Resource.WHEAT) }
-            change("Orange's Grain", -1) { it.hand(2, Resource.WHEAT) }
+            change("Purple's Grain", -1) { it.hand(2, Resource.WHEAT) }
             then(play(P.RESOURCE_MONOPOLY, Resource.WHEAT))
         }
     }
@@ -1005,11 +1008,11 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("wares.one-each", P.TRADE_MONOPOLY, "1 from each player") {
         opening(true).apply {
             progress(0, P.TRADE_MONOPOLY); give(1, Commodity.COIN, 2); give(2, Commodity.COIN, 1)
-            howTo = "Blue holds 2 Silver, Orange 1, White none. Tap Play ${name(P.TRADE_MONOPOLY)}… and name Silver."
-            expect = "Blue and Orange give you 1 Silver each (never more than 1)."
+            howTo = "Blue holds 2 Silver, Purple 1, White none. Tap Play ${name(P.TRADE_MONOPOLY)}… and name Silver."
+            expect = "Blue and Purple give you 1 Silver each (never more than 1)."
             change("Your Silver", +2) { it.card(0, Commodity.COIN) }
             change("Blue's Silver", -1) { it.card(1, Commodity.COIN) }
-            change("Orange's Silver", -1) { it.card(2, Commodity.COIN) }
+            change("Purple's Silver", -1) { it.card(2, Commodity.COIN) }
             then(play(P.TRADE_MONOPOLY, Commodity.COIN))
         }
     }
@@ -1026,7 +1029,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     // Abbot: the bandit moves and robs one card from each player there.
     add("abbot.rob-each", P.BISHOP, "rob everyone on the tile") {
         opening(true).apply {
-            ck.barbarianAttacks = 1
+            chivalry.barbarianAttacks = 1
             progress(0, P.BISHOP)
             val h = (0 until b.hexCount).filter { it != s.robberHex }.maxBy { Integer.bitCount(victims(it)) }
             val n = Integer.bitCount(victims(h))
@@ -1041,7 +1044,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     }
     add("abbot.empty-tile", P.BISHOP, "a tile nobody else builds on") {
         opening(true).apply {
-            ck.barbarianAttacks = 1
+            chivalry.barbarianAttacks = 1
             progress(0, P.BISHOP)
             val h = (0 until b.hexCount).filter { it != s.robberHex }.let { hs -> hs.firstOrNull { !touchesAny(it) } ?: hs.first { victims(it) == 0 } }
             howTo = "Tap Play ${name(P.BISHOP)}… and tap ${tile(h)}."
@@ -1063,7 +1066,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             expect = "Blue loses a basic knight and you place a basic knight of your own."
             change("Your knights", +1, knightCount(0))
             change("Blue's knights", -1, knightCount(1))
-            then(play(P.DESERTER, 1)); then(firstOf(CkActionType.CHOOSE_VERTEX))
+            then(play(P.DESERTER, 1)); then(firstOf(ChivalryActionType.CHOOSE_VERTEX))
         }
     }
     add("turncoat.no-spot", P.DESERTER, "you have nowhere to place it") {
@@ -1096,7 +1099,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("envoy.rival-road", P.DIPLOMAT, "remove another player's open road") {
         opening(true).apply {
             progress(0, P.DIPLOMAT)
-            val e = (0 until b.edgeCount).first { s.edgeOwner[it] == 1 && CitiesAndKnights.isOpenRoad(s, it) }
+            val e = (0 until b.edgeCount).first { s.edgeOwner[it] == 1 && Chivalry.isOpenRoad(s, it) }
             howTo = "Tap Play ${name(P.DIPLOMAT)}… and tap Blue's road (the open end of it)."
             expect = "Blue's road goes back to Blue's supply."
             change("Blue's roads on the board", -1) { it.piecesOnBoard(1, Piece.ROAD) }
@@ -1106,7 +1109,7 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("envoy.own-road", P.DIPLOMAT, "move one of your own roads") {
         opening(true).apply {
             progress(0, P.DIPLOMAT)
-            val e = (0 until b.edgeCount).first { s.edgeOwner[it] == 0 && CitiesAndKnights.isOpenRoad(s, it) }
+            val e = (0 until b.edgeCount).first { s.edgeOwner[it] == 0 && Chivalry.isOpenRoad(s, it) }
             howTo = "Tap Play ${name(P.DIPLOMAT)}…, tap one of your own roads, then place it again on a glowing edge."
             expect = "Your road comes up and goes straight back down for free: the same number of roads."
             change("Your roads on the board", 0) { it.piecesOnBoard(0, Piece.ROAD) }
@@ -1120,7 +1123,7 @@ private fun chivalryScenarios(): List<CardScenario> {
         val v = (0 until b.vertexCount).first { s.vertexOwner[it] < 0 && Rules.hasRoadAt(s, 0, it) }
         knight(1, v)
         if (retreat) {
-            val e = (0 until 3).map { b.vertexEdge[v * 3 + it] }.first { e -> e >= 0 && s.edgeOwner[e] < 0 && b.otherEnd(e, v).let { w -> s.vertexOwner[w] < 0 && ck.knightOwner[w] < 0 } }
+            val e = (0 until 3).map { b.vertexEdge[v * 3 + it] }.first { e -> e >= 0 && s.edgeOwner[e] < 0 && b.otherEnd(e, v).let { w -> s.vertexOwner[w] < 0 && chivalry.knightOwner[w] < 0 } }
             road(1, e)
         }
         return v
@@ -1131,7 +1134,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             val v = plotKnight(retreat = true)
             howTo = "Blue's knight stands on the end of your road. Tap Play ${name(P.INTRIGUE)}… and tap that knight."
             expect = "The knight leaves your road; Blue sets it down further along Blue's own road."
-            becomes("Blue knight on your road end (1 = yes)", 0) { if (it.ck!!.knightOwner[v] == 1) 1 else 0 }
+            becomes("Blue knight on your road end (1 = yes)", 0) { if (it.chivalry!!.knightOwner[v] == 1) 1 else 0 }
             change("Blue's knights", 0, knightCount(1))
             then(play(P.INTRIGUE, v))
         }
@@ -1142,7 +1145,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             val v = plotKnight(retreat = false)
             howTo = "Blue's knight stands on the end of your road with no Blue road to retreat along. Tap Play ${name(P.INTRIGUE)}… and tap it."
             expect = "The knight has nowhere to go, so it goes back to Blue's supply."
-            becomes("Blue knight on your road end (1 = yes)", 0) { if (it.ck!!.knightOwner[v] == 1) 1 else 0 }
+            becomes("Blue knight on your road end (1 = yes)", 0) { if (it.chivalry!!.knightOwner[v] == 1) 1 else 0 }
             change("Blue's knights", -1, knightCount(1))
             then(play(P.INTRIGUE, v))
         }
@@ -1155,10 +1158,10 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.SABOTEUR)
             give(1, Resource.WHEAT, 1); give(2, Resource.WHEAT, 2); emptyCard(3, Resource.WOOD); emptyCard(3, Resource.BRICK)
-            howTo = "Everyone has 3 points, like you. Blue holds 4 cards, Orange 5, White 1. Tap Play ${name(P.SABOTEUR)}."
-            expect = "Blue and Orange each discard 2 (half, rounded down); White keeps its 1."
+            howTo = "Everyone has 3 points, like you. Blue holds 4 cards, Purple 5, White 1. Tap Play ${name(P.SABOTEUR)}."
+            expect = "Blue and Purple each discard 2 (half, rounded down); White keeps its 1."
             change("Blue's cards", -2) { it.cardCount(1) }
-            change("Orange's cards", -2) { it.cardCount(2) }
+            change("Purple's cards", -2) { it.cardCount(2) }
             change("White's cards", 0) { it.cardCount(3) }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.SABOTEUR))
@@ -1175,7 +1178,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             expect = "You see Blue's progress cards and take the one you choose."
             change("Progress cards in your hand (the ${name(P.SPY)} goes, one comes)", 0, progressCount(0))
             change("Blue's progress cards", -1, progressCount(1))
-            then(play(P.SPY, 1)); then(firstOf(CkActionType.TAKE_PROGRESS))
+            then(play(P.SPY, 1)); then(firstOf(ChivalryActionType.TAKE_PROGRESS))
         }
     }
     add("informer.nobody", P.SPY, "nobody else holds a progress card", playable = false) {
@@ -1188,7 +1191,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             val a = knightSpot(0)!!; knight(0, a); val c = knightSpot(0, setOf(a))!!; knight(0, c)
             howTo = "Your two knights stand unsupplied. Tap Play ${name(P.WARLORD)}."
             expect = "Both knights are supplied (raised) for nothing."
-            change("Your raised knights", +2) { s -> (0 until s.board.vertexCount).count { s.ck!!.knightOwner[it] == 0 && s.ck!!.isActive(it) } }
+            change("Your raised knights", +2) { s -> (0 until s.board.vertexCount).count { s.chivalry!!.knightOwner[it] == 0 && s.chivalry!!.isActive(it) } }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.WARLORD))
         }
@@ -1208,11 +1211,11 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.WEDDING)
             upgrade(buildings(1, Piece.SETTLEMENT).first()); upgrade(buildings(2, Piece.SETTLEMENT).first())
-            howTo = "Blue and Orange have 4 points, you 3. Tap Play ${name(P.WEDDING)}."
-            expect = "Blue and Orange each give you 2 cards of their choice; White (3 points) gives nothing."
+            howTo = "Blue and Purple have 4 points, you 3. Tap Play ${name(P.WEDDING)}."
+            expect = "Blue and Purple each give you 2 cards of their choice; White (3 points) gives nothing."
             change("Your cards", +4) { it.cardCount(0) }
             change("Blue's cards", -2) { it.cardCount(1) }
-            change("Orange's cards", -2) { it.cardCount(2) }
+            change("Purple's cards", -2) { it.cardCount(2) }
             change("White's cards", 0) { it.cardCount(3) }
             then(play(P.WEDDING))
         }

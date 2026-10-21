@@ -20,9 +20,9 @@ class StaleSheetTest {
     @Test
     fun `an Age of Chivalry picker closes when none of its choices is legal any more`() {
         val choices = listOf(Action.monopoly(0), Action.monopoly(1))
-        assertFalse(sheetStillLegal("ck", choices, roll))
-        assertFalse(sheetStillLegal("ck", null, roll))
-        assertTrue(sheetStillLegal("ck", choices, roll + Action.monopoly(1)))
+        assertFalse(sheetStillLegal("chivalry", choices, roll))
+        assertFalse(sheetStillLegal("chivalry", null, roll))
+        assertTrue(sheetStillLegal("chivalry", choices, roll + Action.monopoly(1)))
         assertFalse(sheetStillLegal(null, null, roll))
     }
 }

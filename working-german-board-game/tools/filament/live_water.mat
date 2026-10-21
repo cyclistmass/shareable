@@ -1,0 +1,80 @@
+// Filament adaptation of MinhCreator's Stylized Water for Godot 4.x and
+// Zach Bernal/contributors' Boujie Water Shader. MIT notices: docs/licenses/MIT-water-*.txt.
+// Own coast-distance texture replaces scene-depth reads; ocean art is our own.
+material {
+    name : LiveStylizedSea,
+    shadingModel : unlit,
+    doubleSided : true,
+    parameters : [
+        { type : float, name : time },
+        { type : float, name : waveStrength },
+        { type : float, name : foamStrength },
+        { type : float, name : coastEnabled },
+        { type : float, name : boardSaturation },
+        { type : float, name : boardWarmth },
+        { type : sampler2d, name : ocean },
+        { type : sampler2d, name : coast, shader : all }
+    ]
+}
+vertex {
+    #include "live_water_math.glsl"
+    void materialVertex(inout MaterialVertexInputs material) {
+        float2 p = (getUserWorldFromWorldMatrix() * material.worldPosition).xz;
+        float d = coastDistance(p);
+        float fade = waveFade(d) * materialParams.waveStrength;
+        float3 normal;
+        float3 wave = waterWaves(p, materialParams.time, normal);
+        material.worldPosition.xyz += wave * fade;
+    }
+}
+fragment {
+    #include "live_water_math.glsl"
+    // Adapted from the selected MIT Godot references.
+    float waterFresnel(float amount, float3 normal, float3 view) {
+        return pow(1.0 - clamp(dot(normalize(normal), normalize(view)), 0.0, 1.0), amount);
+    }
+    // The Compose board filter operates in sRGB; match it before returning linear colour.
+    float3 boardColour(float3 linearColour) {
+        float3 c = max(linearColour, float3(0));
+        c = mix(1.055 * pow(c, float3(1.0/2.4)) - .055, c * 12.92, step(c, float3(.0031308)));
+        float grey = dot(c, float3(.299,.587,.114));
+        c = mix(float3(grey), c, materialParams.boardSaturation);
+        c *= float3(1.0 + materialParams.boardWarmth, 1.0, 1.0 - materialParams.boardWarmth);
+        c = clamp(c, 0.0, 1.0);
+        return mix(pow((c + .055) / 1.055, float3(2.4)), c / 12.92, step(c, float3(.04045)));
+    }
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        float2 p = getUserWorldPosition().xz;
+        float t = materialParams.time;
+        float d = coastDistance(p);
+        float3 normal;
+        waterWaves(p, t, normal);
+        normal = normalize(mix(float3(0,1,0), normal, materialParams.waveStrength));
+        // Opposing flows and normal-based refraction of our underwater colour texture.
+        float2 uv = p / 7.0;
+        float2 displacement = normal.xz * .024;
+        float3 n1 = texture(materialParams_ocean, uv + float2(t*.007,t*.004) + displacement).rgb;
+        float3 n2 = texture(materialParams_ocean, uv*1.37 + float2(-t*.004,t*.003) - displacement).rgb;
+        float3 ocean = mix(n1, n2, .25) * .68;
+        // Boujie's Beer-Lambert depth fog, using known coast distance rather than scene depth.
+        float beer = exp(-max(d - .17, 0.0) * .65);
+        float3 shallow = float3(.012,.114,.276);
+        float3 deep = float3(.003,.048,.145);
+        float3 depthColor = mix(deep, shallow, beer);
+        float3 color = mix(ocean, depthColor, .22);
+        float fresnel = waterFresnel(3.0, normal, getWorldViewVector());
+        color = mix(color, float3(.08,.20,.29), fresnel * .22);
+        // Each wave runs in from open water and breaks against the actual rock foot.
+        // A narrow moving crest with broken flecks, never a broad board-shaped halo.
+        float pulse = fract(t / 6.5 + .075*sin(p.x*2.1+p.y*1.7));
+        float front = .17 + .24 * (1.0-pulse);
+        float grain = texture(materialParams_ocean, p*1.7-float2(t*.045,t*.018)).g;
+        float crest = 1.0-smoothstep(.012,.047,abs(d-front+.018*sin(p.x*15.0+p.y*11.0+t)));
+        float contact = (1.0-smoothstep(.01,.055,abs(d-.17))) * (.18+.26*sin(t*1.5+p.x*4.0)*sin(t*1.5+p.x*4.0));
+        float breakup = smoothstep(.10,.28,grain) * smoothstep(.0,.14,pulse) * (1.0-smoothstep(.85,1.0,pulse));
+        float foam = max(contact,crest*breakup*.70) * step(.10,d) * materialParams.coastEnabled * materialParams.foamStrength;
+        color = mix(color, float3(.75,.88,.91), foam);
+        material.baseColor = float4(max(boardColour(color),float3(.001)),1.0);
+    }
+}

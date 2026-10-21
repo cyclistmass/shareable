@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import wgbg.engine.Action
 import wgbg.engine.ActionKind
 import wgbg.engine.ActionType
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 
 /**
  * One entry of the build menu down the right edge (Mauro: "a menu on the right side with the build/activate options,
@@ -24,10 +24,12 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
     HOMESTEAD(ActionType.BUILD_SETTLEMENT, MoveIcon.HOMESTEAD, "Homestead"),
     TOWN(ActionType.BUILD_CITY, MoveIcon.TOWN, "Town"),
     FORTUNE(ActionType.BUY_DEVELOPMENT_CARD, MoveIcon.CARD, "Fortune card", onBoard = false, chivalry = false),
-    KNIGHT(CkActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "New knight", chivalry = true),
-    ROUSE(CkActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply knight", chivalry = true),
-    PROMOTE(CkActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote knight", chivalry = true),
-    RAMPARTS(CkActionType.BUILD_CITY_WALL, MoveIcon.RAMPARTS, "Ramparts", chivalry = true);
+    KNIGHT(ChivalryActionType.BUILD_KNIGHT, MoveIcon.KNIGHT, "New knight", chivalry = true),
+    ROUSE(ChivalryActionType.ACTIVATE_KNIGHT, MoveIcon.ROUSE, "Supply knight", chivalry = true),
+    PROMOTE(ChivalryActionType.PROMOTE_KNIGHT, MoveIcon.PROMOTE, "Promote knight", chivalry = true),
+    /** Picks the knights that can move (a charge too); tap one, then where it goes. */
+    MOVE(ChivalryActionType.MOVE_KNIGHT, MoveIcon.MOVE_KNIGHT, "Move knight", chivalry = true),
+    RAMPARTS(ChivalryActionType.BUILD_CITY_WALL, MoveIcon.RAMPARTS, "Ramparts", chivalry = true);
 
     companion object {
         /** The entries for a ruleset, in menu order. */
@@ -40,10 +42,13 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
  * picked entry so it can be switched off.
  */
 fun shownKinds(chivalry: Boolean, legal: List<Action>, mode: BuildKind?): List<BuildKind> =
-    BuildKind.forRuleset(chivalry).filter { k -> k == mode || legal.any { it.type == k.kind } }
+    BuildKind.forRuleset(chivalry).filter { k -> k == mode || legal.any { k.offers(it) } }
 
 /** The legal moves the board should offer while [mode] is picked (all of them when nothing is). */
-fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { it.type == mode.kind }
+fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { mode.offers(it) }
+
+/** True when [a] is one of this entry's moves: Move knight takes a charge (displacing a knight) too. */
+fun BuildKind.offers(a: Action) = a.type == kind || this == BuildKind.MOVE && a.type in KNIGHT_MOVES
 
 /**
  * The build menu: an icon per entry that can be done now, gold while it filters the board. A board entry
@@ -56,7 +61,7 @@ fun BuildMenu(chivalry: Boolean, legal: List<Action>, mode: BuildKind?, onMode: 
     Row(modifier.testTag("build-menu"), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         for (col in kinds.chunked(4)) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (k in col) {
-                val moves = legal.filter { it.type == k.kind }
+                val moves = legal.filter { k.offers(it) }
                 IconPlateButton(k.icon, k.label, "build-${k.name.lowercase()}", lit = mode == k, enabled = moves.isNotEmpty(), width = 46.dp, height = 40.dp) {
                     if (!k.onBoard) moves.firstOrNull()?.let(onMove) else onMode(if (mode == k) null else k)
                 }

@@ -17,12 +17,12 @@ class FirebaseOffMainTest {
     }
 
     @Test
-    fun `Join, Host and Resume wait for the online transport off the main thread`() {
+    fun `Join, Host, Resume and the friends list wait for the online transport off the main thread`() {
         val main = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
         // transport.value is only read once it's set up, or on a background thread inside withTransport.
         val reads = Regex("""transport\.value""").findAll(main).count()
         assertTrue(reads == 2 && "if (transport.isInitialized()) return then(transport.value)" in main, "transport.value read on the main thread")
-        assertTrue(Regex("""withTransport \{ t ->""").findAll(main).count() == 3, "Join, Host and Resume go through withTransport")
+        assertTrue(Regex("""withTransport \{ t ->""").findAll(main).count() == 6, "Join, Host, Resume and Quick game's Start, star and Forget go through withTransport")
     }
 
     @Test

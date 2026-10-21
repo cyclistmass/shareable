@@ -36,11 +36,12 @@ orphaned() { kill -0 "$PARENT" 2>/dev/null || { echo "USERPLAY $TAG: stopped (th
 # The screen's text. A uiautomator left over from a stopped run blocks new ones ("already registered"): clear it and retry.
 dump() {
   local x
-  for _ in 1 2 3; do
+  for _ in 1 2 3 4 5 6; do
     "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac
     "$ADB" shell pkill -f uiautomator 2>/dev/null; sleep 1
   done
+  echo "uiautomator dump failed 6 times (busy device?)" >&2
 }
 # Centre of the first on-screen text exactly $1 (optionally in $2 = a dump already taken).
 find_text() {
@@ -132,7 +133,13 @@ else
   fi
   # Hosting for a friend: seat 2 becomes a Friend seat.
   [ "$MODE" = host ] && { xy=$(all_text Friend "$(dump)" | head -1); [ -n "$xy" ] || fail "no Friend seat button"; tap $xy; sleep 0.6; }
-  [ "$RULESET" = chivalry ] && { tap_text "Age of Chivalry" || fail "no ruleset button"; }
+  # The Game row can sit below the fold (0.3.4's Colours rows): scroll the Players panel to it, then back to the top.
+  if [ "$RULESET" = chivalry ]; then
+    read -r sw sh < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$sw" -lt "$sh" ] && { t=$sw; sw=$sh; sh=$t; }
+    ok=0; for _ in 1 2 3 4 5 6; do tap_text "Age of Chivalry" && { ok=1; break; }; "$ADB" shell input swipe $((sw / 4)) $((sh * 3 / 4)) $((sw / 4)) $((sh / 3)) 400 </dev/null; sleep 0.6; done
+    [ $ok = 1 ] || fail "no ruleset button"
+    for _ in 1 2 3 4 5 6; do "$ADB" shell input swipe $((sw / 4)) $((sh / 3)) $((sw / 4)) $((sh * 3 / 4)) 300 </dev/null; done
+  fi
   if [ "$MODE" = online ] || [ "$MODE" = host ]; then
     xy=$(find_text "You") || true; [ -n "$xy" ] && { type_into $xy "Tester"; hide_keyboard; }
     tap_text "Host a room" || fail "no Host a room button"
@@ -166,18 +173,18 @@ shot start
 for _ in $(seq 1 120); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
 "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started (still on the start screen?)"
 # Animations off from the menu, like a player can (Mauro: test games skip the animation; it also makes reading the
-# screen fast, since a still screen needs no waiting): Menu, Settings, Play, Animations Off, Hide (it saves as you tap).
-# Settings opens with its groups shut (Fable review T4), so open Play first; only its Off is then on screen.
+# screen fast, since a still screen needs no waiting): Menu, Settings, Scenery, drag Density to 0, Hide (it saves as
+# you go). Settings opens with its groups shut (Fable review T4); Density is the first slider in Scenery. (0.3.4 dropped
+# the Animations switch and, in your own games, the bots' speed button: AI pace, at its fastest by default, is it, #91.)
 if tap_text "Menu"; then
-  tap_desc "Settings" && tap_text "Play" && { tap_text "Off" || echo "USERPLAY $TAG: no Animations Off switch"; }
+  if tap_desc "Settings" && tap_text "Scenery"; then
+    b=$(dump | grep -o 'class="android.widget.SeekBar"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | grep -o '[0-9]*' | tr '
+' ' ')
+    if [ -n "$b" ]; then set -- $b; "$ADB" shell input swipe $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 )) $(( $1 - 40 )) $(( ($2 + $4) / 2 )) 400 </dev/null; sleep 0.5
+      dump | grep -q 'text="Density 0%"' || echo "USERPLAY $TAG: Density didn't go to 0"
+    else echo "USERPLAY $TAG: no Density slider"; fi
+  fi
   tap_text "Hide"
-fi
-# Local games: speed the bots up like a player can (Menu, the gear, This game, tap the speed button up to Max, Hide).
-if [ "$MODE" = local ]; then
-  tap_text "Menu" && tap_desc "Settings" && tap_text "This game" && for _ in 1 2 3 4 5; do
-    lbl=$(dump | grep -o 'text="\(Max\|[0-9]*×\)"' | head -1 | cut -d'"' -f2)
-    [ "$lbl" = "Max" ] && break; [ -n "$lbl" ] && tap_text "$lbl"
-  done; tap_text "Hide"
 fi
 
 start=$(date +%s); moves=0; last=""; prev=""; same=0; tries=0; changed=$(date +%s)
@@ -218,7 +225,7 @@ while true; do
     if tap_desc "$label"; then
       sleep 0.6; xy=${menu_pick#*@}; tap "${xy%,*}" "${xy#*,}"; sleep 0.6; tap "${xy%,*}" "${xy#*,}"
       for _ in $(seq 1 10); do sleep 0.5; after=$("$ADB" logcat -d -s WGBG-TURN:I | tail -1); [ "$after" != "$line" ] && break; done
-      if echo "$after" | grep -q "legal=[^ ]*$mv_"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
+      if echo "$after" | grep -q "legal=[^ ]*\b$mv_\b"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
       else echo "MENUBUILD ok $label $mv_"; MENU_OK=$((${MENU_OK:-0} + 1)); fi
     else echo "MENUBUILD FAIL $label: no $label button in the build menu while $mv_ is legal"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-nobutton-$label"; fi
   elif [ -n "$spots" ] && [ $((RANDOM % 5)) != 0 ]; then
@@ -273,12 +280,12 @@ while true; do
   elif echo "$d" | grep -q 'text="Back"' && echo "$d" | grep -q 'text="Play [^"]*: '; then
     # A card's player picker ("Play Grand Factor: ... Blue / White / Back"): pick one of the named players. The
     # general list below leaves player names out because the scores panel shows them too.
-    who=$(echo "$d" | grep -o 'text="\(Red\|Blue\|Orange\|White\)"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' |
+    who=$(echo "$d" | grep -o 'text="\(Red\|Blue\|Orange\|White\|Yellow\|Purple\|Black\)"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' |
       sed 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]"/\1 \2 \3 \4/' | awk '$1 > 600 {print int(($1+$3)/2), int(($2+$4)/2)}' | shuf -n 1)
     if [ -n "$who" ]; then echo "$(date +%T) player picker" >&2; tap "${who% *}" "${who#* }"; else tap_text "Back" "$d" || true; fi
   else
     # Any other on-screen choice (pickers, victims, Age of Chivalry buttons), else End turn.
-    opts=$(echo "$d" | grep -o 'text="[^"]\+"' | cut -d'"' -f2 | grep -v -x -E 'Menu|Trade|Hide|Exit|Leave|Settings|End turn|Roll|Counter|Offer|You|Blue|Orange|White|Red|Tester|Duo|\(.*\)|Your turn|[0-9/ ]+|.*turn.*|.*Tap .*|.*built.*|.*rolled.*|.*\+[0-9].*|Raiders|Zoom|Tilt|Players|Maritime|Harbour|have [0-9]+|.*offers.*|.*chosen.*|Pause|Play|Slow|Normal|Fast|Max|Watch bots|Fit|Dice.*|v[0-9.]+|Sound|Music.*|Sounds.*|Inventory|Look.*|Card guide|Close' | shuf)
+    opts=$(echo "$d" | grep -o 'text="[^"]\+"' | cut -d'"' -f2 | grep -v -x -E 'Menu|Trade|Hide|Exit|Leave|Settings|End turn|Roll|Counter|Offer|You|Blue|Orange|White|Red|Yellow|Purple|Black|Tester|Duo|\(.*\)|Your turn|[0-9/ ]+|.*turn.*|.*Tap .*|.*built.*|.*rolled.*|.*\+[0-9].*|Raiders|Zoom|Tilt|Players|Maritime|Harbour|have [0-9]+|.*offers.*|.*chosen.*|Pause|Play|Slow|Normal|Fast|Max|Watch bots|Fit|Dice.*|v[0-9.]+|Sound|Music.*|Sounds.*|Inventory|Look.*|Card guide|Close' | shuf)
     # After a few taps that changed nothing, a player ends the turn.
     if [ -n "$opts" ] && [ "$tries" -lt 3 ] && [ $((RANDOM % 3)) != 0 ]; then tap_text "$(echo "$opts" | shuf -n 1)" "$d" || true
     else tap_text "End turn" "$d" || { [ -n "$opts" ] && tap_text "$(echo "$opts" | shuf -n 1)" "$d"; } || true; fi

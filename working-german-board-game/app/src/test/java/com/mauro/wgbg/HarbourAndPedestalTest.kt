@@ -13,7 +13,7 @@ import wgbg.engine.Rules
 class HarbourAndPedestalTest {
     @Test
     fun `every harbour points straight out from the middle of its own coast edge`() {
-        for (seed in 1L..30L) for (config in listOf(GameConfig(), GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS))) {
+        for (seed in 1L..30L) for (config in listOf(GameConfig(), GameConfig(expansion = Expansion.CHIVALRY))) {
             val b = Rules.newGame(config, seed).board
             for (port in b.ports) {
                 val a = liveVertex(b, port.v1); val c = liveVertex(b, port.v2)
@@ -45,8 +45,9 @@ class HarbourAndPedestalTest {
                 assertEquals(p.project((a + c) / 2f + n * PORT_BUOY_OUT).y + drop, h.token.y, 1e-3f)
             }
         }
-        assertEquals(LIVE_SEA, livePlacements(Rules.newGame(GameConfig(), 7L), false, 0).first { it.model == "sea" }.height,
-            "the harbours and the sea model agree on the water's height")
+        // The 3D water (#63) is built at the harbours' sea height and placed unraised.
+        assertEquals(LIVE_SEA, LIVE_WATER_HEIGHT, "the harbours and the water agree on the water's height")
+        assertEquals(0f, livePlacements(Rules.newGame(GameConfig(), 7L), false, 0).single { it.model == "live_water_mesh" }.height)
     }
 
     @Test
@@ -59,15 +60,15 @@ class HarbourAndPedestalTest {
         assertEquals(KNIGHT_BAND_COLOR, liveTint(KNIGHT_BAND, "NumberPlate_PBR", -1))
         assertEquals(PLAYER_COLORS[2], liveTint("default_town", "WoodBody", 2))
         assertNull(liveTint("default_town", "BrassTrim", 2))
-        assertNull(liveTint("number_plate", "NumberPlate_PBR", -1))
+        assertEquals(BrassPlateLook.LIVE_COLOR, liveTint("number_plate", "NumberPlate_PBR", -1)) // option A: the plate is brass
         assertEquals("number_plate", liveModelFile(KNIGHT_RING)); assertEquals("default_town", liveModelFile("default_town"))
     }
 
     @Test
     fun `each knight on the 3D board gets its ring and dark disc underneath`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 3L)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 3L)
         val v = (0 until s.board.vertexCount).first()
-        s.ck!!.knightOwner[v] = 2; s.ck!!.knightLevel[v] = 1
+        s.chivalry!!.knightOwner[v] = 2; s.chivalry!!.knightLevel[v] = 1
         val placed = livePlacements(s, false, 0) { true }.filter { it.position == liveVertex(s.board, v) }
         val ring = placed.single { it.model == KNIGHT_RING }; val band = placed.single { it.model == KNIGHT_BAND }
         val knight = placed.single { "_knight_" in it.model }

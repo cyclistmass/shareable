@@ -86,7 +86,7 @@ fun PlateBox(
 }
 
 /** The drawn icons on the move buttons (Mauro: "buttons not words, with icons on them"). */
-enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUSE, PROMOTE, RAMPARTS, CLOSE }
+enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUSE, PROMOTE, MOVE_KNIGHT, RAMPARTS, CLOSE }
 
 /**
  * A brass plate with an engraved [icon] instead of words; [label] is what a screen reader (and the test scripts)
@@ -137,14 +137,19 @@ fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifi
                         androidx.compose.ui.geometry.CornerRadius(0.08f * w), style = stroke)
                     drawCircle(ink, 0.11f * w, androidx.compose.ui.geometry.Offset(0.5f * w, 0.5f * h))
                 }
-                MoveIcon.KNIGHT, MoveIcon.ROUSE, MoveIcon.PROMOTE -> {
-                    // A shield; Supply adds a pennant, Promote an upward chevron.
+                MoveIcon.KNIGHT, MoveIcon.ROUSE, MoveIcon.PROMOTE, MoveIcon.MOVE_KNIGHT -> {
+                    // A shield; Supply adds a pennant, Promote an upward chevron, Move an arrow across.
                     val shield = androidx.compose.ui.graphics.Path().apply { moveTo(0.18f * w, 0.18f * h); lineTo(0.82f * w, 0.18f * h); lineTo(0.82f * w, 0.5f * h)
                         quadraticTo(0.8f * w, 0.82f * h, 0.5f * w, 0.95f * h); quadraticTo(0.2f * w, 0.82f * h, 0.18f * w, 0.5f * h); close() }
                     drawPath(shield, ink, style = stroke)
                     when (icon) {
                         MoveIcon.ROUSE -> { val f = androidx.compose.ui.graphics.Path().apply { moveTo(0.5f * w, 0.0f); lineTo(0.95f * w, 0.1f * h); lineTo(0.5f * w, 0.2f * h); close() }; drawPath(f, ink) }
                         MoveIcon.PROMOTE -> { val c = androidx.compose.ui.graphics.Path().apply { moveTo(0.32f * w, 0.68f * h); lineTo(0.5f * w, 0.45f * h); lineTo(0.68f * w, 0.68f * h) }; drawPath(c, ink, style = stroke) }
+                        MoveIcon.MOVE_KNIGHT -> {
+                            drawLine(ink, androidx.compose.ui.geometry.Offset(0.3f * w, 0.52f * h), androidx.compose.ui.geometry.Offset(0.7f * w, 0.52f * h), sw)
+                            val head = androidx.compose.ui.graphics.Path().apply { moveTo(0.56f * w, 0.38f * h); lineTo(0.7f * w, 0.52f * h); lineTo(0.56f * w, 0.66f * h) }
+                            drawPath(head, ink, style = stroke)
+                        }
                         else -> drawLine(ink, androidx.compose.ui.geometry.Offset(0.5f * w, 0.32f * h), androidx.compose.ui.geometry.Offset(0.5f * w, 0.78f * h), sw)
                     }
                 }

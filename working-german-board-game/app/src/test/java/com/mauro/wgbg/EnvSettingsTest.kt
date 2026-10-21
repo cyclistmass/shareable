@@ -12,6 +12,17 @@ class EnvSettingsTest {
     }
 
     @Test
+    fun `a broken saved art choice falls back instead of crashing`() {
+        // roundToInt throws on NaN; a damaged settings file read NaN for the theme and the art getter threw on start.
+        for (bad in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            val store = MapStore().apply { map[EnvSettings.THEME] = bad }
+            for (o in ArtObject.entries) store.map[EnvSettings.artKey(o)] = bad
+            assertEquals(ArtSet.DEFAULT, EnvSettings(store).art.theme)
+        }
+        assertEquals(-1, Float.NaN.savedIndex()); assertEquals(2, 1.6f.savedIndex())
+    }
+
+    @Test
     fun `every scenery slider starts at half`() {
         val env = EnvSettings(MapStore())
         for (i in Item.entries) assertEquals(0.5f, env[i])
@@ -78,6 +89,23 @@ class EnvSettingsTest {
         assertEquals(SoundSettings.DEFAULT_MUSIC, sound.musicVolume)
         assertEquals(SoundSettings.DEFAULT_SOUNDS, sound.soundVolume)
         assertEquals(EnvSettings.DEFAULT, EnvSettings(store).clouds, "and the reset is saved")
+    }
+
+    @Test
+    fun `Reset all puts the look back too, and no Animations switch outlives it (#91)`() {
+        val store = MapStore()
+        EnvSettings(store).apply {
+            art = ArtChoice(ArtSet.PIRATE); tiles3d = true; seeThrough = true; bugButton = true; liveBoard = true; density = 0f
+        }
+        val env = EnvSettings(store)
+        assertEquals(false, env.animating, "Density 0 is the one off switch")
+        env.reset()
+        val again = EnvSettings(store)
+        assertEquals(ArtChoice(ArtSet.DEFAULT), again.art)
+        assertEquals(false, again.tiles3d); assertEquals(false, again.seeThrough); assertEquals(false, again.bugButton)
+        assertEquals(false, again.liveBoard); assertEquals(true, again.animating)
+        // An "Animations off" saved by 0.3.3 no longer freezes the scenery with no switch left to undo it.
+        assertEquals(true, EnvSettings(MapStore().apply { map["animations"] = 0f }).animating)
     }
 
     @Test

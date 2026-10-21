@@ -2,7 +2,7 @@ package com.mauro.wgbg
 
 import wgbg.engine.Action
 import wgbg.engine.ActionKind
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 import wgbg.engine.GameState
 import wgbg.engine.Phase
 import wgbg.engine.Progress
@@ -30,9 +30,9 @@ val PROGRESS_HINTS = listOf(
     "Improve a town upgrade (Guilds, Academy or Crown) for one commodity less.",
     "Build Ramparts on one of your towns for free.",
     "Swap the numbers on two tiles (not 2, 12, 6 or 8).",
-    "Take 2 Grain for every field tile next to your homesteads and towns.",
+    "Take 2 Grain for every Grainfield next to your homesteads and towns.",
     "Turn a homestead into a town for 2 Stone and 1 Grain.",
-    "Take 2 Stone for every mountain tile next to your homesteads and towns.",
+    "Take 2 Stone for every Quarry next to your homesteads and towns.",
     "Worth 1 point; played at once.",
     "Build 2 roads for free.",
     "Promote up to 2 of your knights for free.",
@@ -65,7 +65,7 @@ fun cardSpotKind(card: Int): CardSpot? = when (card) {
 }
 
 /** True when every one of [acts] is a progress card played on a board spot (so it's picked on the board, not from a list). */
-fun isBoardCard(acts: List<Action>) = acts.isNotEmpty() && acts.all { it.type == CkActionType.PLAY_PROGRESS && cardSpotKind(it.a) != null }
+fun isBoardCard(acts: List<Action>) = acts.isNotEmpty() && acts.all { it.type == ChivalryActionType.PLAY_PROGRESS && cardSpotKind(it.a) != null }
 
 /**
  * The board spot (corner, edge or tile index) for a board card's choice [a]; the Inventor picks two tiles, the
@@ -82,22 +82,22 @@ fun pickChoices(acts: List<Action>): List<Action> = acts + acts.filter { it.a ==
     .map { Action.playProgress(Progress.INVENTOR, it.c, it.b) }
 
 fun asLegalPick(a: Action): Action =
-    if (a.type == CkActionType.PLAY_PROGRESS && a.a == Progress.INVENTOR && a.b > a.c) Action.playProgress(Progress.INVENTOR, a.c, a.b) else a
+    if (a.type == ChivalryActionType.PLAY_PROGRESS && a.a == Progress.INVENTOR && a.b > a.c) Action.playProgress(Progress.INVENTOR, a.c, a.b) else a
 
 /** The hint for progress card [i], or empty. */
 fun progressHint(i: Int) = PROGRESS_HINTS.getOrElse(i) { "" }
 
-/** C&K actions that are a tap on a board corner, and the corner each one means. */
-val CK_VERTEX_KINDS: Set<ActionKind> = setOf(
-    CkActionType.BUILD_KNIGHT, CkActionType.ACTIVATE_KNIGHT, CkActionType.PROMOTE_KNIGHT, CkActionType.MOVE_KNIGHT,
-    CkActionType.DISPLACE_KNIGHT, CkActionType.CHASE_ROBBER, CkActionType.RELOCATE_KNIGHT, CkActionType.BUILD_CITY_WALL,
-    CkActionType.CHOOSE_VERTEX,
+/** Age of Chivalry actions that are a tap on a board corner, and the corner each one means. */
+val CHIVALRY_VERTEX_KINDS: Set<ActionKind> = setOf(
+    ChivalryActionType.BUILD_KNIGHT, ChivalryActionType.ACTIVATE_KNIGHT, ChivalryActionType.PROMOTE_KNIGHT, ChivalryActionType.MOVE_KNIGHT,
+    ChivalryActionType.DISPLACE_KNIGHT, ChivalryActionType.CHASE_ROBBER, ChivalryActionType.RELOCATE_KNIGHT, ChivalryActionType.BUILD_CITY_WALL,
+    ChivalryActionType.CHOOSE_VERTEX,
 )
 
-/** The corner a C&K board action points at (a move's destination), or -1. */
-fun ckVertex(a: Action): Int = when (a.type) {
-    CkActionType.MOVE_KNIGHT, CkActionType.DISPLACE_KNIGHT -> a.b
-    in CK_VERTEX_KINDS -> a.payload.toInt()
+/** The corner a Age of Chivalry board action points at (a move's destination), or -1. */
+fun chivalryVertex(a: Action): Int = when (a.type) {
+    ChivalryActionType.MOVE_KNIGHT, ChivalryActionType.DISPLACE_KNIGHT -> a.b
+    in CHIVALRY_VERTEX_KINDS -> a.payload.toInt()
     else -> -1
 }
 
@@ -105,30 +105,30 @@ private fun card(i: Int) = ALL_CARD_NAMES.getOrElse(i) { "card $i" }
 private fun progress(i: Int) = PROGRESS_NAMES.getOrElse(i) { "card $i" }
 private fun deck(t: Int) = DECK_NAMES.getOrElse(t) { "deck $t" }
 
-/** A short button / confirm label for a C&K action, in our names; null for non-C&K actions. */
-fun ckLabel(s: GameState, a: Action, names: List<String>): String? = when (a.type) {
-    CkActionType.BUILD_KNIGHT -> "Place a new knight here"
-    CkActionType.ACTIVATE_KNIGHT -> "Supply this knight"
-    CkActionType.PROMOTE_KNIGHT -> "Promote this knight"
-    CkActionType.MOVE_KNIGHT -> "Move the knight here"
-    CkActionType.DISPLACE_KNIGHT -> "Charge and displace the knight here"
-    CkActionType.CHASE_ROBBER -> "Chase the bandit off"
-    CkActionType.RELOCATE_KNIGHT -> "Set your knight down here"
-    CkActionType.BUILD_CITY_WALL -> "Build Ramparts here"
-    CkActionType.CHOOSE_VERTEX -> when (s.phase) {
+/** A short button / confirm label for a Age of Chivalry action, in our names; null for non-Age of Chivalry actions. */
+fun chivalryLabel(s: GameState, a: Action, names: List<String>): String? = when (a.type) {
+    ChivalryActionType.BUILD_KNIGHT -> "Place a new knight here"
+    ChivalryActionType.ACTIVATE_KNIGHT -> "Supply this knight"
+    ChivalryActionType.PROMOTE_KNIGHT -> "Promote this knight"
+    ChivalryActionType.MOVE_KNIGHT -> "Move the knight here"
+    ChivalryActionType.DISPLACE_KNIGHT -> "Charge and displace the knight here"
+    ChivalryActionType.CHASE_ROBBER -> "Chase the bandit off"
+    ChivalryActionType.RELOCATE_KNIGHT -> "Set your knight down here"
+    ChivalryActionType.BUILD_CITY_WALL -> "Build Ramparts here"
+    ChivalryActionType.CHOOSE_VERTEX -> when (s.phase) {
         Phase.BARBARIAN_LOSS -> "Lose this town"
         Phase.DESERTER_REMOVE -> "Remove this knight"
         else -> "Choose this corner"
     }
-    CkActionType.IMPROVE_CITY -> "Improve ${deck(a.a)}" + if (a.b > 0) " (claim the Capital)" else ""
-    CkActionType.PLAY_PROGRESS -> "Play ${progress(a.a)}"
-    CkActionType.DISCARD_PROGRESS -> "Discard ${progress(a.a)}"
-    CkActionType.TAKE_PROGRESS -> "Take ${progress(a.a)}"
-    CkActionType.CHOOSE_CARD -> "Choose ${card(a.a)}"
-    CkActionType.CHOOSE_PROGRESS_DECK -> "Draw from ${deck(a.a)}"
-    CkActionType.COMMERCIAL_HARBOR_OFFER -> "Offer ${card(a.a)} to ${names.getOrElse(a.b) { "player ${a.b}" }}"
-    CkActionType.CK_DONE -> "Done"
-    CkActionType.OFFER_TRADE_CK -> "Offer this trade"
+    ChivalryActionType.IMPROVE_CITY -> "Improve ${deck(a.a)}" + if (a.b > 0) " (claim the Capital)" else ""
+    ChivalryActionType.PLAY_PROGRESS -> "Play ${progress(a.a)}"
+    ChivalryActionType.DISCARD_PROGRESS -> "Discard ${progress(a.a)}"
+    ChivalryActionType.TAKE_PROGRESS -> "Take ${progress(a.a)}"
+    ChivalryActionType.CHOOSE_CARD -> "Choose ${card(a.a)}"
+    ChivalryActionType.CHOOSE_PROGRESS_DECK -> "Draw from ${deck(a.a)}"
+    ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> "Offer ${card(a.a)} to ${names.getOrElse(a.b) { "player ${a.b}" }}"
+    ChivalryActionType.CHIVALRY_DONE -> "Done"
+    ChivalryActionType.OFFER_TRADE_CK -> "Offer this trade"
     else -> null
 }
 
@@ -140,7 +140,7 @@ fun progressOption(s: GameState, a: Action, names: List<String>): String {
         Progress.MASTER_MERCHANT, Progress.DESERTER, Progress.SPY -> names.getOrElse(a.b) { "Player ${a.b + 1}" }
         Progress.CRANE -> {
             // What it costs with the Hoist against without (Mauro, 2026-10-13: Hoist went off before he saw what it did).
-            val next = (s.ck?.level(s.currentPlayer, a.b) ?: 0) + 1
+            val next = (s.chivalry?.level(s.currentPlayer, a.b) ?: 0) + 1
             val what = card(Track.commodity(a.b))
             "Improve ${deck(a.b)} to level $next: ${maxOf(0, next - 1)} $what instead of $next"
         }
@@ -148,10 +148,10 @@ fun progressOption(s: GameState, a: Action, names: List<String>): String {
     }
 }
 
-/** Button groups for the non-board C&K moves: one entry per kind (and per card), each with its actions. */
-fun ckButtonGroups(s: GameState, legal: List<Action>, names: List<String>): List<Pair<String, List<Action>>> {
-    val groups = legal.filter { it.type is CkActionType && it.type !in CK_VERTEX_KINDS && it.type != CkActionType.OFFER_TRADE_CK && offered(s, it) }
-        .groupBy { if (it.type == CkActionType.PLAY_PROGRESS) "Play ${progress(it.a)}" else ckLabel(s, it, names) ?: it.toString() }
+/** Button groups for the non-board Age of Chivalry moves: one entry per kind (and per card), each with its actions. */
+fun chivalryButtonGroups(s: GameState, legal: List<Action>, names: List<String>): List<Pair<String, List<Action>>> {
+    val groups = legal.filter { it.type is ChivalryActionType && it.type !in CHIVALRY_VERTEX_KINDS && it.type != ChivalryActionType.OFFER_TRADE_CK && offered(s, it) }
+        .groupBy { if (it.type == ChivalryActionType.PLAY_PROGRESS) "Play ${progress(it.a)}" else chivalryLabel(s, it, names) ?: it.toString() }
         .map { (label, actions) -> label to actions }
     return groups // bank and player trades go through the trade chest
 }
@@ -159,23 +159,23 @@ fun ckButtonGroups(s: GameState, legal: List<Action>, names: List<String>): List
 /** Label for one bank trade choice (card indices may be commodities). */
 fun bankLabel(a: Action) = "Give ${card(a.maritimeGive)} for ${card(a.maritimeGet)}"
 
-/** The prompt line for a C&K turn, by what the legal moves ask for. */
-fun ckPrompt(s: GameState, legal: List<Action>, names: List<String> = PLAYER_NAMES): String? {
+/** The prompt line for a Age of Chivalry turn, by what the legal moves ask for. */
+fun chivalryPrompt(s: GameState, legal: List<Action>, names: List<String>): String? {
     val kinds = legal.map { it.type }.toSet()
     val by = names.getOrElse(s.currentPlayer) { "Someone" }
     return when {
         // A card played against you: who played what, and what you have to do (Mauro).
         s.phase == Phase.DESERTER_REMOVE -> "$by played Turncoat against you: tap one of your knights to give up"
-        s.phase == Phase.WEDDING -> "$by played Feast against you: give them ${s.ck?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s)"
+        s.phase == Phase.WEDDING -> "$by played Feast against you: give them ${s.chivalry?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s)"
         s.phase == Phase.COMMERCIAL_HARBOR_RESPOND -> "$by played Harbour Charter: give back one commodity for the card you got"
         s.phase == Phase.BARBARIAN_LOSS -> "The Raiders won: tap one of your towns to lose to them"
-        s.phase == Phase.SPY -> "Spy: take one of ${names.getOrElse(s.ck?.pendingTarget ?: -1) { "their" }}'s progress cards"
+        s.phase == Phase.SPY -> "Informer: take one of ${names.getOrElse(s.chivalry?.pendingTarget ?: -1) { "their" }}'s progress cards"
         s.phase == Phase.COMMERCIAL_HARBOR -> "Harbour Charter: give each player a resource for a commodity, or Done"
-        CkActionType.CHOOSE_PROGRESS_DECK in kinds -> "Raiders beaten: draw a progress card from a deck"
-        CkActionType.DISCARD_PROGRESS in kinds -> "Too many progress cards: discard one"
-        CkActionType.CHOOSE_CARD in kinds -> "Choose a card"
-        CkActionType.RELOCATE_KNIGHT in kinds -> "Tap a glowing corner to set your knight down"
-        CkActionType.CHOOSE_VERTEX in kinds -> "Tap a glowing corner"
+        ChivalryActionType.CHOOSE_PROGRESS_DECK in kinds -> "Raiders beaten: draw a progress card from a deck"
+        ChivalryActionType.DISCARD_PROGRESS in kinds -> "Too many progress cards: discard one"
+        ChivalryActionType.CHOOSE_CARD in kinds -> "Choose a card"
+        ChivalryActionType.RELOCATE_KNIGHT in kinds -> "Tap a glowing corner to set your knight down"
+        ChivalryActionType.CHOOSE_VERTEX in kinds -> "Tap a glowing corner"
         else -> null
     }
 }
@@ -186,9 +186,9 @@ fun ckPrompt(s: GameState, legal: List<Action>, names: List<String> = PLAYER_NAM
  * isn't on a town of yours, or no improvement can be paid for now.
  */
 fun townMovesAt(s: GameState, legal: List<Action>, p: androidx.compose.ui.geometry.Offset, me: Int): List<Action> {
-    if (me < 0 || legal.none { it.type == CkActionType.IMPROVE_CITY }) return emptyList()
+    if (me < 0 || legal.none { it.type == ChivalryActionType.IMPROVE_CITY }) return emptyList()
     val town = townAt(s, p, me) ?: return emptyList()
-    return legal.filter { it.type == CkActionType.IMPROVE_CITY && (it.b == 0 || it.b - 1 == town) }.sortedBy { it.a }
+    return legal.filter { it.type == ChivalryActionType.IMPROVE_CITY && (it.b == 0 || it.b - 1 == town) }.sortedBy { it.a }
 }
 
 /** The town of [me]'s within a finger's reach of lattice point [p], nearest first, or null. */
@@ -214,8 +214,37 @@ fun tapMoves(s: GameState, boardLegal: List<Action>, legal: List<Action>, p: and
     else if (kotlin.math.hypot(boardPos.x - p.x, boardPos.y - p.y) < kotlin.math.hypot(townPos.x - p.x, townPos.y - p.y)) board else town
 }
 
+/**
+ * Moves that carry a knight to another corner. They light up only once the player picks that knight (0.3.4, Mauro: with
+ * a knight that could move, every corner lit up as a move target and it wasn't clear what for).
+ */
+val KNIGHT_MOVES: Set<ActionKind> = setOf(ChivalryActionType.MOVE_KNIGHT, ChivalryActionType.DISPLACE_KNIGHT)
+
+/** The corners of the knights in [legal] that can move now. */
+fun movableKnights(legal: List<Action>): Set<Int> = legal.filter { it.type in KNIGHT_MOVES }.map { it.a }.toSet()
+
+/** [boardLegal] as the board offers it while knight [picked] is chosen (null: none): only that knight's moves. */
+fun withKnightPick(boardLegal: List<Action>, picked: Int?): List<Action> = boardLegal.filter { it.type !in KNIGHT_MOVES || it.a == picked }
+
+/**
+ * The knight a tap at lattice point [p] picks or lets go of: a movable knight within reach, unless another move is
+ * offered right there (Supply or Promote on that knight come first; the build menu's Move knight offers only moves).
+ * Returns the new pick, null to let go, or [picked] unchanged when the tap isn't on a movable knight.
+ */
+fun knightPickAt(s: GameState, boardLegal: List<Action>, p: androidx.compose.ui.geometry.Offset, picked: Int?): Int? {
+    fun d(v: Int) = vertexLattice(s.board, v).let { kotlin.math.hypot(it.x - p.x, it.y - p.y) }
+    val knight = movableKnights(boardLegal).filter { d(it) < TAP_RADIUS }.minByOrNull { d(it) } ?: return picked
+    if (boardLegal.any { it.type !in KNIGHT_MOVES && it.type in CHIVALRY_VERTEX_KINDS && chivalryVertex(it) == knight }) return picked
+    return if (picked == knight) null else knight
+}
+
+/** The board's glowing spots with knight [picked] chosen: its targets, or with none picked, each knight that can move. */
+fun knightTargets(boardLegal: List<Action>, picked: Int?): Targets = Targets.of(withKnightPick(boardLegal, picked)).let {
+    if (picked != null) it else Targets(it.vertices + movableKnights(boardLegal), it.edges, it.hexes)
+}
+
 /** Track of the improvement an IMPROVE_CITY action raises (for colouring its button). */
-fun improveTrack(a: Action) = if (a.type == CkActionType.IMPROVE_CITY) a.a else -1
+fun improveTrack(a: Action) = if (a.type == ChivalryActionType.IMPROVE_CITY) a.a else -1
 
 @Suppress("unused")
 private val TRACK_ORDER_CHECK = listOf(Track.TRADE, Track.POLITICS, Track.SCIENCE) // DECK_NAMES follows this order
@@ -224,9 +253,9 @@ private val TRACK_ORDER_CHECK = listOf(Track.TRADE, Track.POLITICS, Track.SCIENC
  * A progress card aimed at something (a track, a player) shows its picker even when there's only one choice, so you
  * see what it will do before it's spent (Mauro, 2026-10-13: one tap on "Play Hoist" improved Guilds at once).
  */
-fun asksFirst(a: Action) = a.type == CkActionType.PLAY_PROGRESS &&
+fun asksFirst(a: Action) = a.type == ChivalryActionType.PLAY_PROGRESS &&
     a.a in intArrayOf(Progress.CRANE, Progress.MASTER_MERCHANT, Progress.DESERTER, Progress.SPY)
 
 /** A legal move worth offering: a progress card only when it would do something (the engine still accepts the rest). */
 fun offered(s: GameState, a: Action) =
-    a.type != CkActionType.PLAY_PROGRESS || wgbg.engine.CitiesAndKnights.progressHasEffect(s, s.currentPlayer, a.a)
+    a.type != ChivalryActionType.PLAY_PROGRESS || wgbg.engine.Chivalry.progressHasEffect(s, s.currentPlayer, a.a)

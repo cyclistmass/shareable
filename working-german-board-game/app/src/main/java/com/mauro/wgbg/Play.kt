@@ -12,7 +12,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -35,6 +38,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import wgbg.engine.Action
@@ -64,7 +68,7 @@ class Targets(val vertices: Set<Int>, val edges: Set<Int>, val hexes: Set<Int>) 
 
         fun of(legal: List<Action>) = Targets(
             vertices = legal.filter { it.type == ActionType.BUILD_SETTLEMENT || it.type == ActionType.BUILD_CITY }.map { it.payload.toInt() }.toSet() +
-                legal.filter { it.type in CK_VERTEX_KINDS }.map { ckVertex(it) }.filter { it >= 0 },
+                legal.filter { it.type in CHIVALRY_VERTEX_KINDS }.map { chivalryVertex(it) }.filter { it >= 0 },
             edges = legal.filter { it.type == ActionType.BUILD_ROAD }.map { it.payload.toInt() }.toSet(),
             hexes = legal.filter { it.type == ActionType.MOVE_ROBBER }.map { it.robberHex }.toSet(),
         )
@@ -85,14 +89,14 @@ fun hexLattice(b: Board, h: Int) = b.topology.hexVertices[h].map { vertexLattice
  */
 /** Where on the board (lattice units) a player taps for move [a], or null for moves that aren't board taps. */
 fun spotOf(b: Board, a: Action, second: Boolean = false): Offset? = when (a.type) {
-    wgbg.engine.CkActionType.PLAY_PROGRESS -> cardSpotKind(a.a)?.let { k ->
+    wgbg.engine.ChivalryActionType.PLAY_PROGRESS -> cardSpotKind(a.a)?.let { k ->
         val i = cardSpotIndex(a, second)
         when (k) { CardSpot.VERTEX -> vertexLattice(b, i); CardSpot.EDGE -> edgeLattice(b, i); CardSpot.HEX -> hexLattice(b, i) }
     }
     ActionType.BUILD_SETTLEMENT, ActionType.BUILD_CITY -> vertexLattice(b, a.payload.toInt())
     ActionType.BUILD_ROAD -> edgeLattice(b, a.payload.toInt())
     ActionType.MOVE_ROBBER -> hexLattice(b, a.robberHex)
-    in CK_VERTEX_KINDS -> ckVertex(a).takeIf { it >= 0 }?.let { vertexLattice(b, it) }
+    in CHIVALRY_VERTEX_KINDS -> chivalryVertex(a).takeIf { it >= 0 }?.let { vertexLattice(b, it) }
     else -> null
 }
 
@@ -104,7 +108,7 @@ fun movesAt(b: Board, legal: List<Action>, p: Offset, second: Boolean = false): 
     var bestD = TAP_RADIUS
     for (a in legal) {
         val at = spotOf(b, a, second) ?: continue
-        val tile = a.type == ActionType.MOVE_ROBBER || (a.type == wgbg.engine.CkActionType.PLAY_PROGRESS && cardSpotKind(a.a) == CardSpot.HEX)
+        val tile = a.type == ActionType.MOVE_ROBBER || (a.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && cardSpotKind(a.a) == CardSpot.HEX)
         val d = hypot(at.x - p.x, at.y - p.y) * if (tile) 0.5f else 1f // tiles are big targets
         if (d < bestD - 1e-4f) { bestD = d; best = listOf(a) }
         else if (kotlin.math.abs(d - bestD) < 1e-4f) best = best + a
@@ -130,7 +134,7 @@ private val INK_LIGHT = Color(0xFFEDE6D8)
 
 /** One-line instruction for what the human should do now. */
 fun prompt(s: GameState, legal: List<Action>, names: List<String>): String =
-    if (legal.isEmpty() && !s.isOver) "Waiting for ${names[s.actingPlayer]}…" else ckPrompt(s, legal, names) ?: when {
+    if (legal.isEmpty() && !s.isOver) "Waiting for ${names[s.actingPlayer]}…" else chivalryPrompt(s, legal, names) ?: when {
     // Age of Chivalry: the second piece placed is a town, straight onto an empty corner.
     s.phase == Phase.BUILD_INITIAL_SETTLEMENT -> "Tap a glowing corner to place a ${if (legal.any { it.type == ActionType.BUILD_CITY }) "town" else "homestead"}"
     s.phase == Phase.BUILD_INITIAL_ROAD -> "Tap a glowing edge to place a road"
@@ -150,7 +154,7 @@ fun prompt(s: GameState, legal: List<Action>, names: List<String>): String =
     s.freeRoads > 0 -> "Place ${if (s.freeRoads > 1) "${s.freeRoads} free roads" else "your free road"} first: tap a glowing edge"
     legal.any { it.type == ActionType.BUILD_ROAD || it.type == ActionType.BUILD_SETTLEMENT || it.type == ActionType.BUILD_CITY } ->
         "Tap a glowing spot to build, or trade, or end your turn"
-    else -> if (s.ck != null) "Trade, improve your towns, or end your turn" else "Trade, buy a Fortune card, or end your turn"
+    else -> if (s.chivalry != null) "Trade, improve your towns, or end your turn" else "Trade, buy a Fortune card, or end your turn"
 }
 
 private fun cards(n: (Int) -> Int) = (0 until CARD_TYPES).filter { n(it) > 0 }.joinToString(", ") { "${n(it)} ${RES[it]}" }.ifEmpty { "nothing" }
@@ -200,11 +204,11 @@ fun HumanControls(
         }
         onFortuneDone()
     }
-    var ckChoices by remember { mutableStateOf<Pair<String, List<Action>>?>(null) }
+    var chivalryChoices by remember { mutableStateOf<Pair<String, List<Action>>?>(null) }
     val types = legal.map { it.type }.toSet()
     // A picker left open after its moves stopped being legal (a new turn, a bot's move, a resumed game) hid the
     // Roll button under a prompt that said roll (#105). Drop any sheet that has nothing left to pick.
-    if (sheet != null && !sheetStillLegal(sheet, ckChoices?.second, legal)) sheet = null
+    if (sheet != null && !sheetStillLegal(sheet, chivalryChoices?.second, legal)) sheet = null
     // The buttons in a column hugging the right edge with the main one (Roll / End turn) at the very bottom, within
     // reach of a right thumb. Every card sheet (pick, give, discard, name a card) sits in one place: bottom centre,
     // the lower third of the screen, like the trade chest (Mauro: "same card puller/giver ... for thumb reach").
@@ -221,11 +225,11 @@ fun HumanControls(
                     .map { a -> (RES[a.yopFirst] + if (a.yopSecond >= 0) " + ${RES[a.yopSecond]}" else "") to a }, onMove) { sheet = null }
                 "mono" -> Picker("Corner the Market: everyone hands you all of the one you name:", legal.filter { it.type == ActionType.PLAY_MONOPOLY }
                     .map { a -> RES[a.payload.toInt()] to a }, onMove) { sheet = null }
-                "ck" -> ckChoices?.let { (label, acts) ->
+                "chivalry" -> chivalryChoices?.let { (label, acts) ->
                     // The Transmuter picks two dice: show two rows of dice, not 36 "1 / 5" buttons (Mauro, 2026-10-12).
                     if (isAlchemist(acts)) { DicePicker(label, acts, onMove) { sheet = null }; return@let }
-                    val hint = acts.firstOrNull { it.type == wgbg.engine.CkActionType.PLAY_PROGRESS }?.let { progressHint(it.a) }
-                    Picker(if (hint.isNullOrEmpty()) label else "$label: $hint", acts.map { a -> (if (a.type == wgbg.engine.CkActionType.PLAY_PROGRESS) progressOption(s, a, names) else if (a.type == ActionType.MARITIME_TRADE) bankLabel(a) else ckLabel(s, a, names) ?: a.toString()) to a }, onMove) { sheet = null }
+                    val hint = acts.firstOrNull { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS }?.let { progressHint(it.a) }
+                    Picker(if (hint.isNullOrEmpty()) label else "$label: $hint", acts.map { a -> (if (a.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS) progressOption(s, a, names) else if (a.type == ActionType.MARITIME_TRADE) bankLabel(a) else chivalryLabel(s, a, names) ?: a.toString()) to a }, onMove) { sheet = null }
                 }
             }
         }
@@ -233,11 +237,11 @@ fun HumanControls(
         // on buttons that moved as card types ran out, lost the wrong card with no undo).
         if (ActionType.DISCARD in types) { Box(Modifier.align(Alignment.BottomCenter)) { DiscardSheet(s, me, legal, onMove, discardCause) }; return@Box }
         cardPick(s, legal, names)?.let { pick -> CardPickSheet(s, me, pick, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box }
-        if (wgbg.engine.CkActionType.CHOOSE_CARD in types) {
-            CardChoiceSheet(s, me, legal.filter { it.type == wgbg.engine.CkActionType.CHOOSE_CARD }, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box
+        if (wgbg.engine.ChivalryActionType.CHOOSE_CARD in types) {
+            CardChoiceSheet(s, me, legal.filter { it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD }, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box
         }
         val buttonTypes = setOf(ActionType.ROLL, ActionType.END_TURN, ActionType.BUY_DEVELOPMENT_CARD)
-        if (sheet == null && (types.any { it in buttonTypes } || ckButtonGroups(s, legal, names).isNotEmpty() || tradeButton != null)) Column(
+        if (sheet == null && (types.any { it in buttonTypes } || chivalryButtonGroups(s, legal, names).isNotEmpty() || tradeButton != null)) Column(
             Modifier.align(Alignment.BottomEnd).width(176.dp).testTag("thumb-buttons"),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -248,16 +252,16 @@ fun HumanControls(
             // Buying a Fortune card lives in the build menu on the right edge now.
             // Fortune cards are played from the hand row (tap the card).
             // Age of Chivalry moves that aren't board taps: one button per kind (or card), a picker if it has choices.
-            for ((label, acts) in ckButtonGroups(s, legal, names)) {
+            for ((label, acts) in chivalryButtonGroups(s, legal, names)) {
                 if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
                 else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
-                else MoveButton("$label…") { ckChoices = label to acts; sheet = "ck" }
+                else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
             }
             // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
-                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp) { onMove(a) } }
-                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn") { onMove(a) } }
+                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp, onClick = moveTap { onMove(a) }) }
+                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn", onClick = moveTap { onMove(a) }) }
             }
         }
     }
@@ -283,11 +287,13 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
     val owed = s.discardOwed[me]
     var pile by remember(s.turn, owed) { mutableStateOf(IntArray(tradeCards(s))) }
     val full = pile.sum() == owed
-    Row(Modifier.chest().testTag("discard-sheet"), verticalAlignment = Alignment.CenterVertically) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(Modifier.chest().testTag("discard-sheet").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
+        // Weighted, so the buttons are measured first and always on screen; the cards shrink, then scroll, to fit what's
+        // left (0.3.4: 8 cards at font 1.3 on a 640 dp phone covered Discard, and a player who had to discard was stuck).
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${cause ?: "A 7: you hold too many cards"}. Choose $owed to discard (${pile.sum()} chosen)", color = CHEST_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Text("Tap a card to add it · hold to take it back", color = CHEST_INK.copy(alpha = 0.7f), fontSize = 11.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ChestCardRow(pile.indices.count { holding(s, me, it) > 0 }, 42.dp) { w ->
                 for (r in pile.indices) {
                     val have = holding(s, me, r)
                     if (have == 0) continue
@@ -295,7 +301,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                         // Today's pile and counts, whatever the handler first saw (the #122 stale-tap pattern).
                         val pick by androidx.compose.runtime.rememberUpdatedState({ add: Boolean -> pile = discardPick(pile, r, add, have, owed) })
                         Box(
-                            Modifier.size(width = 42.dp, height = 60.dp)
+                            Modifier.size(width = w, height = w * (60f / 42f))
                                 .pointerInput(r) {
                                     detectTapGestures(onTap = { pick(true) }, onLongPress = { pick(false) })
                                 }.testTag("discard-card-$r"),
@@ -305,7 +311,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                             if (pile[r] > 0) Text("−${pile[r]}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
                         }
-                        Text("have $have", color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        UnderCard("have $have", w, CHEST_INK)
                     }
                 }
             }
@@ -323,12 +329,13 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
 @Composable
 private fun MoveButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
     // Primary (Roll / End turn): a big brass plate; the rest: wood with a brass rim.
-    if (primary) BrassButton(label, "move-$label", Modifier.fillMaxWidth().height(54.dp), size = 18.sp, onClick = onClick)
-    else WoodButton(label, "move-$label", Modifier.fillMaxWidth(), onClick = onClick)
+    // Behind the move guard: a double tap never sends a second move (or hits the button that took this one's place).
+    if (primary) BrassButton(label, "move-$label", Modifier.fillMaxWidth().height(54.dp), size = 18.sp, onClick = moveTap(onClick))
+    else WoodButton(label, "move-$label", Modifier.fillMaxWidth(), onClick = moveTap(onClick))
 }
 
 /** True when [acts] are the Transmuter's (Alchemist's) dice choices. */
-internal fun isAlchemist(acts: List<Action>) = acts.isNotEmpty() && acts.all { it.type == wgbg.engine.CkActionType.PLAY_PROGRESS && it.a == wgbg.engine.Progress.ALCHEMIST }
+internal fun isAlchemist(acts: List<Action>) = acts.isNotEmpty() && acts.all { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && it.a == wgbg.engine.Progress.ALCHEMIST }
 
 /** The Transmuter's choice: tap a face on the red die and on the ivory die, then set them. */
 @Composable
@@ -347,21 +354,22 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
     val chosen = acts.firstOrNull { it.b == red && it.c == ivory }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         ChestButton("Back", CHEST_NO, "pick-back") { close() }
-        GoButton(if (chosen != null) "Set the dice: ${red + ivory}" else "Pick both dice", "dice-set", chosen != null, Modifier.height(44.dp)) {
-            chosen?.let { close(); onMove(it) }
-        }
+        GoButton(if (chosen != null) "Set the dice: ${red + ivory}" else "Pick both dice", "dice-set", chosen != null, Modifier.height(44.dp),
+            onClick = moveTap { chosen?.let { close(); onMove(it) } })
     }
 }
 
 @Composable
-private fun Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, close: () -> Unit) {
+private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, close: () -> Unit) {
     Text(title, color = INK_LIGHT, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    // Choices that are cards show the card art, as in the trade chest; the rest stay worded buttons.
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Choices that are cards show the card art, as in the trade chest; the rest stay worded buttons. Weighted and
+    // scrolling, so Back stays on screen however many rows they wrap to (0.3.4: Windfall's 15 pairs on a 320 dp screen).
+    FlowRow(Modifier.weight(1f, fill = false).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((label, a) in options) {
             val cards = optionCards(a)
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { close(); onMove(a) }.testTag("pick-$label")) {
+                modifier = Modifier.clickable(onClick = moveTap { close(); onMove(a) }).testTag("pick-$label")) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
                     for (c in cards) Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
                 }
@@ -376,7 +384,7 @@ private fun Picker(title: String, options: List<Pair<String, Action>>, onMove: (
 internal fun optionCards(a: Action): List<Int>? = when (a.type) {
     ActionType.PLAY_YEAR_OF_PLENTY -> listOfNotNull(a.yopFirst, a.yopSecond.takeIf { it >= 0 })
     ActionType.PLAY_MONOPOLY -> listOf(a.payload.toInt())
-    wgbg.engine.CkActionType.PLAY_PROGRESS -> when (a.a) {
+    wgbg.engine.ChivalryActionType.PLAY_PROGRESS -> when (a.a) {
         wgbg.engine.Progress.RESOURCE_MONOPOLY, wgbg.engine.Progress.TRADE_MONOPOLY, wgbg.engine.Progress.MERCHANT_FLEET -> listOf(a.b)
         else -> null
     }
@@ -393,19 +401,19 @@ internal data class CardPick(val title: String, val options: List<Action>, val d
  * and the science bonus are CHOOSE_CARD, already drawn by [CardChoiceSheet].
  */
 internal fun cardPick(s: GameState, legal: List<Action>, names: List<String>): CardPick? {
-    val ck = s.ck ?: return null
+    val chivalry = s.chivalry ?: return null
     val kinds = legal.map { it.type }.toSet()
     fun of(t: wgbg.engine.ActionKind) = legal.filter { it.type == t }
     return when {
-        wgbg.engine.CkActionType.TAKE_PROGRESS in kinds ->
-            CardPick("Spy: take one of ${names.getOrElse(ck.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.CkActionType.TAKE_PROGRESS))
-        wgbg.engine.CkActionType.DISCARD_PROGRESS in kinds ->
-            CardPick("Too many progress cards: discard one", of(wgbg.engine.CkActionType.DISCARD_PROGRESS))
-        wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK in kinds ->
-            CardPick("Raiders beaten: draw a progress card from a deck", of(wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK))
-        wgbg.engine.CkActionType.COMMERCIAL_HARBOR_OFFER in kinds ->
+        wgbg.engine.ChivalryActionType.TAKE_PROGRESS in kinds ->
+            CardPick("Informer: take one of ${names.getOrElse(chivalry.pendingTarget) { "their" }}'s progress cards", of(wgbg.engine.ChivalryActionType.TAKE_PROGRESS))
+        wgbg.engine.ChivalryActionType.DISCARD_PROGRESS in kinds ->
+            CardPick("Too many progress cards: discard one", of(wgbg.engine.ChivalryActionType.DISCARD_PROGRESS))
+        wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK in kinds ->
+            CardPick("Raiders beaten: draw a progress card from a deck", of(wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK))
+        wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER in kinds ->
             CardPick("Harbour Charter: give a player one of your resources; they give you a commodity back",
-                of(wgbg.engine.CkActionType.COMMERCIAL_HARBOR_OFFER), legal.firstOrNull { it == Action.CK_DONE })
+                of(wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER), legal.firstOrNull { it == Action.CHIVALRY_DONE })
         else -> null
     }
 }
@@ -413,33 +421,39 @@ internal fun cardPick(s: GameState, legal: List<Action>, names: List<String>): C
 /** [pick] as cards to tap, in the chest at the bottom centre like every other card sheet (#123). */
 @Composable
 internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<String>, onMove: (Action) -> Unit, modifier: Modifier = Modifier) {
-    val ck = s.ck ?: return
+    val chivalry = s.chivalry ?: return
     Column(modifier.chest().testTag("card-pick-sheet"), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(pick.title, color = CHEST_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         // Harbour Charter: a row of your resources for each player you can still offer one to.
-        val rows = if (pick.options.all { it.type == wgbg.engine.CkActionType.COMMERCIAL_HARBOR_OFFER }) pick.options.groupBy { it.b }
+        val rows = if (pick.options.all { it.type == wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER }) pick.options.groupBy { it.b }
             else mapOf(-1 to pick.options)
-        for ((who, acts) in rows) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (who >= 0) Text("To ${names.getOrElse(who) { "player ${who + 1}" }}", color = CHEST_INK, fontSize = 12.sp,
-                fontWeight = FontWeight.Bold, modifier = Modifier.width(76.dp))
-            for (a in acts) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onMove(a) }.testTag("pick-card-${a.a}-${a.b}")) {
-                when (a.type) {
-                    wgbg.engine.CkActionType.TAKE_PROGRESS, wgbg.engine.CkActionType.DISCARD_PROGRESS ->
-                        ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
-                            progressArt(a.a), progressHint(a.a), w = 64, h = 90)
-                    wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK ->
-                        ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], ALL_CARD_ART[wgbg.engine.Track.commodity(a.a)],
-                            "${ck.deckSize[a.a]} left", w = 64, h = 90)
-                    else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+        // The rows scroll (down, and each one sideways) and Done stays on screen below them (0.3.4: three Harbour
+        // Charter rows ran past a 320 dp screen, taking Done with them).
+        Column(Modifier.weight(1f, fill = false).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((who, acts) in rows) Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (who >= 0) Text("To ${names.getOrElse(who) { "player ${who + 1}" }}", color = CHEST_INK, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.width(76.dp))
+                for (a in acts) Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable(onClick = moveTap { onMove(a) }).testTag("pick-card-${a.a}-${a.b}")) {
+                    when (a.type) {
+                        wgbg.engine.ChivalryActionType.TAKE_PROGRESS, wgbg.engine.ChivalryActionType.DISCARD_PROGRESS ->
+                            ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
+                                progressArt(a.a), progressHint(a.a), w = 64, h = 90)
+                        wgbg.engine.ChivalryActionType.CHOOSE_PROGRESS_DECK ->
+                            ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], deckArt(a.a),
+                                "${chivalry.deckSize[a.a]} left", w = 64, h = 90)
+                        else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
+                    }
+                    val under = when (a.type) {
+                        wgbg.engine.ChivalryActionType.DISCARD_PROGRESS -> "have ${chivalry.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
+                        wgbg.engine.ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> "have ${s.hand(me, a.a)}"
+                        else -> null
+                    }
+                    under?.let { Text(it, color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
                 }
-                val under = when (a.type) {
-                    wgbg.engine.CkActionType.DISCARD_PROGRESS -> "have ${ck.progressHand[me * wgbg.engine.Progress.COUNT + a.a]}"
-                    wgbg.engine.CkActionType.COMMERCIAL_HARBOR_OFFER -> "have ${s.hand(me, a.a)}"
-                    else -> null
-                }
-                under?.let { Text(it, color = CHEST_INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false) }
             }
         }
         pick.done?.let { d -> ChestButton("Done", CHEST_NO, "pick-done") { onMove(d) } }
@@ -454,13 +468,13 @@ fun confirmTitle(s: GameState, a: Action): String = when (a.type) {
     ActionType.BUILD_CITY -> if (s.phase == Phase.BUILD_INITIAL_SETTLEMENT) "Place your town here?" else "Upgrade this homestead to a town?"
     ActionType.BUILD_ROAD -> if (s.phase == Phase.BUILD_INITIAL_ROAD || s.freeRoads > 0) "Place a free road here?" else "Build a road here?"
     ActionType.MOVE_ROBBER -> "Move the bandit here?"
-    wgbg.engine.CkActionType.PLAY_PROGRESS -> "Play ${PROGRESS_NAMES.getOrElse(a.a) { "this card" }} here?"
-    wgbg.engine.CkActionType.CHOOSE_VERTEX -> when (s.phase) {
+    wgbg.engine.ChivalryActionType.PLAY_PROGRESS -> "Play ${PROGRESS_NAMES.getOrElse(a.a) { "this card" }} here?"
+    wgbg.engine.ChivalryActionType.CHOOSE_VERTEX -> when (s.phase) {
         Phase.BARBARIAN_LOSS -> "The Raiders won: lose this town to them?"
         Phase.DESERTER_REMOVE -> "Turncoat: remove this knight of yours?"
         else -> "Choose what to do here"
     }
-    wgbg.engine.CkActionType.IMPROVE_CITY -> "Improve your towns?"
+    wgbg.engine.ChivalryActionType.IMPROVE_CITY -> "Improve your towns?"
     else -> "Choose what to do here"
 }
 
@@ -476,10 +490,10 @@ fun edgeGlowSpan(pieceAt0: Boolean, pieceAt1: Boolean): Pair<Float, Float> =
 const val EDGE_GLOW_CLEAR = 0.42f
 
 /** Whether a homestead, town or knight stands on corner [v]. */
-fun pieceAt(s: GameState, v: Int): Boolean = s.vertexOwner[v] >= 0 || (s.ck?.knightOwner?.get(v) ?: -1) >= 0
+fun pieceAt(s: GameState, v: Int): Boolean = s.vertexOwner[v] >= 0 || (s.chivalry?.knightOwner?.get(v) ?: -1) >= 0
 
 /** An Age of Chivalry knight stands on corner [v]. */
-fun knightAt(s: GameState, v: Int): Boolean = (s.ck?.knightOwner?.get(v) ?: -1) >= 0
+fun knightAt(s: GameState, v: Int): Boolean = (s.chivalry?.knightOwner?.get(v) ?: -1) >= 0
 
 /** The first homesteads and roads are being placed: no dice, no trading yet. */
 fun inSetup(s: GameState): Boolean = s.phase == Phase.BUILD_INITIAL_SETTLEMENT || s.phase == Phase.BUILD_INITIAL_ROAD
@@ -504,7 +518,7 @@ fun confirmWarning(s: GameState, me: Int, a: Action): String? {
 
 /** Button text for one confirming choice. */
 fun confirmLabel(s: GameState, a: Action, names: List<String>): String =
-    ckLabel(s, a, names) ?: if (a.type != ActionType.MOVE_ROBBER) "Confirm"
+    chivalryLabel(s, a, names) ?: if (a.type != ActionType.MOVE_ROBBER) "Confirm"
     else if (a.robberVictim < 0) "Move it (nobody to rob)"
     else "Rob ${names[a.robberVictim]} (${s.cardCount(a.robberVictim)} cards)"
 
@@ -518,15 +532,15 @@ internal data class SpotChoice(val action: Action, val icon: MoveIcon?, val name
 internal fun spotChoices(s: GameState, chosen: List<Action>, names: List<String>): List<SpotChoice> = chosen.map { a ->
     val kind = BuildKind.entries.firstOrNull { it.kind == a.type }
     val free = inSetup(s) || (a.type == ActionType.BUILD_ROAD && s.freeRoads > 0) ||
-        (a.type == wgbg.engine.CkActionType.PROMOTE_KNIGHT && (s.ck?.freePromotions ?: 0) > 0)
+        (a.type == wgbg.engine.ChivalryActionType.PROMOTE_KNIGHT && (s.chivalry?.freePromotions ?: 0) > 0)
     val cost = if (free) null else when (a.type) {
         ActionType.BUILD_ROAD -> wgbg.engine.Cost.ROAD
         ActionType.BUILD_SETTLEMENT -> wgbg.engine.Cost.SETTLEMENT
         ActionType.BUILD_CITY -> wgbg.engine.Cost.CITY
-        wgbg.engine.CkActionType.BUILD_KNIGHT -> wgbg.engine.CkCost.KNIGHT
-        wgbg.engine.CkActionType.PROMOTE_KNIGHT -> wgbg.engine.CkCost.PROMOTE
-        wgbg.engine.CkActionType.ACTIVATE_KNIGHT -> wgbg.engine.CkCost.ACTIVATE
-        wgbg.engine.CkActionType.BUILD_CITY_WALL -> wgbg.engine.CkCost.WALL
+        wgbg.engine.ChivalryActionType.BUILD_KNIGHT -> wgbg.engine.ChivalryCost.KNIGHT
+        wgbg.engine.ChivalryActionType.PROMOTE_KNIGHT -> wgbg.engine.ChivalryCost.PROMOTE
+        wgbg.engine.ChivalryActionType.ACTIVATE_KNIGHT -> wgbg.engine.ChivalryCost.ACTIVATE
+        wgbg.engine.ChivalryActionType.BUILD_CITY_WALL -> wgbg.engine.ChivalryCost.WALL
         else -> null
     }
     val name = when (a.type) {
@@ -544,12 +558,12 @@ internal fun SpotPicker(choices: List<SpotChoice>, onPick: (Action) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((i, c) in choices.withIndex()) Row(
             // Capped so the box stays mid-screen, clear of the build buttons and the zoom/tilt bars (seen on device).
-            Modifier.widthIn(min = 260.dp, max = 400.dp).brassPlate().clickable { onPick(c.action) }
+            Modifier.widthIn(min = 260.dp, max = 400.dp).brassPlate().clickable(onClick = moveTap { onPick(c.action) })
                 .testTag("spot-choice-$i").semantics(mergeDescendants = true) { contentDescription = c.name }
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (c.icon != null) IconPlateButton(c.icon, c.name, "spot-icon-$i", width = 40.dp, height = 36.dp) { onPick(c.action) }
+            if (c.icon != null) IconPlateButton(c.icon, c.name, "spot-icon-$i", width = 40.dp, height = 36.dp, onClick = moveTap { onPick(c.action) })
             Text(c.name, color = Color(0xFF2A1A0C), fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.weight(1f))
             val cost = c.cost
             if (cost == null) Text("free", color = Color(0xFF2A1A0C), fontSize = 14.sp)
@@ -574,10 +588,10 @@ internal fun fortunePlayable(legal: List<Action>): Set<Int> = buildSet {
 }
 
 /** Whether an open picker still has a legal move to offer (#105: a stale one hid the Roll button). */
-internal fun sheetStillLegal(sheet: String?, ckActs: List<Action>?, legal: List<Action>): Boolean = when (sheet) {
+internal fun sheetStillLegal(sheet: String?, chivalryActs: List<Action>?, legal: List<Action>): Boolean = when (sheet) {
     null -> false
     "yop" -> legal.any { it.type == ActionType.PLAY_YEAR_OF_PLENTY }
     "mono" -> legal.any { it.type == ActionType.PLAY_MONOPOLY }
-    "ck" -> ckActs != null && ckActs.any { it in legal }
+    "chivalry" -> chivalryActs != null && chivalryActs.any { it in legal }
     else -> true
 }

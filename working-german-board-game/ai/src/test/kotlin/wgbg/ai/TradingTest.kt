@@ -8,7 +8,7 @@ import wgbg.engine.ActionBuffer
 import wgbg.engine.ActionType
 import wgbg.engine.BANK_PER_RESOURCE
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CK_CARD_TYPES
+import wgbg.engine.CHIVALRY_CARD_TYPES
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.GameState
@@ -107,11 +107,11 @@ class TradingTest {
 
     @Test
     fun `#135 a one-sided ask gets counters from greedy bots, in both rulesets`() {
-        for (ck in listOf(false, true)) {
+        for (chivalry in listOf(false, true)) {
             var asks = 0
             var countered = 0
             for (g in 0 until 40) {
-                val cfg = if (ck) GameConfig(numPlayers = 4, expansion = Expansion.CITIES_AND_KNIGHTS) else GameConfig(numPlayers = 4)
+                val cfg = if (chivalry) GameConfig(numPlayers = 4, expansion = Expansion.CHIVALRY) else GameConfig(numPlayers = 4)
                 val s = Rules.newGame(cfg, 500L + g)
                 val bots = List(4) { GreedyBot(g * 13L + it) }
                 val buf = ActionBuffer()
@@ -123,7 +123,7 @@ class TradingTest {
                     if (s.actingPlayer == 0 && s.phase == Phase.PLAY_TURN && s.hasRolled && s.freeRoads == 0) {
                         val r = (0 until CARD_TYPES).firstOrNull { s.hand(0, it) == 0 }
                         val ask = r?.let {
-                            if (ck) Action.offerTradeCk(IntArray(CK_CARD_TYPES), IntArray(CK_CARD_TYPES).also { w -> w[it] = 1 })
+                            if (chivalry) Action.offerTradeCk(IntArray(CHIVALRY_CARD_TYPES), IntArray(CHIVALRY_CARD_TYPES).also { w -> w[it] = 1 })
                             else Action.offerTrade(IntArray(CARD_TYPES), IntArray(CARD_TYPES).also { w -> w[it] = 1 })
                         }
                         if (ask != null && Rules.isLegal(s, ask) && s.turn != askedTurn) {
@@ -137,8 +137,8 @@ class TradingTest {
                     Rules.applyChecked(s, bots[s.actingPlayer].choose(s, buf))
                 }
             }
-            assertTrue(asks >= 20, "ck=$ck: only $asks asks")
-            assertTrue(countered * 4 >= asks, "ck=$ck: $countered of $asks asks got a counter")
+            assertTrue(asks >= 20, "chivalry=$chivalry: only $asks asks")
+            assertTrue(countered * 4 >= asks, "chivalry=$chivalry: $countered of $asks asks got a counter")
         }
     }
 }

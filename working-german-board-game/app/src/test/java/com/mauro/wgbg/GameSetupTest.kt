@@ -66,7 +66,7 @@ class GameSetupTest {
         assertEquals(13, base.withRuleset(Ruleset.CHIVALRY).points)
         assertEquals(10, base.withRuleset(Ruleset.CHIVALRY).withRuleset(Ruleset.BASE).points)
         assertEquals(12, base.withPoints(12).withRuleset(Ruleset.CHIVALRY).points)
-        assertEquals(Expansion.CITIES_AND_KNIGHTS, base.withRuleset(Ruleset.CHIVALRY).config().expansion)
+        assertEquals(Expansion.CHIVALRY, base.withRuleset(Ruleset.CHIVALRY).config().expansion)
     }
 
     @Test

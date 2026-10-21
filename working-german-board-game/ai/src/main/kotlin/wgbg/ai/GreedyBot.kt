@@ -4,10 +4,10 @@ import wgbg.engine.Action
 import wgbg.engine.ActionBuffer
 import wgbg.engine.ActionType
 import wgbg.engine.CARD_TYPES
-import wgbg.engine.CK_CARD_TYPES
-import wgbg.engine.CitiesAndKnights
-import wgbg.engine.CkActionType
-import wgbg.engine.CkPiece
+import wgbg.engine.CHIVALRY_CARD_TYPES
+import wgbg.engine.Chivalry
+import wgbg.engine.ChivalryActionType
+import wgbg.engine.ChivalryPiece
 import wgbg.engine.GameState
 import wgbg.engine.Phase
 import wgbg.engine.Piece
@@ -26,12 +26,12 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
     private var offerTurn = -1
     private var offersThisTurn = 0
     /** Age of Chivalry: what the acting player is saving for and how the Raiders stand, set per choose(). */
-    private var ckPlan: ChivalryPlan? = null
+    private var chivalryPlan: ChivalryPlan? = null
 
     override fun choose(state: GameState, legal: ActionBuffer): Action {
         tradeOffer(state, legal)?.let { return it }
         tradeResponse(state, legal)?.let { return it }
-        ckPlan = if (state.ck != null) ChivalryPlan(state, state.actingPlayer) else null
+        chivalryPlan = if (state.chivalry != null) ChivalryPlan(state, state.actingPlayer) else null
         var best = legal[0]
         var bestScore = Double.NEGATIVE_INFINITY
         for (i in 0 until legal.size) {
@@ -47,7 +47,7 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
 
     private fun score(s: GameState, a: Action): Double {
         val me = s.actingPlayer
-        ckPlan?.let { plan -> ckScore(s, me, a, plan)?.let { return it } }
+        chivalryPlan?.let { plan -> chivalryScore(s, me, a, plan)?.let { return it } }
         return when (a.type) {
             ActionType.BUILD_CITY -> 1000.0 + vertexValue(s, a.a.toInt())
             ActionType.BUILD_SETTLEMENT -> 900.0 + vertexValue(s, a.a.toInt())
@@ -69,7 +69,7 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
                 val gain = s.counterOf(q)?.let { counterGain(s, me, it) } ?: 0.0
                 if (s.counterOf(q) != null && (gain <= -0.05 || s.publicVictoryPoints(q) >= s.config.vpToWin - 2)) -1.0 else 10.0 + gain - s.publicVictoryPoints(q)
             }
-            ActionType.OFFER_TRADE, ActionType.COUNTER_TRADE, CkActionType.OFFER_TRADE_CK, CkActionType.COUNTER_TRADE_CK -> -10.0
+            ActionType.OFFER_TRADE, ActionType.COUNTER_TRADE, ChivalryActionType.OFFER_TRADE_CK, ChivalryActionType.COUNTER_TRADE_CK -> -10.0
             ActionType.END_TURN, ActionType.REJECT_TRADE, ActionType.CANCEL_TRADE -> 0.0
             else -> 1.0
         }
@@ -82,7 +82,7 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
      * tie-break stream is untouched) and whether the Raiders threaten us.
      */
     private class ChivalryPlan(s: GameState, me: Int) {
-        val ck = s.ck!!
+        val chivalry = s.chivalry!!
         val savingCity = s.piecesOnBoard(me, Piece.SETTLEMENT) > 0 && s.piecesLeft[me * Piece.COUNT + Piece.CITY] > 0
         val goal: IntArray = when {
             savingCity -> COST_CITY
@@ -94,14 +94,14 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
             else -> IntArray(CARD_TYPES)
         }
         /** The Raiders land within two rolls. */
-        val raidersNear = ck.barbarianPos >= CkPiece.BARBARIAN_TRACK - 2
+        val raidersNear = chivalry.barbarianPos >= ChivalryPiece.BARBARIAN_TRACK - 2
         /** A city (not a Capital) the Raiders could take from us. */
         val cityAtRisk = (0 until s.board.vertexCount).any {
-            s.vertexOwner[it] == me && s.vertexBuilding[it] == Piece.CITY && !ck.isMetropolis(it)
+            s.vertexOwner[it] == me && s.vertexBuilding[it] == Piece.CITY && !chivalry.isMetropolis(it)
         }
         /** All active knights together are weaker than the Raiders and we stand to lose a city. */
         val defenceShort = cityAtRisk &&
-            (0 until s.numPlayers).sumOf { CitiesAndKnights.activeKnightStrength(s, it) } < CitiesAndKnights.barbarianStrength(s)
+            (0 until s.numPlayers).sumOf { Chivalry.activeKnightStrength(s, it) } < Chivalry.barbarianStrength(s)
         /** Spending on knights is worth it now: the Raiders are close, or the defence is short. */
         val defend = raidersNear || defenceShort
 
@@ -118,33 +118,33 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
      * spends a city card is scored below END_TURN unless the Raiders make it worth it, so the bots save
      * for towns instead of burning grain on activations and knight shuffles.
      */
-    private fun ckScore(s: GameState, me: Int, a: Action, plan: ChivalryPlan): Double? {
-        val ck = plan.ck
+    private fun chivalryScore(s: GameState, me: Int, a: Action, plan: ChivalryPlan): Double? {
+        val chivalry = plan.chivalry
         return when (a.type) {
-            CkActionType.IMPROVE_CITY -> 990.0 // just under a town
-            CkActionType.ACTIVATE_KNIGHT -> if (plan.defend) 600.0 + ck.knightLevel[a.a] else -1.0
-            CkActionType.BUILD_KNIGHT -> when {
+            ChivalryActionType.IMPROVE_CITY -> 990.0 // just under a town
+            ChivalryActionType.ACTIVATE_KNIGHT -> if (plan.defend) 600.0 + chivalry.knightLevel[a.a] else -1.0
+            ChivalryActionType.BUILD_KNIGHT -> when {
                 plan.defenceShort -> 550.0
                 !plan.savingCity && plan.spare(s, me, Resource.SHEEP) >= 1 && plan.spare(s, me, Resource.ORE) >= 1 -> 250.0
                 else -> -1.0
             }
-            CkActionType.PROMOTE_KNIGHT -> when {
-                ck.freePromotions > 0 -> 500.0
-                plan.defenceShort && ck.isActive(a.a) -> 540.0
+            ChivalryActionType.PROMOTE_KNIGHT -> when {
+                chivalry.freePromotions > 0 -> 500.0
+                plan.defenceShort && chivalry.isActive(a.a) -> 540.0
                 !plan.savingCity && plan.spare(s, me, Resource.SHEEP) >= 1 && plan.spare(s, me, Resource.ORE) >= 1 -> 240.0
                 else -> -1.0
             }
             // Moving deactivates the knight, wasting the grain that woke it.
-            CkActionType.MOVE_KNIGHT, CkActionType.DISPLACE_KNIGHT -> -1.0
-            CkActionType.CHASE_ROBBER -> if (robberHurtsMe(s, me)) 400.0 else -1.0
-            CkActionType.BUILD_CITY_WALL -> if (plan.goal[Resource.BRICK] == 0 && plan.cityAtRisk) 5.0 else -0.5
-            CkActionType.PLAY_PROGRESS -> 1.0
-            CkActionType.COMMERCIAL_HARBOR_OFFER -> if (plan.protects(a.a) || plan.spare(s, me, a.a) < 1) -1.0 else 0.5
-            CkActionType.CK_DONE -> 0.0
+            ChivalryActionType.MOVE_KNIGHT, ChivalryActionType.DISPLACE_KNIGHT -> -1.0
+            ChivalryActionType.CHASE_ROBBER -> if (robberHurtsMe(s, me)) 400.0 else -1.0
+            ChivalryActionType.BUILD_CITY_WALL -> if (plan.goal[Resource.BRICK] == 0 && plan.cityAtRisk) 5.0 else -0.5
+            ChivalryActionType.PLAY_PROGRESS -> 1.0
+            ChivalryActionType.COMMERCIAL_HARBOR_OFFER -> if (plan.protects(a.a) || plan.spare(s, me, a.a) < 1) -1.0 else 0.5
+            ChivalryActionType.CHIVALRY_DONE -> 0.0
             ActionType.MARITIME_TRADE -> {
                 val give = a.maritimeGive
                 val get = a.maritimeGet
-                val rate = CitiesAndKnights.tradeRate(s, me, give)
+                val rate = Chivalry.tradeRate(s, me, give)
                 val keepsGoal = plan.spare(s, me, give) >= rate && !(plan.savingCity && (give == Resource.WHEAT || give == Resource.ORE))
                 when {
                     !keepsGoal -> -1.0
@@ -163,8 +163,8 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
                     else -> plan.spare(s, me, c).toDouble()
                 }
             }
-            CkActionType.OFFER_TRADE_CK, CkActionType.COUNTER_TRADE_CK -> null
-            is CkActionType -> -0.5 // forced prompts still pick their best (only) options; nothing optional beats END_TURN
+            ChivalryActionType.OFFER_TRADE_CK, ChivalryActionType.COUNTER_TRADE_CK -> null
+            is ChivalryActionType -> -0.5 // forced prompts still pick their best (only) options; nothing optional beats END_TURN
             else -> null
         }
     }
@@ -262,18 +262,18 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
         return Action.REJECT_TRADE
     }
 
-    private fun cardTypes(s: GameState) = if (s.ck != null) CK_CARD_TYPES else CARD_TYPES
+    private fun cardTypes(s: GameState) = if (s.chivalry != null) CHIVALRY_CARD_TYPES else CARD_TYPES
 
-    /** The open offer's count of card [c] (C&K card space in Chivalry), give side or [want] side. */
+    /** The open offer's count of card [c] (Age of Chivalry card space in Chivalry), give side or [want] side. */
     private fun openTerm(s: GameState, c: Int, want: Boolean): Int {
         val k = if (want) 1 else 0
         return if (c < CARD_TYPES) s.tradeOffer[k * CARD_TYPES + c]
-        else s.ck!!.offer[k * (CK_CARD_TYPES - CARD_TYPES) + c - CARD_TYPES]
+        else s.chivalry!!.offer[k * (CHIVALRY_CARD_TYPES - CARD_TYPES) + c - CARD_TYPES]
     }
 
     /** Counter terms from the offerer's side: they give [give], get [want]. */
     private fun counterAction(s: GameState, give: IntArray, want: IntArray) =
-        if (s.ck != null) Action.counterTradeCk(give, want) else Action.counterTrade(give, want)
+        if (s.chivalry != null) Action.counterTradeCk(give, want) else Action.counterTrade(give, want)
 
     /** Resources by the build target; commodities a steady middling value. */
     private fun cardWorth(s: GameState, me: Int, goal: IntArray, c: Int, extra: Int) =
@@ -281,12 +281,12 @@ class GreedyBot(seed: Long = 0, override val name: String = "Greedy") : Bot {
 
     /** As the offerer: what a counter's terms are worth to us (negative = it costs more than it brings). */
     private fun counterGain(s: GameState, me: Int, c: Action): Double {
-        val ck = s.ck != null
+        val chivalry = s.chivalry != null
         val goal = target(s, me)
         var gain = 0.0
         for (r in 0 until cardTypes(s)) {
-            val gets = if (ck) c.ckOfferWant(r) else c.offerWant(r)
-            val gives = if (ck) c.ckOfferGive(r) else c.offerGive(r)
+            val gets = if (chivalry) c.chivalryOfferWant(r) else c.offerWant(r)
+            val gives = if (chivalry) c.chivalryOfferGive(r) else c.offerGive(r)
             repeat(gets) { gain += cardWorth(s, me, goal, r, it) }
             repeat(gives) { gain -= cardWorth(s, me, goal, r, -it - 1) }
         }

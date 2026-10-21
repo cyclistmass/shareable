@@ -50,7 +50,7 @@ class EasyBotTest {
     @Test
     fun `easy bots finish Age of Chivalry games too`() {
         for (g in 0 until 20) {
-            val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3 + g % 2), g.toLong())
+            val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3 + g % 2), g.toLong())
             playOut(s, List(s.numPlayers) { EasyBot(g * 5L + it) })
             assertTrue(s.isOver, "chivalry game $g did not finish")
         }

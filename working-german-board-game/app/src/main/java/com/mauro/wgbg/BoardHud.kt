@@ -36,7 +36,15 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,19 +71,25 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 /** False inside the one left side panel (#73), which draws the frame for both halves. */
                 framed: Boolean = true) {
     version // the state object is mutated in place; this changing value makes the strip redraw after each move
-    Column((if (framed) modifier.brassEdgedWood() else modifier).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp).testTag("player-strip"), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+    // Taller than the height it's given (the room above the dice: a short screen, a large font, the Raiders warning, six
+    // seats), the whole list shrinks to fit, so every row stays in sight; it never scrolls White away (0.3.4, Mauro).
+    ShrinkToFit(modifier) {
+    Column((if (framed) Modifier.brassEdgedWood() else Modifier).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp).testTag("player-strip")
+        // Named for screen readers and for tools/ci_reach.sh, which checks the dice row never overlaps it.
+        .semantics { contentDescription = "Players"; testTagsAsResourceId = true }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
         // Age of Chivalry: how near the Raiders are (a ship marker on a 7-step track).
-        s.ck?.let { ck ->
+        s.chivalry?.let { chivalry ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.testTag("raiders-track")) {
-                Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp))
-                for (i in 0 until wgbg.engine.CkPiece.BARBARIAN_TRACK) Box(
+                Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp),
+                    maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
+                for (i in 0 until wgbg.engine.ChivalryPiece.BARBARIAN_TRACK) Box(
                     Modifier.size(width = 11.dp, height = 8.dp)
-                        .background(if (i < ck.barbarianPos) Color(0xFFC0392B) else Color(0x73000000), RoundedCornerShape(2.dp)),
+                        .background(if (i < chivalry.barbarianPos) Color(0xFFC0392B) else Color(0x73000000), RoundedCornerShape(2.dp)),
                 )
                 // Raiders' strength vs every active knight, on the track's own line (Mauro): green while the knights would hold.
-                val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
-                val knights = (0 until s.numPlayers).sumOf { wgbg.engine.CitiesAndKnights.activeKnightStrength(s, it) }
-                Text("$raiders vs $knights", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp).testTag("raiders-vs-knights"),
+                val raiders = wgbg.engine.Chivalry.barbarianStrength(s)
+                val knights = (0 until s.numPlayers).sumOf { wgbg.engine.Chivalry.activeKnightStrength(s, it) }
+                Text("$raiders vs $knights", fontSize = 13.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp).testTag("raiders-vs-knights"),
                     color = if (knights >= raiders) Color(0xFF8BD18B) else Color(0xFFFF6B5E))
             }
             // On your turn, 3 steps or fewer out: say so, and what's at stake (#92).
@@ -91,14 +105,21 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 // The score sits in the player's colour dot, so the strip needs no score column (Mauro).
                 Box(Modifier.size(26.dp).background(PLAYER_COLORS[p], CircleShape).border(1.dp, Color(0xFFF1D58A), CircleShape).testTag("score-$p"),
                     contentAlignment = Alignment.Center) {
-                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    // The dot is a fixed 26 dp, so its number is sized to the dot, not the font scale (at 1.3 it shrank to a
+                    // speck); 10 and more shrink a step rather than wrap (0.3.4).
+                    val fs = LocalDensity.current.fontScale
+                    Text("${if (p == me) s.victoryPoints(p) else s.publicVictoryPoints(p)}", fontSize = (14 / fs).sp, fontWeight = FontWeight.Bold,
+                        lineHeight = (16 / fs).sp, maxLines = 1, softWrap = false,
+                        autoSize = TextAutoSize.StepBased(minFontSize = (9 / fs).sp, maxFontSize = (14 / fs).sp), modifier = Modifier.padding(horizontal = 2.dp),
                         color = if (PLAYER_COLORS[p].luminance() > 0.35f) Color(0xFF2B2118) else Color.White)
                 }
                 Column(Modifier.width(74.dp)) {
-                    Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    val ck = s.ck
-                    if (ck != null) for ((track, color) in IMPROVEMENT_BARS) Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
-                        val filled = barSegments(ck.level(p, track))
+                    // A long name (16 letters online) or a large font shrinks, then ends in "…", on one line (0.3.4).
+                    Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("name-$p"))
+                    val chivalry = s.chivalry
+                    if (chivalry != null) for ((track, color) in IMPROVEMENT_BARS) Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
+                        val filled = barSegments(chivalry.level(p, track))
                         for (i in 0 until 4) Box(Modifier.size(width = 14.dp, height = 4.dp).background(if (i < filled) color else Color(0x73000000), RoundedCornerShape(1.dp)))
                     }
                 }
@@ -112,11 +133,11 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                     Spacer(Modifier.width(4.dp))
                     // Red when a rolled 7 would make them discard half (Mauro).
                     Text(cardsLabel(s, p), color = if (overCardLimit(s, p)) Color(0xFFFF6B5E) else Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.testTag("cards-$p"))
+                        maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("cards-$p"))
                 }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         StatBadge(StatIcon.ROAD, s.roadLength[p], s.longestRoadOwner == p, "road-$p")
-                        StatBadge(StatIcon.SHIELD, knightsShown(s, p), s.ck == null && s.largestArmyOwner == p, "army-$p")
+                        StatBadge(StatIcon.SHIELD, knightsShown(s, p), s.chivalry == null && s.largestArmyOwner == p, "army-$p")
                     }
                 }
                 // The last roll's cards, each overlapping the one before by half in one fixed slot, so the frame never
@@ -128,11 +149,30 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
             }
         }
     }
+    }
 }
+
+/**
+ * Lays out [content] at its natural height; when that is more than the height allowed, scales it down evenly (from the
+ * top left) to fit, and takes up only the scaled size.
+ */
+@Composable
+internal fun ShrinkToFit(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    androidx.compose.ui.layout.Layout(content, modifier) { measurables, c ->
+        val child = measurables.first().measure(c.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
+        val k = fitScale(child.height, if (c.hasBoundedHeight) c.maxHeight else Int.MAX_VALUE)
+        layout((child.width * k).toInt().coerceIn(c.minWidth, c.maxWidth), (child.height * k).toInt().coerceIn(c.minHeight, c.maxHeight)) {
+            child.placeWithLayer(0, 0) { scaleX = k; scaleY = k; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) }
+        }
+    }
+}
+
+/** How much [ShrinkToFit] scales content [height] px tall into [max] px: 1 when it fits. */
+internal fun fitScale(height: Int, max: Int): Float = if (height <= max || height <= 0) 1f else max.toFloat() / height
 
 
 /** The knights number on a player's shield: Sentinels played (base game), active knight strength (Age of Chivalry). */
-fun knightsShown(s: GameState, p: Int): Int = if (s.ck != null) wgbg.engine.CitiesAndKnights.activeKnightStrength(s, p) else s.knightsPlayed(p)
+fun knightsShown(s: GameState, p: Int): Int = if (s.chivalry != null) wgbg.engine.Chivalry.activeKnightStrength(s, p) else s.knightsPlayed(p)
 
 enum class StatIcon { ROAD, SHIELD }
 
@@ -140,7 +180,8 @@ enum class StatIcon { ROAD, SHIELD }
 @Composable
 fun StatBadge(icon: StatIcon, value: Int, held: Boolean, tag: String) {
     val ink = if (held) Color(0xFFF1D58A) else Color(0xFFCDBFA6)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.testTag(tag)) {
+    // Each badge has half of its 64 dp column, so two two-digit numbers at a large font shrink instead of wrapping (0.3.4).
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.width(STAT_BADGE_W).testTag(tag)) {
         androidx.compose.foundation.Canvas(Modifier.size(12.dp)) {
             val w = size.width; val h = size.height
             val stroke = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.16f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
@@ -152,7 +193,8 @@ fun StatBadge(icon: StatIcon, value: Int, held: Boolean, tag: String) {
                     quadraticTo(0.85f * w, 0.85f * h, 0.5f * w, 0.98f * h); quadraticTo(0.15f * w, 0.85f * h, 0.12f * w, 0.5f * h); close() }, ink, style = stroke)
             }
         }
-        Text("$value", color = ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("$value", color = ink, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = 11.sp))
     }
 }
 
@@ -176,8 +218,14 @@ private val MINI_STEP = 10.5.dp
 private const val MINI_MAX = 4
 private val MINI_SLOT = 21.dp + MINI_STEP * (MINI_MAX - 1)
 
-/** A progress card's art: its deck's commodity card (Guilds Fabric, Crown Silver, Academy Parchment). */
-fun progressArt(card: Int): Int = ALL_CARD_ART[wgbg.engine.Track.commodity(wgbg.engine.Progress.track(card))]
+/**
+ * A progress card's art: its deck's commodity painting (Guilds Fabric, Crown Silver, Academy Parchment), not the
+ * Ledger card, whose own title and seal would show through the named face.
+ */
+fun progressArt(card: Int): Int = deckArt(wgbg.engine.Progress.track(card))
+
+/** A progress deck's picture ([track]), on its cards and its draw pile: the deck commodity's painting. */
+fun deckArt(track: Int): Int = COMMODITY_PICTURE[wgbg.engine.Track.commodity(track) - CARD_TYPES]
 
 /** Age of Chivalry deck colours by track: Guilds gold (trade), Crown blue (politics), Academy green (science). */
 // Mauro: themed by commodity and its land. Guilds / Fabric (pasture) pale white-green, Crown / Silver (mountains)
@@ -241,7 +289,8 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     androidx.compose.runtime.LaunchedEffect(detail) { if (detail != null) { kotlinx.coroutines.delay((12000L * pace).toLong()); detail = null } }
     fun Modifier.longPressFor(d: CardDetail) = this.pointerInput(d) { detectTapGestures(onTap = { detail = null }, onLongPress = { detail = d }) }
     @Composable
-    fun namedCard(name: String, edge: Color, n: Int, tag: String, w: Int, h: Int, small: String? = null, art: Int? = null, long: CardDetail? = null, onTap: (() -> Unit)? = null) {
+    fun namedCard(name: String, edge: Color, n: Int, tag: String, w: Int, h: Int, small: String? = null, art: Int? = null, long: CardDetail? = null,
+                  plain: Boolean = false, onTap: (() -> Unit)? = null) {
         // The tap handler outlives this call: it must run today's onTap, not the one from the card's first touch
         // (the #122 stale-tap bug, same pattern).
         val tapNow = androidx.compose.runtime.rememberUpdatedState(onTap)
@@ -249,8 +298,10 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             modifier = Modifier.testTag(tag).then(if (onTap != null || long != null) Modifier.pointerInput(long) {
                 detectTapGestures(onTap = { if (detail != null) detail = null else tapNow.value?.invoke() }, onLongPress = { long?.let { detail = it } })
             } else Modifier)) {
-            // Themed by its deck's commodity (Mauro): Guilds on Fabric, Crown on Silver, Academy on Parchment.
-            ProgressCardFace(name, edge, art, small, w, h)
+            // A full card that names itself (a Ledger Fortune card) as it is; a progress card on its drawn face, themed
+            // by its deck's commodity (Mauro): Guilds on Fabric, Crown on Silver, Academy on Parchment.
+            if (plain && art != null) Image(artPainter(art), name, Modifier.size(width = w.dp, height = h.dp))
+            else ProgressCardFace(name, edge, art, small, w, h)
             if (n > 1) count(n)
         }
     }
@@ -269,26 +320,31 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     }
     hint?.let { Text(it, color = Color(0xFFEDE6D8), fontSize = 13.sp,
         modifier = Modifier.padding(bottom = 4.dp).brassEdgedWood(2.dp).padding(horizontal = 10.dp, vertical = 6.dp).testTag("card-hint")) }
-    Row(Modifier.testTag("hand-row").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy((-5).dp), verticalAlignment = Alignment.Bottom) {   // #127: cards overlap 10% (5 of 50 dp), scroll only past the window
+    val cards = handCardCount(s, me)
+    androidx.compose.foundation.layout.BoxWithConstraints {
+    // #127: cards overlap 10% (5 of 50 dp); on a small screen they fan closer so 2-3 or more still show, each keeping a
+    // tappable slice with its count, and the row scrolls only past that (Mauro, 0.3.4: one card wide at 640x320).
+    Row(Modifier.testTag("hand-row").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(handOverlap(maxWidth.value, cards).dp), verticalAlignment = Alignment.Bottom) {
         // Each card sits over the next, so the count in its top-right corner stays in view (#127).
         var z = 0
         for (r in 0 until CARD_TYPES) {
             val n = s.hand(me, r)
             if (n == 0) continue
-            Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.ck != null))) {
+            Box(contentAlignment = Alignment.TopEnd, modifier = Modifier.zIndex(-(z++).toFloat()).longPressFor(cardDetail(r, s.chivalry != null))) {
                 Image(artPainter(CARD_ART[r]), RESOURCE_NAMES[r], Modifier.size(width = 50.dp, height = 70.dp))
                 count(n)
             }
         }
         // Fortune cards (base game) as cards in the hand, dimmed when they can't be played; a tap plays one, a long press
         // shows it large. They were worded buttons beside the move buttons before (Fable review 2.5).
-        if (s.ck == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
+        if (s.chivalry == null) for (c in 0 until wgbg.engine.DevCard.COUNT) {
             val n = s.devHand[me * wgbg.engine.DevCard.COUNT + c]
             if (n == 0) continue
             val now = c in fortunePlayable && onFortune != null
             Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now && c != wgbg.engine.DevCard.VICTORY_POINT)) {
                 namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70, art = fortuneArt(c),
-                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c]))) {
+                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c])),
+                    plain = !LocalArtChoice.current.space(ArtObject.CARDS)) {
                     if (now) { hint = null; onFortune?.invoke(c) }
                     else hint = "${FORTUNE[c]}: " + when {
                         c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]
@@ -298,7 +354,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                 }
             }
         }
-        val ck = s.ck ?: return@Row
+        val chivalry = s.chivalry ?: return@Row
         // Commodities: Parchment, Fabric, Silver, with their card art (#62).
         for (c in 0 until wgbg.engine.Commodity.COUNT) {
             val n = s.card(me, CARD_TYPES + c)
@@ -310,7 +366,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         // Cards you can't play right now are dimmed and say why (#117: "don't let me play it"); the engine's own list.
         val playable = androidx.compose.runtime.remember(version, me) { playableProgress(s, me) }
         for (c in 0 until wgbg.engine.Progress.COUNT) {
-            val n = ck.progressHand[me * wgbg.engine.Progress.COUNT + c]
+            val n = chivalry.progressHand[me * wgbg.engine.Progress.COUNT + c]
             val now = c in playable
             if (n > 0) Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now)) {
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
@@ -322,6 +378,40 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
         }
     }
     }
+    }
+}
+
+/** Hand cards are 50 dp wide; each keeps at least this much showing (with its count) when the row fans closer. */
+internal const val HAND_CARD_W = 50f
+internal const val HAND_MIN_SLICE = 24f
+
+/** How many cards [HandRow] shows for [me]: one per kind held (resources, Fortune cards, commodities, progress cards). */
+internal fun handCardCount(s: GameState, me: Int): Int {
+    var n = (0 until CARD_TYPES).count { s.hand(me, it) > 0 }
+    val chivalry = s.chivalry
+    if (chivalry == null) n += (0 until wgbg.engine.DevCard.COUNT).count { s.devHand[me * wgbg.engine.DevCard.COUNT + it] > 0 }
+    else {
+        n += (0 until wgbg.engine.Commodity.COUNT).count { s.card(me, CARD_TYPES + it) > 0 }
+        n += (0 until wgbg.engine.Progress.COUNT).count { chivalry.progressHand[me * wgbg.engine.Progress.COUNT + it] > 0 }
+    }
+    return n
+}
+
+/**
+ * The spacing (dp, negative: overlap) between [cards] hand cards in [room] dp: the usual 5 dp overlap when they fit,
+ * else as close as needed to fit, but never closer than [HAND_MIN_SLICE] showing per card (then the row scrolls).
+ */
+internal fun handOverlap(room: Float, cards: Int): Float = fanSpacing(room, cards, HAND_CARD_W, -5f, HAND_MIN_SLICE - HAND_CARD_W)
+
+/**
+ * The spacing (dp, negative: overlap) between [cards] cards [card] dp wide in [room] dp: [most] when they fit, else as
+ * close as needed to fit, but never closer than [least] (then the row scrolls, or a chest shrinks its cards first).
+ * Shared by the hand and the chests ([chestFit]), so cards fan the same way everywhere.
+ */
+internal fun fanSpacing(room: Float, cards: Int, card: Float, most: Float, least: Float): Float {
+    if (cards <= 1 || !room.isFinite()) return most
+    val fit = (room - card) / (cards - 1) - card
+    return fit.coerceIn(least, most)
 }
 
 /**
@@ -336,8 +426,8 @@ private fun Modifier.dimmed(dim: Boolean): Modifier = if (!dim) this else
 
 /** Progress cards [me] may play right now: the engine's legal plays (none when it isn't their move). */
 fun playableProgress(s: GameState, me: Int): Set<Int> =
-    if (s.ck == null || s.currentPlayer != me) emptySet()
-    else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.CkActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
+    if (s.chivalry == null || s.currentPlayer != me) emptySet()
+    else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
 
 /** Why progress card [c] can't be played by [me] now, in a few words. */
 fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
@@ -353,20 +443,20 @@ fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
  * Grand Factor card and can't use it", with no reason given). Public facts only: points, card counts, the board.
  */
 internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
-    val ck = s.ck ?: return "nothing it can do right now"
+    val chivalry = s.chivalry ?: return "nothing it can do right now"
     val b = s.board
     val P = wgbg.engine.Progress
     val others = (0 until s.numPlayers).filter { it != me }
     val mine = s.victoryPoints(me)
     val cities = s.piecesOnBoard(me, wgbg.engine.Piece.CITY)
-    fun knights(q: Int) = (0 until b.vertexCount).count { ck.knightOwner[it] == q }
+    fun knights(q: Int) = (0 until b.vertexCount).count { chivalry.knightOwner[it] == q }
     return when (c) {
         P.CRANE -> when {
             cities == 0 -> "you need a town to improve"
-            (0 until wgbg.engine.Track.COUNT).all { ck.level(me, it) >= wgbg.engine.Track.MAX_LEVEL } -> "every improvement is at the top"
+            (0 until wgbg.engine.Track.COUNT).all { chivalry.level(me, it) >= wgbg.engine.Track.MAX_LEVEL } -> "every improvement is at the top"
             else -> "not enough commodities for any improvement, even one less: " + (0 until wgbg.engine.Track.COUNT)
-                .filter { ck.level(me, it) < wgbg.engine.Track.MAX_LEVEL }
-                .joinToString(", ") { t -> "${DECK_NAMES[t]} needs ${ck.level(me, t)} ${ALL_CARD_NAMES[wgbg.engine.Track.commodity(t)]}" }
+                .filter { chivalry.level(me, it) < wgbg.engine.Track.MAX_LEVEL }
+                .joinToString(", ") { t -> "${DECK_NAMES[t]} needs ${chivalry.level(me, t)} ${ALL_CARD_NAMES[wgbg.engine.Track.commodity(t)]}" }
         }
         P.MASTER_MERCHANT -> if (others.none { s.victoryPoints(it) > mine }) "it only takes from a player with more points than you, and nobody has more"
             else "the players ahead of you have no cards"
@@ -376,15 +466,15 @@ internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
             else "the players it would hit hold fewer than 2 cards"
         P.IRRIGATION, P.MINING -> {
             val r = if (c == P.IRRIGATION) wgbg.engine.Resource.WHEAT else wgbg.engine.Resource.ORE
-            if (s.bank[r] == 0) "the bank is out of ${RESOURCE_NAMES[r]}" else "none of your buildings touch a ${if (c == P.IRRIGATION) "field" else "mountain"}"
+            if (s.bank[r] == 0) "the bank is out of ${RESOURCE_NAMES[r]}" else "none of your buildings touch a ${TERRAIN_NAMES[r]}"
         }
         P.WARLORD -> if (knights(me) == 0) "you have no knights" else "your knights are all raised already"
         P.SMITH -> "no knight of yours can be promoted"
-        P.ENGINEER -> if (ck.wallsLeft[me] == 0) "no Ramparts left" else "every town of yours has Ramparts"
+        P.ENGINEER -> if (chivalry.wallsLeft[me] == 0) "no Ramparts left" else "every town of yours has Ramparts"
         P.MEDICINE -> "it needs a homestead, a town piece left, 1 Grain and 2 Stone"
         P.ROAD_BUILDING -> "no road pieces or spots left"
         P.COMMERCIAL_HARBOR -> if (s.handSize(me) == 0) "you have no resources to give" else "nobody else has a commodity"
-        P.BISHOP -> if (!ck.robberActive) "the bandit stays put until the Raiders first land" else "nowhere to move the bandit"
+        P.BISHOP -> if (!chivalry.robberActive) "the bandit stays put until the Raiders first land" else "nowhere to move the bandit"
         P.DESERTER -> "nobody else has a knight on the board"
         P.DIPLOMAT -> "no open road end to remove"
         P.INTRIGUE -> "no enemy knight on your roads"
@@ -396,9 +486,21 @@ internal fun progressBlocked(s: GameState, me: Int, c: Int): String {
 /** A slim prompt across the top saying what to do now. */
 @Composable
 fun TurnPrompt(text: String, modifier: Modifier = Modifier) {
-    Text(text, color = Color(0xFFEDE6D8), fontSize = 15.sp, fontWeight = FontWeight.Bold,
-        modifier = modifier.brassEdgedWood().padding(horizontal = 16.dp, vertical = 6.dp).testTag("turn-prompt"))
+    // Two lines at most in the room it is given, smaller before it is cut.
+    Text(text, color = Color(0xFFEDE6D8), fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+        maxLines = 2, overflow = TextOverflow.Ellipsis, autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 15.sp),
+        modifier = modifier.brassEdgedWood().padding(horizontal = 16.dp, vertical = 6.dp).testTag("turn-prompt")
+            .semantics { testTagsAsResourceId = true })
 }
+
+/**
+ * The top band for the turn prompt and the notices over the board: right of the side panel ([panel] wide, 8 dp in) and
+ * left of the Menu button. With the box's TopCenter, the uneven padding centres them in the band and keeps them inside it.
+ * Centred on the whole screen, a long prompt ran over the first player's name on a 640 dp screen (0.3.4).
+ */
+internal fun Modifier.rightOfPanel(panel: androidx.compose.ui.unit.Dp) = padding(start = promptStart(panel), end = PROMPT_END)
+internal fun promptStart(panel: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (panel <= 0.dp) 376.dp else panel + 16.dp
+internal val PROMPT_END = 112.dp
 
 /** Ship steps left before the Raiders land (attack) for track position [pos]. */
 /**
@@ -406,26 +508,26 @@ fun TurnPrompt(text: String, modifier: Modifier = Modifier) {
  * and what happens if they land now.
  */
 fun raidersWarning(s: GameState, me: Int): String? {
-    val ck = s.ck ?: return null
-    val left = raidersStepsLeft(ck.barbarianPos)
+    val chivalry = s.chivalry ?: return null
+    val left = raidersStepsLeft(chivalry.barbarianPos)
     if (left !in 1..3 || s.currentPlayer != me || s.isOver) return null
-    val raiders = wgbg.engine.CitiesAndKnights.barbarianStrength(s)
-    val knights = (0 until s.numPlayers).sumOf { wgbg.engine.CitiesAndKnights.activeKnightStrength(s, it) }
-    val mine = wgbg.engine.CitiesAndKnights.activeKnightStrength(s, me)
+    val raiders = wgbg.engine.Chivalry.barbarianStrength(s)
+    val knights = (0 until s.numPlayers).sumOf { wgbg.engine.Chivalry.activeKnightStrength(s, it) }
+    val mine = wgbg.engine.Chivalry.activeKnightStrength(s, me)
     val near = if (left == 1) "1 step" else "$left steps"
     // Raiders first, like the "R vs K" on the track line above it.
     return "Raiders $near away!\n$raiders vs $knights: " + if (knights >= raiders) "knights hold (you $mine)"
         else "too weak, weakest lose a town (you $mine)"
 }
 
-fun raidersStepsLeft(pos: Int) = (wgbg.engine.CkPiece.BARBARIAN_TRACK - pos).coerceAtLeast(0)
+fun raidersStepsLeft(pos: Int) = (wgbg.engine.ChivalryPiece.BARBARIAN_TRACK - pos).coerceAtLeast(0)
 
 /** Hand size for the player list: "8", or "8/3" (cards / progress cards) in Age of Chivalry. */
 /** True if [p] holds more cards than a rolled 7 allows (they would discard half): the engine's own limit and count. */
 fun overCardLimit(s: GameState, p: Int): Boolean =
-    if (s.ck != null) s.cardCount(p) > wgbg.engine.CitiesAndKnights.discardLimit(s, p) else s.handSize(p) > s.config.discardLimit
+    if (s.chivalry != null) s.cardCount(p) > wgbg.engine.Chivalry.discardLimit(s, p) else s.handSize(p) > s.config.discardLimit
 
-fun cardsLabel(s: GameState, p: Int): String = s.ck?.let { "${s.cardCount(p)}/${it.progressCount(p)}" } ?: "${s.cardCount(p)}"
+fun cardsLabel(s: GameState, p: Int): String = s.chivalry?.let { "${s.cardCount(p)}/${it.progressCount(p)}" } ?: "${s.cardCount(p)}"
 
 /** One mini card in the player list: [card] (-1 = face down, a robbery others can't see) and [n] (+ got, - lost). */
 data class RollMini(val card: Int, val n: Int)
@@ -449,7 +551,9 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
 
 @Composable
 private fun MiniRollCard(m: RollMini) {
-    Box(Modifier.size(width = 21.dp, height = 30.dp), contentAlignment = Alignment.Center) {
+    // One node for screen readers and the layout check: the card and the count on it ("Timber, +1").
+    val said = "${ALL_CARD_NAMES.getOrElse(m.card) { "Card" }} ${if (m.n > 0) "+${m.n}" else "${m.n}"}"
+    Box(Modifier.size(width = 21.dp, height = 30.dp).clearAndSetSemantics { contentDescription = said }, contentAlignment = Alignment.Center) {
         if (m.card in ALL_CARD_ART.indices) androidx.compose.foundation.Image(artPainter(ALL_CARD_ART[m.card]),
             ALL_CARD_NAMES[m.card], Modifier.fillMaxSize())
         else Box(Modifier.fillMaxSize().background(Color(0xFF5A4030), RoundedCornerShape(2.dp)).border(1.dp, Color(0xFF8A6A2A), RoundedCornerShape(2.dp)),
@@ -460,3 +564,31 @@ private fun MiniRollCard(m: RollMini) {
                 .padding(horizontal = 2.dp))
     }
 }
+
+/**
+ * Where the hand row starts: just right of the side panel ([panel] wide, 8 dp in from the edge), and never further in
+ * than the 384 dp it always had on a big screen. Before the panel is measured ([panel] 0) it keeps 384 dp.
+ */
+internal fun handStart(panel: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (panel <= 0.dp) 384.dp else minOf(384.dp, panel + 16.dp)
+
+/** The turn panel's least height: the dice row and one line of news, with the panel's padding. */
+internal val TURN_HUD_MIN = (DIE_DP + 30).dp
+
+/**
+ * The turn panel's height: the room under the player list ([stripBottom]), so the dice sit right under it. It used to
+ * be at least 110 dp, which on a 320 dp tall screen pushed the dice up over the last player's row (0.3.4).
+ */
+/** One road or knights badge: (64 dp column - 6 dp gap) / 2. */
+internal val STAT_BADGE_W = 29.dp
+
+/**
+ * The player list's greatest height on a [screen] that tall: what leaves the turn panel its least height under it
+ * (the list sits 8 dp down; the panel keeps a 10 dp gap). Past it the list shrinks to fit ([ShrinkToFit]; 0.3.4: six
+ * seats in v3, the Raiders warning, a large font). Unmeasured ([screen] 0), no limit.
+ */
+internal fun stripMaxHeight(screen: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (screen <= 0.dp) androidx.compose.ui.unit.Dp.Infinity else (screen - 18.dp - TURN_HUD_MIN).coerceAtLeast(0.dp)
+
+internal fun turnHudHeight(screen: androidx.compose.ui.unit.Dp, stripBottom: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (screen <= 0.dp) 210.dp else (screen - stripBottom - 10.dp).coerceAtLeast(TURN_HUD_MIN)

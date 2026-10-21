@@ -106,6 +106,19 @@ CLI 15 requires Java 21+ for emulators; Gradle uses JDK 17. On restricted Window
 npm.cmd/firebase.cmd avoid PowerShell script-policy restrictions. Testing used an
 isolated CLI config, npm cache and downloaded Java 21 JRE in the writable user cache.
 
+To run them against emulators that are already up on other ports, point the suite at them (it loads the rules there
+and clears that emulator's data, so never aim it at someone else's): `FIRESTORE_EMULATOR_HOST=127.0.0.1:8185 npm test`.
+
+### Rooms that expire (#72)
+
+Every room and move carries `expireAt`: 1 day for a lobby nobody started, 30 days after a game starts (and each
+move 30 days after it was played), 7 days after a game ends. A game still being played counts as expired only once
+its last move has too, so a long game is never cleared from under its players. Firestore's TTL policies would delete them but need billing, which the project doesn't have, so the app
+does it: when a player who is already signed in opens the start screen, it deletes up to 3 of their own hosted rooms
+that are past `expireAt`, oldest first, moves before the room, in the background. The rules allow that delete only to
+the room's host and only once `expireAt` is past (`request.time`). Rooms made before 0.3.4 have no `expireAt` and stay.
+A host who never opens the app again leaves their rooms behind.
+
 After reviewing the rules, deploy them yourself from repo root:
 
 ```
@@ -188,7 +201,7 @@ history (a rejected prediction) rebuilds the screen from the room.
 ### Two phones against the Firebase emulators (no deploy needed)
 
 ```
-firebase emulators:start --only firestore,auth --project workinggermangame   # Java 21+ on PATH
+firebase emulators:start --only firestore,auth --project demo-wgbg   # Java 21+ on PATH; no google-services.json needed
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/emulator.ps1 -Lane 1   # and -Lane 2
 ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug   # and 5556
 tools/online_sim.sh base        # or chivalry

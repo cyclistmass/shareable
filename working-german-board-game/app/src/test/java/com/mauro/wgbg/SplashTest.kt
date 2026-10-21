@@ -17,6 +17,16 @@ class SplashTest {
     }
 
     @Test
+    fun `#72 Quick game with friends shows when signed in with someone to play with, under New game`() {
+        assertEquals(listOf(Action.NEW_GAME, Action.FRIENDS, Action.LOG_IN, Action.SETTINGS), Splash.buttons(false, null, true, signedIn = true, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = false, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = true, friends = false).map { it.action })
+        val r = wgbg.net.Room("OAK-12", "h", GameSetup().withRuleset(Ruleset.CHIVALRY).config(), 1,
+            listOf(wgbg.net.Seat("h", "Mauro"), wgbg.net.Seat(), wgbg.net.Seat(), wgbg.net.Seat()))
+        assertEquals("Mauro invited you: ${Ruleset.CHIVALRY.label}", Splash.inviteLine(r))
+    }
+
+    @Test
     fun `exactly one green button, the first one`() {
         for (local in listOf(true, false)) for (room in listOf(null, "OAK-12")) {
             val b = Splash.buttons(local, room, true)
@@ -51,8 +61,20 @@ class SplashTest {
 
     @Test
     fun `credits never name the original game`() {
-        val text = (Splash.CREDITS.flatMap { listOf(it.first, it.second) } + Splash.DISCLAIMER + Splash.ABOUT_LINE).joinToString(" ")
+        val text = (Splash.CREDITS.flatMap { listOf(it.first, it.second) } + Splash.ABOUT_LINE).joinToString(" ")
         for (word in listOf("Catan", "Settlers", "Siedler", "Seafarers", "Kosmos")) assertFalse(word in text, word)
-        assertTrue("not affiliated with or endorsed by its publishers" in Splash.DISCLAIMER)
+    }
+
+    @Test
+    fun `the trademark notice is Mauro's wording and the only place the app names the original game`() {
+        assertEquals("An original game. Not affiliated with or endorsed by Catan GmbH or Catan Studio. " +
+            "CATAN is a trademark of Catan GmbH. All names, rules text and art are our own.", Splash.TRADEMARK)
+        // Every other line of app code stays clear of the name (Catanatron, the bot project, is not it).
+        val name = Regex("catan(?!atron)", RegexOption.IGNORE_CASE)
+        val hits = java.io.File("src/main").walkTopDown().filter { it.isFile && it.extension in setOf("kt", "xml") }
+            .flatMap { f -> f.readLines().mapIndexed { i, l -> "${f.name}:${i + 1}: ${l.trim()}" } }
+            .filter { name.containsMatchIn(it.substringAfter(": ")) }.toList()
+        assertEquals(listOf("Splash.kt"), hits.map { it.substringBefore(":") }.distinct(), hits.joinToString(" | "))
+        assertTrue(hits.all { "Catan GmbH" in it || "TRADEMARK" in it || "CATAN" in it }, hits.joinToString(" | "))
     }
 }

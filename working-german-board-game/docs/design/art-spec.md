@@ -38,7 +38,7 @@ from any artist or AI drop in without rework. Sizes are measured from the shippe
 |---|---|---|---|---|
 | Terrain tile, painted | `tile_<terrain>.webp`, `_framed` variant | **443 × 512**, the exact box around a pointy-top hex (side 256 px) | 1 hex, edge to edge | Hex fills the file; terrain keys timber, clay, fleece, grain, stone, desert |
 | Terrain tile, 3D render | `tile3d_*_{flat,mid,max}` | 512 × 512, orthographic scale 2.65 | 1 hex | Hex centred; one render per tilt step |
-| Number plate | drawn by the game | — | radius **0.27**, centre **(+0.36, +0.30)**: **lower right** | Keep a plain clearing of radius 0.31 there; see "Tilt rule" |
+| Number plate | drawn by the game | — | radius **0.27**, centre **(+0.36, +0.30)**: **lower right** | Keep a plain clearing of radius 0.31 there; see "Tilt rule". Aged brass (`NumberPlate.kt`), with dark-ink numbers and red 6 and 8 |
 | Bandit | `bandit_tilt_0..7` | 384 × 384 (512 at source) | **2.65** hex units square, standing on the plate | Foot anchor at the image centre; opaque base seal radius 0.278 hides the plate; 8 tilt steps, tilt = 0.96·i/7 |
 | Homestead / town / road | drawn by the game (`WoodPieces.kt`) today | — | homestead about 0.25 wide, town 0.45, road 0.66 × 0.19 | Stained in the player's colour at runtime; see **Buildings and pieces** for the rendered spec |
 | Knight token (Age of Chivalry) | `knight_{normal,pirate}_l{1,2,3}_{active,inactive}` | 512 × 512 (256 until re-rendered) | **1.30** hex units (3× the first 0.62, then 30% smaller), on a ring in the owner's colour | Figure stands on the corner; base at the lower centre |

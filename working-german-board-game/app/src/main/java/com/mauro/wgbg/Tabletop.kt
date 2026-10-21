@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -88,9 +89,6 @@ object Wood {
     val READY = Color(0xFF8BD18B)
     val WAITING = Color(0xFFE0B23A)
 
-    /** Text colors for player seats on dark wood (lifted so blue and white read; design values). */
-    val SEAT_TEXT = listOf(Color(0xFFEF8A8A), Color(0xFF7FB0F0), Color(0xFFF7A24B), Color(0xFFF5F5F5))
-
     fun sans(size: TextUnit, weight: FontWeight = FontWeight.Normal, color: Color = INK) =
         TextStyle(fontFamily = ALEGREYA_SANS, fontSize = size, fontWeight = weight, color = color)
 
@@ -98,13 +96,15 @@ object Wood {
         TextStyle(fontFamily = ALEGREYA_SC, fontSize = size, fontWeight = FontWeight.Bold, color = color)
 }
 
-/** A texture tiled at [tileDp] wide, like CSS `background-size`. Decoded once per size. */
+/** A texture tiled at [tileDp] wide, like CSS `background-size`; [turned] a quarter turn. Decoded once per size. */
 @Composable
-fun rememberTexture(res: Int, tileDp: Dp): ShaderBrush {
+fun rememberTexture(res: Int, tileDp: Dp, turned: Boolean = false): ShaderBrush {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { tileDp.roundToPx() }.coerceAtLeast(8)
-    return remember(res, px) {
-        val scaled = decodeRenderTexture(context.resources, res, px)
+    return remember(res, px, turned) {
+        val scaled = decodeRenderTexture(context.resources, res, px).let {
+            if (!turned) it else android.graphics.Bitmap.createBitmap(it, 0, 0, it.width, it.height, android.graphics.Matrix().apply { postRotate(90f) }, true)
+        }
         ShaderBrush(ImageShader(scaled.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
     }
 }
@@ -122,9 +122,13 @@ fun Modifier.tableTop(): Modifier {
     }
 }
 
-/** A panel of dark-stained wood with a thin old-brass edge (the canvases' `.seat`). */
+/**
+ * A panel of wood in an old-brass frame. Panels get Mauro's pick D (0.3.4): hammered brass bent round rounded corners
+ * on aged wood ([hammeredFrame]). [edge] below 5 dp keeps today's thin straight edge, for small chips.
+ */
 @Composable
 fun Modifier.brassEdgedWood(edge: Dp = 5.dp, woodAlpha: Float = 1f): Modifier {
+    if (edge >= 5.dp) return hammeredFrame(woodAlpha)
     val wood = rememberTexture(R.drawable.wood_grain, 240.dp)
     val brass = rememberTexture(R.drawable.old_brass, 200.dp)
     // woodAlpha < 1: a see-through panel (Settings > Side panel) shows the board through the wood; the brass frame stays.
@@ -140,6 +144,78 @@ fun Modifier.brassEdgedWood(edge: Dp = 5.dp, woodAlpha: Float = 1f): Modifier {
 }
 
 private val RectangleShapeCompat: Shape = RoundedCornerShape(0.dp)
+
+/** Widest hammered band and outer corner radius; the band bends round the corner in one piece. */
+private val FRAME_BAND = 10.dp
+private val FRAME_CORNER = 14.dp
+
+/**
+ * The hammered frame's band width, outer corner radius and inner (wood) corner radius, px, for a [w] x [h] panel. The
+ * band grows with the panel (6% of its short side, at most [band]) and adds no padding, so a small box keeps a slim
+ * band and no panel's content is pushed out (a padded first try cut off the game-start screen's Host and Join).
+ */
+internal fun frameBand(w: Float, h: Float, band: Float, corner: Float, least: Float): Triple<Float, Float, Float> {
+    val short = minOf(w, h)
+    val f = minOf(band, 0.06f * short).coerceAtLeast(least)
+    val r = minOf(corner, short / 2)
+    return Triple(f, r, (r - f).coerceAtLeast(least))
+}
+
+/**
+ * Hand-beaten brass round warm, aged wood (Mauro, 0.3.4: "panels should have brushed brass framing, aged, and wooden
+ * backgrounds", then "I like round corners, preferably hammered that way", and pick D). One rounded band of hammered
+ * brass (`hammered_brass.webp`, tools/make_hammered_brass.py), no joins, lit from the top left and rolled at its edges;
+ * the wood's grain shows, darker toward the frame where years of hands have not rubbed it.
+ */
+@Composable
+private fun Modifier.hammeredFrame(woodAlpha: Float): Modifier {
+    val wood = rememberTexture(R.drawable.wood_grain, 240.dp)
+    val brass = rememberTexture(R.drawable.hammered_brass, 72.dp)
+    val stain = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFF9A6A40), androidx.compose.ui.graphics.BlendMode.Multiply)
+    // woodAlpha < 1: a see-through panel (Settings > Side panel) shows the board through the wood; the brass band stays.
+    return (if (woodAlpha >= 1f) shadow(8.dp, RoundedCornerShape(FRAME_CORNER)) else this).drawWithCache {
+        val w = size.width; val h = size.height
+        val (f, r, ri) = frameBand(w, h, FRAME_BAND.toPx(), FRAME_CORNER.toPx(), 2.dp.toPx())
+        fun rounded(inset: Float, radius: Float) = androidx.compose.ui.graphics.Path().apply {
+            addRoundRect(androidx.compose.ui.geometry.RoundRect(inset, inset, w - inset, h - inset,
+                androidx.compose.ui.geometry.CornerRadius(radius)))
+        }
+        val inner = rounded(f, ri)
+        val band = androidx.compose.ui.graphics.Path.combine(androidx.compose.ui.graphics.PathOperation.Difference, rounded(0f, r), inner)
+        val wash = Brush.verticalGradient(listOf(Color(0x8C2A170A), Color(0xB80E0703)))
+        val age = 20.dp.toPx()
+        val ageInk = Color(0x700A0502)
+        // The band is lit along its top and left, in shade along its bottom and right, and bends smoothly between.
+        val clear = Color.Transparent
+        val litTop = Brush.verticalGradient(0f to Color(0x40FFF0C8), f / h to clear, 1 - f / h to clear, 1f to Color(0x66000000))
+        val litLeft = Brush.horizontalGradient(0f to Color(0x30FFF0C8), f / w to clear, 1 - f / w to clear, 1f to Color(0x55000000))
+        val px1 = 1.dp.toPx()
+        onDrawBehind {
+            // Wood: the grain stained warm, a wash, and darkening toward the frame.
+            clipPath(inner) {
+                drawRect(wood, alpha = woodAlpha, colorFilter = stain)
+                drawRect(wash, alpha = woodAlpha)
+                drawRect(Brush.verticalGradient(listOf(ageInk, clear), f, f + age), Offset(0f, f), Size(w, age), alpha = woodAlpha)
+                drawRect(Brush.verticalGradient(listOf(clear, ageInk), h - f - age, h - f), Offset(0f, h - f - age), Size(w, age), alpha = woodAlpha)
+                drawRect(Brush.horizontalGradient(listOf(ageInk, clear), f, f + age), Offset(f, 0f), Size(age, h), alpha = woodAlpha)
+                drawRect(Brush.horizontalGradient(listOf(clear, ageInk), w - f - age, w - f), Offset(w - f - age, 0f), Size(age, h), alpha = woodAlpha)
+            }
+            // The hammered band, lit from the top left.
+            drawPath(band, brass)
+            drawPath(band, litTop)
+            drawPath(band, litLeft)
+            // A little verdigris where the band meets the wood at the corners.
+            for ((x, y) in listOf(f to f, w - f to f, f to h - f, w - f to h - f))
+                drawCircle(Brush.radialGradient(listOf(Color(0x404E8C74), clear), Offset(x, y), f * 1.4f), f * 1.4f, Offset(x, y))
+            // A rolled outer edge catching the light, and a dark lip where the band meets the wood.
+            drawRoundRect(Color(0x73FFF2CD), Offset(px1 / 2, px1 / 2), Size(w - px1, h - px1), androidx.compose.ui.geometry.CornerRadius(r), style = Stroke(px1))
+            drawRoundRect(Color(0x40FFE9B0), Offset(f - 2.5f * px1, f - 2.5f * px1), Size(w - 2 * f + 5 * px1, h - 2 * f + 5 * px1),
+                androidx.compose.ui.geometry.CornerRadius(ri + 2.5f * px1), style = Stroke(px1 * 0.75f))
+            drawRoundRect(Color(0xCC1A0F04), Offset(f - px1 / 2, f - px1 / 2), Size(w - 2 * f + px1, h - 2 * f + px1),
+                androidx.compose.ui.geometry.CornerRadius(ri + px1 / 2), style = Stroke(1.5f * px1))
+        }
+    }
+}
 
 /** Old-brass plate: the texture under a light-to-dark wash, a lit top edge and a dark rim. */
 @Composable
@@ -226,3 +302,29 @@ fun StopButton(label: String, tag: String, modifier: Modifier = Modifier, onClic
         Text(label, style = Wood.sans(15.sp, FontWeight.Bold, Color.White), maxLines = 1)
     }
 }
+
+/**
+ * Lets one tap through, then ignores any other for [window] ms (0.3.4 player report: a double tap on Roll also ended
+ * the turn, because End turn takes Roll's place under the finger). One guard, [MoveTaps], is shared by every button
+ * that sends a move or can't be undone, so a second tap is caught whichever button has appeared in its place.
+ */
+class TapGuard(private val window: Long = 500, private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
+    private var last: Long? = null
+
+    /** True (and the window starts again) when a tap now may go through. */
+    fun allow(): Boolean {
+        val now = clock()
+        last?.let { if (now - it in 0 until window) return false }
+        last = now
+        return true
+    }
+
+    /** [action], run only when [allow] lets the tap through. */
+    fun wrap(action: () -> Unit): () -> Unit = { if (allow()) action() }
+}
+
+/** The guard on every move button: Roll, End turn, the chest buttons, card picks, board confirms, Fortune plays. */
+val MoveTaps = TapGuard()
+
+/** [action] behind [MoveTaps]: a second tap within half a second does nothing. */
+fun moveTap(action: () -> Unit): () -> Unit = MoveTaps.wrap(action)

@@ -1,7 +1,7 @@
 package wgbg.engine
 
 /**
- * Resource card indices, in Catanatron's order. Cities & Knights commodities
+ * Resource card indices, in Catanatron's order. Age of Chivalry commodities
  * (paper, cloth, coin) will be appended after ORE by growing [CARD_TYPES].
  */
 object Resource {
@@ -54,12 +54,12 @@ object Cost {
     val DEV_CARD = intArrayOf(0, 0, 1, 1, 1)
 }
 
-// ------------------------------------------------------------------ Cities & Knights
+// ------------------------------------------------------------------ Age of Chivalry
 
 /**
- * C&K commodities. In actions that name a card (DISCARD, MARITIME_TRADE, CHOOSE_CARD, ...)
- * C&K uses one card index space: resources 0..4 then commodities [PAPER]..[COIN] = 5..7.
- * Commodity hands live in [CkState.commodities], indexed by [local] (0..2).
+ * Age of Chivalry commodities. In actions that name a card (DISCARD, MARITIME_TRADE, CHOOSE_CARD, ...)
+ * Age of Chivalry uses one card index space: resources 0..4 then commodities [PAPER]..[COIN] = 5..7.
+ * Commodity hands live in [ChivalryState.commodities], indexed by [local] (0..2).
  */
 object Commodity {
     const val PAPER = 5
@@ -82,10 +82,10 @@ object Commodity {
     }
 }
 
-/** Number of card types (resources + commodities) in C&K's card index space. */
-const val CK_CARD_TYPES = Resource.COUNT + Commodity.COUNT
+/** Number of card types (resources + commodities) in Age of Chivalry's card index space. */
+const val CHIVALRY_CARD_TYPES = Resource.COUNT + Commodity.COUNT
 
-/** Card names for C&K's card index space (resources then commodities). */
+/** Card names for Age of Chivalry's card index space (resources then commodities). */
 val CARD_NAMES = Resource.NAMES + Commodity.NAMES
 
 /** City-improvement tracks, which are also the progress-card colours and event-die gates. */
@@ -120,7 +120,7 @@ object EventDie {
     fun gateTrack(face: Int) = if (face < SHIP_FACES) -1 else face - SHIP_FACES
 }
 
-/** C&K progress cards. Ids are grouped by colour: science 0..9, trade 10..15, politics 16..24. */
+/** Age of Chivalry progress cards. Ids are grouped by colour: science 0..9, trade 10..15, politics 16..24. */
 object Progress {
     // Science (green)
     const val ALCHEMIST = 0
@@ -185,8 +185,8 @@ object Progress {
     fun inventorMovable(number: Int) = number != 0 && number != 2 && number != 12 && number != 6 && number != 8
 }
 
-/** C&K piece supplies and constants. */
-object CkPiece {
+/** Age of Chivalry piece supplies and constants. */
+object ChivalryPiece {
     /** Knights per strength level (basic, strong, mighty) per player. */
     const val KNIGHTS_PER_LEVEL = 2
     const val MAX_KNIGHT_LEVEL = 3
@@ -199,7 +199,7 @@ object CkPiece {
     const val WALL_HAND_BONUS = 2
 }
 
-object CkCost {
+object ChivalryCost {
     val WALL = intArrayOf(0, 2, 0, 0, 0)
     val KNIGHT = intArrayOf(0, 0, 1, 0, 1)
     val PROMOTE = intArrayOf(0, 0, 1, 0, 1)

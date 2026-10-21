@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -144,7 +145,7 @@ fun FeedbackPanel(game: String?, history: List<String>, position: String?, shot:
             game.takeIf { withGame }, if (withGame) history else emptyList(), position.takeIf { withGame }, System.currentTimeMillis())
     }
     // A dim backdrop that swallows taps, so the board under it isn't played by accident.
-    Box(Modifier.fillMaxSize().background(Color(0xA0000000)).clickable(MutableInteractionSource(), null) {}.testTag("feedback"),
+    Box(Modifier.fillMaxSize().background(Color(0xA0000000)).clickable(MutableInteractionSource(), null) {}.displayCutoutPadding().testTag("feedback"),
         contentAlignment = Alignment.Center) {
         // Scrolls when it can't fit: at 320 dp tall (CI's screen) with a screenshot attached, Send and Close were squashed.
         Column(Modifier.width(520.dp).padding(vertical = 6.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),

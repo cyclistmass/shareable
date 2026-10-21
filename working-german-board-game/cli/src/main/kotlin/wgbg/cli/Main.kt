@@ -41,7 +41,7 @@ import kotlin.system.exitProcess
 private val RES = listOf("Timber", "Clay", "Fleece", "Grain", "Stone", "Parchment", "Fabric", "Silver")
 private val FORTUNE = listOf("Sentinel", "Windfall", "Corner the Market", "Trailblazers", "Landmark")
 
-private class Record(val dir: File, val seats: List<String>, val seed: Long, val vp: Int, val actions: MutableList<Action>, /** 0 = true-random dice, else 1-4 stacked 36-card decks. */ val dice: Int = 0) {
+internal class Record(val dir: File, val seats: List<String>, val seed: Long, val vp: Int, val actions: MutableList<Action>, /** 0 = true-random dice, else 1-4 stacked 36-card decks. */ val dice: Int = 0) {
     val config get() = GameConfig(numPlayers = seats.size, vpToWin = vp, generateTradeOffers = true, maxTurns = 400)
 
     fun replay(): GameState {
@@ -92,22 +92,25 @@ private val trueDice = TrueRandomDice()
 private fun Record.drawnCards() = actions.filter { it.type == ActionType.ROLL && it.payload != 0L }.map { DiceDeck.cardOf(it.a, it.b) }
 
 /** The next roll: true-random dice, or the next card of this game's dice deck, dealt from the log. */
-private fun Record.roll(): Action = if (dice == 0) trueDice.next().toAction() else DiceDeck.nextFromLog(drawnCards(), dice).toAction()
+internal fun Record.roll(): Action = if (dice == 0) trueDice.next().toAction() else DiceDeck.nextFromLog(drawnCards(), dice).toAction()
 
 private fun Record.diceText() = if (dice == 0) "true random" else
     "${36 * dice}-card deck, ${DiceDeck.leftInStack(drawnCards(), dice).sum() - 5} cards before the reshuffle"
 
-/** Lets built-in bots take every turn that is theirs, so people/agents only wait on each other. */
-private fun runBots(r: Record, s: GameState) {
+/**
+ * Lets built-in bots take every turn that is theirs, so people/agents only wait on each other, and declines for anyone
+ * an offer they can't pay (#26: Decline was all they could do with it, and the game sat waiting on them).
+ */
+internal fun runBots(r: Record, s: GameState) {
     val buf = ActionBuffer()
     // One bot per seat for the whole run: a bot keeps per-turn memory (like its two-offers-a-turn
     // limit), and a fresh bot for every move forgot it and could offer forever.
     val bots = HashMap<Int, GreedyBot>()
     var guard = 0
-    while (!s.isOver && r.seats[s.actingPlayer].equals("bot", ignoreCase = true) && guard++ < 50_000) {
+    while (!s.isOver && (r.seats[s.actingPlayer].equals("bot", ignoreCase = true) || Rules.cantPayOffer(s, s.actingPlayer)) && guard++ < 50_000) {
         Rules.legalActions(s, buf)
         val p = s.actingPlayer
-        var a = bots.getOrPut(p) { GreedyBot(r.seed * 31 + p + r.actions.size) }.choose(s, buf)
+        var a = if (Rules.cantPayOffer(s, p)) Action.REJECT_TRADE else bots.getOrPut(p) { GreedyBot(r.seed * 31 + p + r.actions.size) }.choose(s, buf)
         if (a.type == ActionType.ROLL) a = r.roll()
         Rules.applyChecked(s, a)
         r.actions += a
@@ -161,7 +164,7 @@ private fun describe(s: GameState, a: Action, names: List<String>): String {
         ActionType.OFFER_TRADE -> "Offer the players: you give ${cards { a.offerGive(it) }}, you get ${cards { a.offerWant(it) }}"
         ActionType.ACCEPT_TRADE -> "Accept ${names[s.currentPlayer]}'s offer"
         ActionType.REJECT_TRADE -> "Decline ${names[s.currentPlayer]}'s offer" +
-            if (Action.ACCEPT_TRADE !in Rules.legalActions(s)) " (you can't pay it; to counter: counter --seat $p --give ... --want ...)" else ""
+            if (Action.ACCEPT_TRADE !in Rules.legalActions(s)) " (it gives or asks only, so it can't be taken as it stands; to counter: counter --seat $p --give ... --want ...)" else ""
         ActionType.COUNTER_TRADE -> "Counter-offer to ${names[s.currentPlayer]}: you give ${cards { a.offerWant(it) }}, you get ${cards { a.offerGive(it) }}"
         ActionType.CONFIRM_TRADE -> s.counterOf(a.payload.toInt())?.let { c ->
             "Take ${names[a.payload.toInt()]}'s counter-offer: you give ${cards { c.offerGive(it) }}, you get ${cards { c.offerWant(it) }}"
@@ -241,7 +244,7 @@ private fun pastTense(t: String) = t
     .replace("End your turn", "ended the turn").replace("Accept ", "accepted ").replace("Decline ", "declined ")
 
 /** The last [n] moves in words, replayed from the log (everything here is public information). */
-private fun recentMoves(r: Record, n: Int): List<String> {
+internal fun recentMoves(r: Record, n: Int): List<String> {
     val s = Rules.newGame(r.config, r.seed)
     val out = ArrayList<String>()
     for (a in r.actions) {
@@ -249,7 +252,8 @@ private fun recentMoves(r: Record, n: Int): List<String> {
         val before = IntArray(r.seats.size * CARD_TYPES) { s.hands[it] }
         var text = when (a.type) {
             ActionType.ROLL -> "rolled " + (if (a.payload != 0L) "${a.a} + ${a.b} = ${a.a + a.b}" else "")
-            ActionType.REJECT_TRADE -> "declined the offer"
+            ActionType.REJECT_TRADE -> if (Rules.cantPayOffer(s, s.actingPlayer))
+                "declined the offer automatically: doesn't hold ${cards { Rules.offerShortfall(s, s.actingPlayer)[it] }}" else "declined the offer"
             ActionType.ACCEPT_TRADE -> "accepted the offer"
             ActionType.BUY_DEVELOPMENT_CARD -> "bought a Fortune card"
             else -> describe(s, a, r.seats).let(::pastTense)

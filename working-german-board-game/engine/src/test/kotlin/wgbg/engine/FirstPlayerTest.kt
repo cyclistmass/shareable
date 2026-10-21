@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 
 /** #126: the first player comes from the seed, the setup snake starts there, and so does the first turn. */
 class FirstPlayerTest {
-    private fun check(s: GameState) = if (s.ck != null) CK.checkInvariants(s) else T.checkInvariants(s)
+    private fun check(s: GameState) = if (s.chivalry != null) CK.checkInvariants(s) else T.checkInvariants(s)
 
     private fun setupOrder(config: GameConfig, seed: Long): Pair<List<Int>, GameState> {
         val s = Rules.newGame(config, seed)
@@ -32,7 +32,7 @@ class FirstPlayerTest {
                 val round = List(n) { (f + it) % n }
                 assertEquals(round + round.reversed(), order, "$exp n=$n seed=$seed")
                 assertEquals(f, s.currentPlayer); assertEquals(f, s.actingPlayer)
-                for (p in 0 until n) assertEquals(if (exp == Expansion.BASE) 2 else 3, s.publicVictoryPoints(p))   // C&K: homestead + town
+                for (p in 0 until n) assertEquals(if (exp == Expansion.BASE) 2 else 3, s.publicVictoryPoints(p))   // Age of Chivalry: homestead + town
                 check(s)
             }
             assertEquals((0 until n).toSet(), starts, "$exp n=$n: every seat starts for some seed")

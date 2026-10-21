@@ -98,7 +98,7 @@ internal fun themedLivePlacements(s: GameState, choice: ArtChoice, lod: Int, has
     return buildList {
         for (p in original) {
             val m = p.model
-            if (board && (m == "sea" || m.startsWith("tile_") || m == "number_plate" || m.startsWith("digit_"))) continue
+            if (board && (m == "sea" || m == "live_water_mesh" || m == "coast_a" || m.startsWith("tile_") || m == "number_plate" || m.startsWith("digit_"))) continue
             if (choice.space(ArtObject.KNIGHTS) && m in listOf(KNIGHT_RING, KNIGHT_BAND)) continue
             var sprite: SpaceArt.Sprite? = null
             var position = p.position
@@ -117,9 +117,9 @@ internal fun themedLivePlacements(s: GameState, choice: ArtChoice, lod: Int, has
                     m.endsWith("_homestead") -> sprite = SpaceArt.homestead
                     m.endsWith("_town") -> sprite = SpaceArt.town
                     m.endsWith("_road_v") -> sprite = SpaceArt.road(0)
-                    m.endsWith("_ramparts") -> sprite = SpaceArt.ramparts(1 + BuildingSprites.rampartsHeight((0..2).maxOf { s.ck!!.level(p.owner, it) }))
+                    m.endsWith("_ramparts") -> sprite = SpaceArt.ramparts(1 + BuildingSprites.rampartsHeight((0..2).maxOf { s.chivalry!!.level(p.owner, it) }))
                     "_capital_" in m -> {
-                        val v = s.ck!!.metroVertex.indexOfFirst { it >= 0 && liveVertex(s.board, it) == p.position }
+                        val v = s.chivalry!!.metroVertex.indexOfFirst { it >= 0 && liveVertex(s.board, it) == p.position }
                         sprite = SpaceArt.capital(v)
                     }
                 }
@@ -145,9 +145,9 @@ internal fun themedLivePlacements(s: GameState, choice: ArtChoice, lod: Int, has
                 val dir = b - a
                 add(LivePlacement(spaceModel(if (common == 1) SpaceArt.cliff else SpaceArt.lane), (a + b) / 2f, heading = atan2(dir.x, dir.y)))
             }
-            if (s.ck != null) {
+            if (s.chivalry != null) {
                 val radius = (0 until s.board.vertexCount).maxOf { liveVertex(s.board, it).getDistance() }
-                val pose = raidersPose(s.ck!!.barbarianPos.toFloat(), radius, 0f)
+                val pose = raidersPose(s.chivalry!!.barbarianPos.toFloat(), radius, 0f)
                 add(LivePlacement(spaceModel(SpaceArt.raidersShip), Offset(pose.x, pose.y), LIVE_SEA, heading = -pose.heading))
             }
         }

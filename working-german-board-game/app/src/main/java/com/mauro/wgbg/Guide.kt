@@ -25,7 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import wgbg.engine.CkCost
+import wgbg.engine.ChivalryCost
 import wgbg.engine.Cost
 import wgbg.engine.Progress
 import wgbg.engine.Track
@@ -43,16 +43,18 @@ fun buildCosts(chivalry: Boolean): List<BuildCost> = buildList {
     add(BuildCost("Town", Cost.CITY, "2 points; replaces a homestead"))
     if (!chivalry) add(BuildCost("Fortune card", Cost.DEV_CARD))
     if (chivalry) {
-        add(BuildCost("Knight", CkCost.KNIGHT, "raised at a corner on your roads, level 1"))
-        add(BuildCost("Promote a knight", CkCost.PROMOTE, "level 3 needs Crown improvement 3"))
-        add(BuildCost("Supply a knight", CkCost.ACTIVATE, "a supplied knight defends and can act"))
-        add(BuildCost("Ramparts", CkCost.WALL, "on a town: hold 2 more cards on a 7"))
+        add(BuildCost("Knight", ChivalryCost.KNIGHT, "raised at a corner on your roads, level 1"))
+        add(BuildCost("Promote a knight", ChivalryCost.PROMOTE, "level 3 needs Crown improvement 3"))
+        add(BuildCost("Supply a knight", ChivalryCost.ACTIVATE, "a supplied knight defends and can act"))
+        add(BuildCost("Ramparts", ChivalryCost.WALL, "on a town: hold 2 more cards on a 7"))
     }
 }
 
+/** Our names for the five producing terrains, in engine resource order (not the original game's, #91). */
+val TERRAIN_NAMES = listOf("Woodland", "Clay pit", "Meadow", "Grainfield", "Quarry")
+
 /** Where each card comes from (card index order). */
-val CARD_SOURCES = listOf("Forest", "Hills", "Pasture", "Fields", "Mountains",
-    "Towns on Forest", "Towns on Pasture", "Towns on Mountains")
+val CARD_SOURCES = TERRAIN_NAMES + listOf("Towns on ${TERRAIN_NAMES[0]}", "Towns on ${TERRAIN_NAMES[2]}", "Towns on ${TERRAIN_NAMES[4]}")
 
 /** The three progress decks in engine card order: (deck name, track, first card, last card). */
 private val DECKS = listOf(Triple("Academy", Track.SCIENCE, 0..9), Triple("Guilds", Track.TRADE, 10..15), Triple("Crown", Track.POLITICS, 16 until Progress.COUNT))
@@ -127,7 +129,7 @@ fun CardGuide(chivalry: Boolean, pirate: Boolean, onClose: () -> Unit, modifier:
         } else {
             heading("Fortune cards")
             for (c in FORTUNE.indices) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top, modifier = Modifier.testTag("fortune-row-$c")) {
-                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = GuideArt.fortuneIsKnightCard(c) && !LocalArtChoice.current.space(ArtObject.CARDS))
+                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = !LocalArtChoice.current.space(ArtObject.CARDS))
                 Column {
                     Text(FORTUNE[c], color = GUIDE_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(150.dp))
                     Text(FORTUNE_HINTS[c], color = GUIDE_INK.copy(alpha = 0.85f), fontSize = 12.sp)

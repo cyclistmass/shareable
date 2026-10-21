@@ -48,6 +48,7 @@ import kotlin.random.Random
  * dragged, and tapping the water splashes.
  */
 class Sea(board: Board, seed: Int = 1) {
+    internal val liveCoastEdges = liveCoast(board)
     private val rnd = Random(seed)
     private val topo = board.topology
     private fun lx(v: Int) = topo.vertexPos[v].x * SQRT3 / 2f
@@ -301,7 +302,7 @@ class Sea(board: Board, seed: Int = 1) {
         val pdt = dt * (0.25f + 1.5f * motion)
         time += pdt
         raidersRunIn = (raidersRunIn - pdt).coerceAtLeast(0f)
-        val orbitTarget = if (raidersRunIn > 0f) wgbg.engine.CkPiece.BARBARIAN_TRACK.toFloat() else raidersTarget.toFloat()
+        val orbitTarget = if (raidersRunIn > 0f) wgbg.engine.ChivalryPiece.BARBARIAN_TRACK.toFloat() else raidersTarget.toFloat()
         raidersTrack += (orbitTarget - raidersTrack) * (1f - exp(-pdt / 3f))
         viewArea?.let { v -> for (c in critters) c.update(pdt, v) }
         for (p in drops) p.age += dt
@@ -732,7 +733,7 @@ class Sea(board: Board, seed: Int = 1) {
     }
 
     /** Clouds, gulls and splash droplets: drawn after the board. */
-    fun drawSky(ds: DrawScope, at: (Float, Float) -> Offset, s: Float) = with(ds) {
+    fun drawSky(ds: DrawScope, at: (Float, Float) -> Offset, s: Float, includeBirds: Boolean = true) = with(ds) {
         for (p in drops) {
             val t = p.age / p.life
             // Droplets arc up and fall back (cloud puffs just spread out).
@@ -740,7 +741,7 @@ class Sea(board: Board, seed: Int = 1) {
             drawCircle(Color(0xFFE8F7FF).copy(alpha = 1 - t), p.r * s, at(p.x + p.dx * t, p.y + p.dy * t * 0.4f + lift))
         }
         drawCritters(this, "air", at, s)
-        for (bi in 0 until birdCount) {
+        for (bi in 0 until if (includeBirds) birdCount else 0) {
             val b = birds[bi]
             if (!onScreen(at(b.x, b.y), 1f * s)) continue // shadow included
             // A faint shadow on the water below, then the bird. Higher up it looks a little bigger, and its shadow
@@ -814,6 +815,31 @@ class Sea(board: Board, seed: Int = 1) {
             val q = c.at.let { at(it.x, it.y) }
             val side = m.frames.span * s * depthScale(at, c.at.x, c.at.y, s)
             if (onScreen(q, side)) drawCritterFrame(m, q, side, fr, m.headingIndex(c.course, squash3d), m.tiltIndex(tiltStep3d))
+        }
+    }
+
+    /**
+     * The 3D board (#63): the critters in and on the water (the whale), drawn over the live water at the board's [tilt]
+     * (radians from straight down). They keep clear of the coast, so they never cover a tile.
+     */
+    internal fun drawLiveCritters(ds: DrawScope, at: (Float, Float) -> Offset, s: Float, tilt: Float) {
+        squash3d = cos(tilt); tiltStep3d = SeaSprites3d.tiltStep(tilt)
+        for (layer in listOf("under", "underwater", "surface")) drawCritters(ds, layer, at, s)
+    }
+
+    /** Splash rings on the live water plane. Cloud particles still use drawSky's shared pool. */
+    internal fun drawLiveSplashes(ds: DrawScope, at: (Float, Float) -> Offset, s: Float) = with(ds) {
+        for (r in rings) {
+            if (r.age < r.delay) continue
+            val t = ((r.age - r.delay) / 1.2f).coerceIn(0f, 1f)
+            val radius = .06f + t * .6f
+            val path = Path()
+            for (i in 0..32) {
+                val a = i * 2f * PI.toFloat() / 32f
+                val p = at(r.x + radius * cos(a), r.y + radius * .62f * sin(a))
+                if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+            }
+            ds.drawPath(path, Color.White.copy(alpha = .9f * (1 - t)), style = Stroke(.03f * s))
         }
     }
 

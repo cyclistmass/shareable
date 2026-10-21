@@ -4,12 +4,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
-/** Random legal Cities & Knights play, checking every invariant after every action. */
-class CkFuzzTest {
-    private val allKinds: List<ActionKind> = ActionType.entries + CkActionType.entries
+/** Random legal Age of Chivalry play, checking every invariant after every action. */
+class ChivalryFuzzTest {
+    private val allKinds: List<ActionKind> = ActionType.entries + ChivalryActionType.entries
 
     @Test
-    fun `1000 random C&K games keep every invariant`() {
+    fun `1000 random Age of Chivalry games keep every invariant`() {
         var wins = 0
         var draws = 0
         var actions = 0L
@@ -21,7 +21,7 @@ class CkFuzzTest {
         val buf = ActionBuffer()
         for (game in 0 until 1000) {
             val config = GameConfig(
-                expansion = Expansion.CITIES_AND_KNIGHTS,
+                expansion = Expansion.CHIVALRY,
                 numPlayers = 3 + game % 2,
                 layout = if (game % 5 == 0) BoardLayout.BEGINNER else BoardLayout.RANDOM,
                 randomDiscard = game % 4 == 1,
@@ -48,19 +48,19 @@ class CkFuzzTest {
                 }
                 counts.merge(a.type, 1, Int::plus)
                 phases.merge(s.phase, 1, Int::plus)
-                if (a.type == CkActionType.PLAY_PROGRESS) cards[a.a]++
+                if (a.type == ChivalryActionType.PLAY_PROGRESS) cards[a.a]++
                 steps++
                 assertTrue(steps < 300_000, "game $game does not terminate")
             }
             actions += steps
-            attacks += s.ck!!.barbarianAttacks
-            metropolises += s.ck!!.metroOwner.count { it >= 0 }
+            attacks += s.chivalry!!.barbarianAttacks
+            metropolises += s.chivalry!!.metroOwner.count { it >= 0 }
             if (s.winner >= 0) wins++ else draws++
         }
-        println("ck fuzz: $wins wins, $draws draws, $actions actions, $attacks barbarian attacks, $metropolises metropolises")
-        println("ck action mix: " + allKinds.joinToString { "$it=${counts[it] ?: 0}" })
-        println("ck phases: " + Phase.entries.joinToString { "$it=${phases[it] ?: 0}" })
-        println("ck progress plays: " + Progress.NAMES.indices.joinToString { "${Progress.NAMES[it]}=${cards[it]}" })
+        println("chivalry fuzz: $wins wins, $draws draws, $actions actions, $attacks barbarian attacks, $metropolises metropolises")
+        println("chivalry action mix: " + allKinds.joinToString { "$it=${counts[it] ?: 0}" })
+        println("chivalry phases: " + Phase.entries.joinToString { "$it=${phases[it] ?: 0}" })
+        println("chivalry progress plays: " + Progress.NAMES.indices.joinToString { "${Progress.NAMES[it]}=${cards[it]}" })
         assertEquals(1000, wins + draws)
         assertTrue(wins > 400, "random games should often finish")
         val unused = setOf<ActionKind>(
@@ -68,7 +68,7 @@ class CkFuzzTest {
             ActionType.PLAY_MONOPOLY, ActionType.PLAY_ROAD_BUILDING, ActionType.OFFER_TRADE, ActionType.COUNTER_TRADE,
         )
         for (k in allKinds) {
-            if (k in unused) assertEquals(0, counts[k] ?: 0, "$k played in C&K")
+            if (k in unused) assertEquals(0, counts[k] ?: 0, "$k played in Age of Chivalry")
             else assertTrue((counts[k] ?: 0) > 0, "$k never played")
         }
         for (p in Phase.entries) if (p != Phase.DECIDE_COUNTER) assertTrue((phases[p] ?: 0) > 0, "phase $p never reached") // counters are base-game only
@@ -78,8 +78,8 @@ class CkFuzzTest {
     }
 
     private val building = setOf<ActionKind>(
-        ActionType.BUILD_SETTLEMENT, ActionType.BUILD_CITY, CkActionType.IMPROVE_CITY, CkActionType.BUILD_CITY_WALL,
-        CkActionType.BUILD_KNIGHT, CkActionType.ACTIVATE_KNIGHT, CkActionType.PROMOTE_KNIGHT,
+        ActionType.BUILD_SETTLEMENT, ActionType.BUILD_CITY, ChivalryActionType.IMPROVE_CITY, ChivalryActionType.BUILD_CITY_WALL,
+        ChivalryActionType.BUILD_KNIGHT, ChivalryActionType.ACTIVATE_KNIGHT, ChivalryActionType.PROMOTE_KNIGHT,
     )
 
     /**
@@ -99,14 +99,14 @@ class CkFuzzTest {
         while (true) {
             val a = buf[bot.nextInt(buf.size)]
             val t = a.type
-            val slow = t == ActionType.END_TURN || t == CkActionType.OFFER_TRADE_CK || t == ActionType.MARITIME_TRADE
+            val slow = t == ActionType.END_TURN || t == ChivalryActionType.OFFER_TRADE_CK || t == ActionType.MARITIME_TRADE
             if (buf.size > 1 && slow && bot.nextInt(4) != 0) continue
             return a
         }
     }
 
     @Test
-    fun `benchmark random C&K playouts`() {
+    fun `benchmark random Age of Chivalry playouts`() {
         val buf = ActionBuffer()
         fun playout(seed: Long, players: Int): Int {
             val s = Rules.newGame(CK.config(players, BoardLayout.RANDOM, maxTurns = 1000), seed)
@@ -125,7 +125,7 @@ class CkFuzzTest {
         val t0 = System.nanoTime()
         for (g in 0 until games) actions += playout(50_000L + g, 3 + g % 2)
         val secs = (System.nanoTime() - t0) / 1e9
-        println("ck benchmark: %.0f games/s, %.0f actions/s (%d games, avg %d actions)".format(
+        println("chivalry benchmark: %.0f games/s, %.0f actions/s (%d games, avg %d actions)".format(
             games / secs, actions / secs, games, actions / games,
         ))
     }

@@ -16,6 +16,16 @@ for ruleset in base chivalry; do
   "$ADB" logcat -c
   "$ADB" logcat -b crash -c 2>/dev/null || true
   timeout 60 "$ADB" shell am start -W --activity-clear-task -n "$PKG/.MainActivity" --es start "$ruleset" --ez watch true >/dev/null
+  if [ "${LIVE_BOARD:-0}" = 1 ]; then
+    # The first activity frame can precede registration of the game's receiver.
+    live_ready=0
+    for attempt in $(seq 1 15); do
+      "$ADB" shell am broadcast -a com.mauro.wgbg.FILAMENT_VIEW -p "$PKG" --ez live true >/dev/null
+      if "$ADB" logcat -d -s WGBG-3D-VIEW:I | grep -q 'live=true'; then live_ready=1; break; fi
+      sleep 1
+    done
+    if [ "$live_ready" != 1 ]; then echo "Live board receiver did not start"; exit 1; fi
+  fi
   start=$(date +%s); games=0
   while [ $(( $(date +%s) - start )) -lt "$SECS" ]; do
     sleep 5

@@ -14,8 +14,8 @@ MODE="${1:-screens}"
 export MSYS_NO_PATHCONV=1
 fail=0
 
-dump() { for _ in 1 2 3; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; }
+dump() { for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  local x; x=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null); case "$x" in *hierarchy*) echo "$x" | tr '>' '\n'; return;; esac; sleep 1; done; echo "uiautomator dump failed 6 times (busy device?)" >&2; }
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
 on() { dump | grep -q "text=\"$1\""; }
@@ -78,8 +78,8 @@ if [ "$MODE" = screens ]; then
   all "start menu" "New game" "Settings" "ⓘ  About and credits"
   go "Settings" "Close"; all "start menu settings" "Close"; tap "Close"
   go "New game" "Players"
-  all "game-start" "Base game" "Age of Chivalry" "Report" "Intro" "Look &amp; art" "Play" "Host a room" "Join a room"
-  go "Report" "Add a picture"; all "Report" "Bug" "Idea" "Add a picture" "Send" "Close"; tap "Close"
+  all "game-start" "Base game" "Age of Chivalry" "Report a bug or idea" "Intro" "Look &amp; art" "Play" "Host a room" "Join a room"
+  go "Report a bug or idea" "Add a picture"; all "Report" "Bug" "Idea" "Add a picture" "Send" "Close"; tap "Close"
   go "Look &amp; art" "Done"; all "Look & art" "Done" "Card guide"; tap "Done"
   # Online needs a real name: type one (the name box is the screen's first text box, at the left panel's top).
   box() { fits "$(dump | grep 'class="android.widget.EditText"' | head -1 | bounds)"; }
@@ -90,7 +90,7 @@ if [ "$MODE" = screens ]; then
   "$ADB" shell input text Duo; "$ADB" shell input keyevent KEYCODE_ENTER; sleep 1
   go "Join a room" "Room code"; all "Join" "Join" "Back"; tap "Back"
   on "Players" || go "New game" "Players"
-  go "Host a room" "Start game"; all "lobby" "Copy link" "Share…" "Show QR" "Start game" "New game settings…"
+  go "Host a room" "Start game"; all "lobby" "Copy link" "Share…" "Show QR" "Start game" "Leave room"
   "$ADB" shell input keyevent KEYCODE_BACK; sleep 2; leave
   on "Players" || go "New game" "Players"
   # Age of Chivalry: its eight cards are the card guide's widest row.
@@ -107,7 +107,11 @@ else
   for _ in $(seq 1 20); do on "See the board" && break; sleep 3; done
   all "game over" "Play again" "See the board" "Exit"
   tap "See the board"
-  xy=$(dump | grep 'content-desc="Dice"' | centre)
+  x=$(dump); xy=$(echo "$x" | grep 'content-desc="Dice"' | centre)
+  # The dice row sits under the player list, never over the last player's row (0.3.4: a 110 dp floor pushed it up).
+  read -r _ _ _ pb < <(echo "$x" | grep 'content-desc="Players"' | bounds); read -r _ dt _ _ < <(echo "$x" | grep 'content-desc="Dice"' | bounds)
+  if [ -z "${pb:-}" ] || [ -z "${dt:-}" ]; then bad "the player list or the dice row is missing"
+  elif [ "$dt" -lt "$pb" ]; then bad "the dice row (top $dt) overlaps the player list (bottom $pb)"; fi
   # A double tap: each `input tap` starts its own process, and on CI's slower emulator two in a row landed further apart
   # than Android's double-tap window (0.3.3 CI). So the first runs in the background and the second starts a beat
   # later, both starting up together; try again with other gaps if it was still read as two taps.

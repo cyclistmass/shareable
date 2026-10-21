@@ -24,7 +24,7 @@ class LiveOverlayTopTest {
 
     @Test
     fun `rings sit where the pieces and plates are drawn, and taps on them come back to the same spot`() {
-        val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS), 5)
+        val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY), 5)
         s.vertexOwner[0] = 0; s.vertexBuilding[0] = Piece.SETTLEMENT
         for (theme in themes) {
             val choice = ArtChoice(theme)
@@ -73,7 +73,10 @@ class LiveOverlayTopTest {
             assertTrue(uses.isNotEmpty(), call)
             for (u in uses) assertTrue("liveBoardTop(env.art)" in u.substringBefore("pieceOn").substringBefore("{ v ->"), "$call without the board top")
         }
-        val boardTap = main.lines().single { "LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at" in it }
-        assertTrue("unproject(at, liveBoardTop(env.art))" in boardTap, "a tap on the 3D board reads it at height 0")
+        val taps = main.lines().filter { "LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at" in it }
+        assertEquals(2, taps.size, taps.toString())
+        assertTrue(taps.any { "unproject(at, liveBoardTop(env.art))" in it }, "a tap on the 3D board reads it at height 0")
+        // A splash lands where the tap meets the 3D water (#63), which is lower than the board.
+        assertTrue(taps.any { "unproject(at, LIVE_WATER_HEIGHT)" in it }, "a tap on the 3D water reads it at the board top")
     }
 }

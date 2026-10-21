@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import wgbg.engine.ActionBuffer
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.GameState
@@ -24,7 +24,7 @@ class ProgressPlayTest {
     @Test
     fun `Hoist with one choice still shows the picker, saying what it improves and what it costs`() {
         val s = report("hoist", drop = 1)                          // just before he played it
-        val (label, acts) = ckButtonGroups(s, Rules.legalActions(s), PLAYER_NAMES).first { it.first == "Play Hoist" }
+        val (label, acts) = chivalryButtonGroups(s, Rules.legalActions(s), PLAYER_NAMES).first { it.first == "Play Hoist" }
         assertEquals(1, acts.size)
         assertTrue(asksFirst(acts[0]), "one choice still asks")
         assertEquals("Improve Guilds to level 2: 1 Fabric instead of 2", progressOption(s, acts[0], PLAYER_NAMES), label)
@@ -43,9 +43,9 @@ class ProgressPlayTest {
         val save = LocalSave.decode(javaClass.getResource("/reports/grandfactor.save")!!.readText())!!
         val s = save.copy(moves = save.moves.take(239)).replay()!!     // move 239: his Saboteur, nobody at his points
         val me = s.currentPlayer
-        assertTrue(Rules.legalActions(s).any { it.type == CkActionType.PLAY_PROGRESS && it.a == Progress.SABOTEUR }, "still legal (old games replay)")
+        assertTrue(Rules.legalActions(s).any { it.type == ChivalryActionType.PLAY_PROGRESS && it.a == Progress.SABOTEUR }, "still legal (old games replay)")
         assertTrue(Progress.SABOTEUR !in playableProgress(s, me))
-        assertTrue(ckButtonGroups(s, Rules.legalActions(s), PLAYER_NAMES).none { it.first == "Play Wrecker" })
+        assertTrue(chivalryButtonGroups(s, Rules.legalActions(s), PLAYER_NAMES).none { it.first == "Play Wrecker" })
         assertEquals("the players it would hit hold fewer than 2 cards", notPlayableWhy(s, me, Progress.SABOTEUR))
     }
 
@@ -54,12 +54,12 @@ class ProgressPlayTest {
         val generic = "nothing it can do right now"
         var checked = 0
         for (seed in 1L..30L) {
-            val s = Rules.newGame(GameConfig(expansion = Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), seed)
+            val s = Rules.newGame(GameConfig(expansion = Expansion.CHIVALRY, numPlayers = 3), seed)
             val rnd = Random(seed); val buf = ActionBuffer(); var guard = 0
             while (!s.isOver && guard++ < 20_000 && !(s.turn >= 20 + seed % 30 && s.phase == Phase.PLAY_TURN && s.hasRolled && s.actingPlayer == s.currentPlayer)) {
                 Rules.legalActions(s, buf)
                 val all = (0 until buf.size).map { buf[it] }
-                val pick = all.filter { it.type != CkActionType.PLAY_PROGRESS }.ifEmpty { all }
+                val pick = all.filter { it.type != ChivalryActionType.PLAY_PROGRESS }.ifEmpty { all }
                 Rules.apply(s, pick[rnd.nextInt(pick.size)])
             }
             if (s.isOver) continue
@@ -68,7 +68,7 @@ class ProgressPlayTest {
             for (c in 0 until Progress.COUNT) {
                 if (c == Progress.ALCHEMIST || c == Progress.PRINTER || c == Progress.CONSTITUTION || c in now) continue
                 // Any card that isn't legal here, as if held: its reason is the card's own.
-                val held = s.copy().also { it.ck!!.progressHand[me * Progress.COUNT + c]++ }
+                val held = s.copy().also { it.chivalry!!.progressHand[me * Progress.COUNT + c]++ }
                 if (c in playableProgress(held, me)) continue
                 assertNotEquals(generic, notPlayableWhy(held, me, c), "${PROGRESS_NAMES[c]} seed $seed")
                 checked++

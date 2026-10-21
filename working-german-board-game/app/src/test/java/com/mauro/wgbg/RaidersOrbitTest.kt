@@ -11,7 +11,7 @@ class RaidersOrbitTest {
         for (sample in 0..720) {
             val t = sample / 720f * (2 * PI / 0.025).toFloat()
             var last = Float.MAX_VALUE
-            for (track in 0..CkPiece.BARBARIAN_TRACK) {
+            for (track in 0..ChivalryPiece.BARBARIAN_TRACK) {
                 val p = raidersPose(track.toFloat(), sea.landR, t)
                 val r = hypot(p.x, p.y)
                 assertTrue(sea.isWater(androidx.compose.ui.geometry.Offset(p.x, p.y)))
@@ -25,7 +25,7 @@ class RaidersOrbitTest {
     }
     @Test fun `track advance and battle reset ease instead of teleporting`() {
         val sea = Sea(Rules.newGame(GameConfig(), 1).board)
-        for (target in listOf(CkPiece.BARBARIAN_TRACK, 0)) {
+        for (target in listOf(ChivalryPiece.BARBARIAN_TRACK, 0)) {
             sea.raidersTarget = target
             repeat(60 * 30) {
                 val old = raidersPose(sea.raidersTrack, sea.landR, sea.time)

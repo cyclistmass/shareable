@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import androidx.compose.foundation.layout.displayCutoutPadding
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -60,7 +61,7 @@ object Splash {
         return url.startsWith("https://ko-fi.com/") && name.isNotEmpty() && name.all { it.isLetterOrDigit() || it == '_' || it == '-' }
     }
 
-    enum class Action { RESUME_GAME, RESUME_ROOM, NEW_GAME, LOG_IN, SETTINGS }
+    enum class Action { RESUME_GAME, RESUME_ROOM, NEW_GAME, FRIENDS, LOG_IN, SETTINGS }
 
     /** One main button: what it does, its label and whether it is the green go plate. */
     data class Button(val action: Action, val label: String, val go: Boolean, val tag: String)
@@ -69,13 +70,21 @@ object Splash {
      * The main buttons, top to bottom. Resume shows only for a saved local game ([localGame]) or an online room you
      * left for now ([room]); the first Resume is the green one, and New game is green when there is nothing to
      * resume. Log in shows only when the build can sign in ([canSignIn]), and reads Account once you are signed in.
+     * Quick game with friends shows once you have someone to play with ([friends], signed in only, #72).
      */
-    fun buttons(localGame: Boolean, room: String?, canSignIn: Boolean, signedIn: Boolean = false): List<Button> = buildList {
+    fun buttons(localGame: Boolean, room: String?, canSignIn: Boolean, signedIn: Boolean = false, friends: Boolean = false): List<Button> = buildList {
         if (localGame) add(Button(Action.RESUME_GAME, "Resume game", go = true, tag = "resume-game"))
         if (room != null) add(Button(Action.RESUME_ROOM, "Resume online game $room", go = !localGame, tag = "resume-room"))
         add(Button(Action.NEW_GAME, "New game", go = isEmpty(), tag = "new-game-open"))
+        if (friends && signedIn) add(Button(Action.FRIENDS, "Quick game with friends", go = false, tag = "quick-friends"))
         if (canSignIn) add(Button(Action.LOG_IN, if (signedIn) "Account" else "Log in", go = false, tag = "log-in"))
         add(Button(Action.SETTINGS, "Settings", go = false, tag = "splash-settings"))
+    }
+
+    /** The start screen's line for a room you were invited to (#72): who asked, and to what. */
+    fun inviteLine(r: wgbg.net.Room): String {
+        val ruleset = Ruleset.entries.firstOrNull { it.expansion == r.config.expansion }?.label ?: "a game"
+        return "${r.seats[0].name.ifBlank { "A friend" }} invited you: $ruleset"
     }
 
     /** The About board's credits, short form (the full list is CREDITS.md). Never the original game's name. */
@@ -88,8 +97,13 @@ object Splash {
         "Software" to "Kotlin, Jetpack Compose and AndroidX, Firebase, ZXing and Filament (Apache License 2.0).",
         "Thanks" to "To everyone who playtested and sent in-app reports.",
     )
-    const val DISCLAIMER = "An independent game with rules compatible with the classic German settlement-building game; " +
-        "not affiliated with or endorsed by its publishers. All names, card text and art are our own."
+    /**
+     * The trademark notice (#85, Mauro's wording): the only place the app names the original game's publisher, and
+     * only to say we're not them (it replaced the vaguer "its publishers" line). Shown on the About board and in
+     * Settings › About.
+     */
+    const val TRADEMARK = "An original game. Not affiliated with or endorsed by Catan GmbH or Catan Studio. " +
+        "CATAN is a trademark of Catan GmbH. All names, rules text and art are our own."
     const val ABOUT_LINE = "Made by Mauro DiBenedetto, with art and music built for the game. No ads, no tracking."
 }
 
@@ -113,23 +127,41 @@ fun SplashScreen(
     onEndGame: () -> Unit = {},
     env: EnvSettings,
     sound: SoundSettings,
+    /** Quick game with friends (#72): the people you played with, to pick from. */
+    onFriends: (List<wgbg.net.Friend>) -> Unit = {},
+    /** Join a room someone invited you to (#72), by its code. */
+    onJoinInvite: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     // Sign-in needs Firebase and a Google client id; builds without them have no Log in button (as AccountSection).
-    // Set up off the main thread (#111): the menu draws at once and Log in appears when Firebase is ready.
+    // Set up off the main thread (#111): the menu draws at once and Log in appears when Firebase is ready. A #72 sim's
+    // fake Google seat (debug, emulators only) has no client id but must still reach friends and invites.
     val account by androidx.compose.runtime.produceState<FirestoreTransport?>(null) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { GoogleAccount.webClientId(context) != null }
+            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }
         }
     }
+    // Rooms you hosted that are past their expiry go now (#72): in the background, never in the menu's way.
+    androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { LobbyRepository.cleanExpiredOnce(context) } }
     var panel by remember { mutableStateOf<Splash.Action?>(null) }
     var about by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }
     // Re-read who is signed in each time the Log in panel closes.
     var accountSeen by remember { mutableIntStateOf(0) }
     val signedIn = remember(accountSeen, account) { account?.let { GoogleAccount.status(it.account).signedIn } ?: false }
+    // Signed in with Google (#72): the people you played with, and the rooms that invite you while this screen is up.
+    val friends by androidx.compose.runtime.produceState(emptyList<wgbg.net.Friend>(), account, signedIn) {
+        val t = account?.takeIf { signedIn } ?: return@produceState
+        value = runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { t.friends().get(20, java.util.concurrent.TimeUnit.SECONDS) } }.getOrDefault(emptyList())
+            .let { wgbg.net.Friends.shown(it, System.currentTimeMillis()) }
+    }
+    var invites by remember { mutableStateOf(emptyList<wgbg.net.Room>()) }
+    androidx.compose.runtime.DisposableEffect(account, signedIn) {
+        val sub = account?.takeIf { signedIn }?.observeInvites({ invites = it }, { invites = emptyList() })
+        onDispose { sub?.close(); invites = emptyList() }
+    }
     if (about) { BackHandler { about = false }; AboutScreen { about = false }; return }
-    Box(Modifier.fillMaxSize().background(SPLASH_SEA).testTag("splash")) {
+    Box(Modifier.fillMaxSize().background(SPLASH_SEA).displayCutoutPadding().testTag("splash")) {
         Column(Modifier.fillMaxSize().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
             Text("Working German Board Game", style = Wood.title(34.sp, Color(0xFFFFF6DE)).copy(shadow = Shadow(Color(0xB3000000), Offset(0f, 4f), 12f)),
                 textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
@@ -137,12 +169,18 @@ fun SplashScreen(
             // Resume and End pushed Settings off the bottom.
             Column(Modifier.weight(1f, fill = false).width(300.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(14.dp).testTag("start-menu"),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (b in Splash.buttons(resumeGame, resumeRoom, account != null, signedIn)) {
+                for (r in invites.take(2)) Row(Modifier.fillMaxWidth().testTag("invite-${r.id}"), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(Splash.inviteLine(r), style = Wood.sans(14.sp, FontWeight.Bold), modifier = Modifier.weight(1f))
+                    GoButton("Join", "join-invite", true, Modifier.height(40.dp)) { onJoinInvite(r.id) }
+                }
+                for (b in Splash.buttons(resumeGame, resumeRoom, account != null, signedIn, friends.isNotEmpty())) {
                     val tap = {
                         when (b.action) {
                             Splash.Action.RESUME_GAME -> onResumeGame()
                             Splash.Action.RESUME_ROOM -> onResumeRoom()
                             Splash.Action.NEW_GAME -> onNewGame()
+                            Splash.Action.FRIENDS -> onFriends(friends)
                             Splash.Action.LOG_IN, Splash.Action.SETTINGS -> panel = b.action
                         }
                     }
@@ -224,7 +262,7 @@ private fun BottomLink(label: String, tag: String, onClick: () -> Unit) {
 @Composable
 fun AboutScreen(onClose: () -> Unit) {
     val context = LocalContext.current
-    Row(Modifier.fillMaxSize().tableTop().padding(14.dp).testTag("about"), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    Row(Modifier.fillMaxSize().tableTop().displayCutoutPadding().padding(14.dp).testTag("about"), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.width(300.dp).fillMaxHeight().brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Working German Board Game", style = Wood.title(22.sp))
@@ -246,7 +284,7 @@ fun AboutScreen(onClose: () -> Unit) {
                     pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = Wood.BRASS_LIGHT)); append("$head. "); pop()
                     append(body)
                 }, style = Wood.sans(14.sp))
-            Text(Splash.DISCLAIMER, style = Wood.sans(13.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("disclaimer"))
+            Text(Splash.TRADEMARK, style = Wood.sans(13.sp, color = Wood.INK_SOFT), modifier = Modifier.testTag("trademark"))
             BottomLink("Full credits and licence texts", "full-credits") { openLink(context, Splash.CREDITS_URL) }
         }
     }

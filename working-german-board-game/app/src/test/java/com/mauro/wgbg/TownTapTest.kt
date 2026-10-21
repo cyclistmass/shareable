@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import wgbg.ai.GreedyBot
 import wgbg.engine.ActionBuffer
-import wgbg.engine.CkActionType
+import wgbg.engine.ChivalryActionType
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.Piece
@@ -18,13 +18,13 @@ class TownTapTest {
     fun `a tap on your town offers exactly the improvements you can pay for, and nowhere else`() {
         var checked = 0; var capitalOnly = 0
         for (seed in 1L..12L) {
-            val s = Rules.newGame(GameConfig(Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), seed)
+            val s = Rules.newGame(GameConfig(Expansion.CHIVALRY, numPlayers = 3), seed)
             val bots = List(3) { GreedyBot(seed + it) }
             val buf = ActionBuffer()
             while (!s.isOver && s.turn < 400) {
                 val legal = Rules.legalActions(s)
                 val me = s.actingPlayer
-                val improves = legal.filter { it.type == CkActionType.IMPROVE_CITY }
+                val improves = legal.filter { it.type == ChivalryActionType.IMPROVE_CITY }
                 if (improves.isNotEmpty()) {
                     val towns = (0 until s.board.topology.vertexCount).filter { s.vertexOwner[it] == me && s.vertexBuilding[it] == Piece.CITY }
                     for (t in towns) {
@@ -42,7 +42,7 @@ class TownTapTest {
                         assertEquals(emptyList<Any>(), townMovesAt(s, legal, at, (me + 1) % 3))
                         assertEquals(emptyList<Any>(), townMovesAt(s, legal, Offset(at.x + 5f, at.y + 5f), me))
                         // A picked build-menu entry keeps the tap to that entry.
-                        assertTrue(tapMoves(s, legal, legal, at, me, menuPicked = true).none { it.type == CkActionType.IMPROVE_CITY })
+                        assertTrue(tapMoves(s, legal, legal, at, me, menuPicked = true).none { it.type == ChivalryActionType.IMPROVE_CITY })
                         assertTrue(tapMoves(s, legal, legal, at, me, menuPicked = false).containsAll(offered))
                         checked++
                     }
@@ -51,7 +51,7 @@ class TownTapTest {
             }
         }
         assertTrue(checked > 20, "town taps checked: $checked, capital-only towns $capitalOnly")
-        val s = Rules.newGame(GameConfig(Expansion.CITIES_AND_KNIGHTS, numPlayers = 3), 1)
-        assertEquals("Improve your towns?", confirmTitle(s, wgbg.engine.Action.of(CkActionType.IMPROVE_CITY, 0L)))
+        val s = Rules.newGame(GameConfig(Expansion.CHIVALRY, numPlayers = 3), 1)
+        assertEquals("Improve your towns?", confirmTitle(s, wgbg.engine.Action.of(ChivalryActionType.IMPROVE_CITY, 0L)))
     }
 }

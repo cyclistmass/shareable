@@ -42,7 +42,7 @@ internal class GameArt(
     val ocean: Bitmap,
 ) {
     companion object {
-        /** Boat sails in the players' colours (Red, Blue, Orange, White), then the extra two. */
+        /** The 2D boats' sails: scenery in fixed colours (the 3D boats take the game's seat colours, [Sea.boatColors]). */
         val BOATS = listOf(R.drawable.boat_red, R.drawable.boat_blue, R.drawable.boat_orange, R.drawable.boat_white, R.drawable.boat_green, R.drawable.boat_brown)
         val CLIFFS = listOf(R.drawable.cliff_top_1, R.drawable.cliff_top_2, R.drawable.cliff_top_3)
 

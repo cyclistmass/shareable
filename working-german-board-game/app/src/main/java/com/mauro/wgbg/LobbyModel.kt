@@ -19,6 +19,7 @@ fun joinCodeFrom(link: String?): String? {
 /**
  * One lobby seat. A person sits in it ([name]), or it is open (anyone can join; [bot] is the
  * bot that takes it at start if nobody does, null = it stays empty), or it is reserved for [bot].
+ * [botName] is the host's theme name for the bot (0.3.4); a person's [name] always wins over it.
  */
 data class LobbySeat(
     val name: String? = null,
@@ -26,11 +27,12 @@ data class LobbySeat(
     val ready: Boolean = false,
     val photo: String? = null,
     val open: Boolean = name == null,
+    val botName: String? = null,
 ) {
     val isPerson get() = name != null
     /** Somebody (person or bot) will play from this seat. */
     val plays get() = isPerson || bot != null
-    val label get() = name ?: if (open) "Open seat" else "${bot!!.label} bot"
+    val label get() = name ?: if (open) "Open seat" else botName?.let { "$it, ${bot!!.label} bot" } ?: "${bot!!.label} bot"
 }
 
 /** A room: its code, the host's settings, and four seats (seat 0 is the host). */
@@ -43,6 +45,8 @@ data class Lobby(
     /** People played with before, for one-tap invites (stubbed until #7). */
     val recent: List<String> = emptyList(),
     val host: Boolean? = null,
+    /** Each seat's colour (0.3.4: the host picks them on New game), in seat order. */
+    val colours: List<SeatColour> = SeatColour.DEFAULT.take(GameSetup.MAX_SEATS),
 ) {
     init {
         require(seats.size == GameSetup.MAX_SEATS)
@@ -121,11 +125,13 @@ data class Lobby(
                     // The host is ready from the start: they press Start themselves (Mauro couldn't start a game
                     // until he found his own "Not ready" toggle). Friends who join still mark themselves ready.
                     i == 0 -> LobbySeat(name = setup.name, photo = setup.photo, ready = true)
-                    s.kind == SeatKind.BOT -> LobbySeat(bot = s.bot, open = false)
-                    s.kind == SeatKind.FRIEND -> LobbySeat(bot = BotLevel.GREEDY)
+                    // Bots keep the host's theme names, the one waiting in a friend's seat too (0.3.4).
+                    s.kind == SeatKind.BOT -> LobbySeat(bot = s.bot, open = false, botName = setup.seatNames[i])
+                    s.kind == SeatKind.FRIEND -> LobbySeat(bot = BotLevel.GREEDY, botName = setup.seatNames[i])
                     else -> LobbySeat(open = true)
                 }
             },
+            colours = setup.roomColours(0L),
         )
 
         /** Stub data until #7, matching the Lobby A design: three people, one not ready, one open seat. */

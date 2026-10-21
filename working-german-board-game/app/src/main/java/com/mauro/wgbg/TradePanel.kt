@@ -4,10 +4,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +38,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -88,20 +93,26 @@ fun tradeNeedsMe(s: GameState, me: Int) = tradeMode(s, me).let {
 }
 
 /** Card kinds a trade covers: the five resources, plus three commodities in Age of Chivalry. */
-fun tradeCards(s: GameState) = if (s.ck != null) wgbg.engine.CK_CARD_TYPES else CARD_TYPES
+fun tradeCards(s: GameState) = if (s.chivalry != null) wgbg.engine.CHIVALRY_CARD_TYPES else CARD_TYPES
 
 /** Cards of kind [i] in [p]'s hand (resources, or commodities in Age of Chivalry). */
 fun holding(s: GameState, p: Int, i: Int) = if (i < CARD_TYPES) s.hand(p, i) else s.card(p, i)
 
 /** The offer action for these counts, in the ruleset's own encoding. */
 fun offerFor(s: GameState, give: IntArray, get: IntArray): Action? = runCatching {
-    if (s.ck != null) Action.offerTradeCk(give, get) else Action.offerTrade(give, get)
+    if (s.chivalry != null) Action.offerTradeCk(give, get) else Action.offerTrade(give, get)
 }.getOrNull()
 
 /** True when [me] holds every card a trade offered to them asks them to give (#44). */
 fun canPayOffer(s: GameState, me: Int): Boolean {
     val give = termsFor(s, me).second
     return give.indices.all { give[it] <= holding(s, me, it) }
+}
+
+/** The cards [p] lacks to pay the open offer, e.g. "1 Grain, 1 Stone" (#26). */
+fun shortfallText(s: GameState, p: Int): String {
+    val short = Rules.offerShortfall(s, p)
+    return short.indices.filter { short[it] > 0 }.joinToString(", ") { "${short[it]} ${ALL_CARD_NAMES[it]}" }
 }
 
 /** How long an offer you can't pay waits before it is declined for you, seconds (Mauro: 5). */
@@ -112,24 +123,24 @@ const val AUTO_NO_SECONDS = 5
  * offer itself; for anyone else it is mirrored.
  */
 fun termsFor(s: GameState, me: Int): Pair<IntArray, IntArray> {
-    val ck = s.ck
+    val chivalry = s.chivalry
     val n = tradeCards(s)
-    val gives = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[it] else ck!!.offer[it - CARD_TYPES] }
-    val gets = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[CARD_TYPES + it] else ck!!.offer[wgbg.engine.Commodity.COUNT + it - CARD_TYPES] }
+    val gives = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[it] else chivalry!!.offer[it - CARD_TYPES] }
+    val gets = IntArray(n) { if (it < CARD_TYPES) s.tradeOffer[CARD_TYPES + it] else chivalry!!.offer[wgbg.engine.Commodity.COUNT + it - CARD_TYPES] }
     return if (me == s.currentPlayer) gets to gives else gives to gets
 }
 
 /** The offerer's (get, give) with taker [q] (#135): [q]'s counter-offer, or the offer as it stands if they said yes. */
 fun takerTerms(s: GameState, q: Int): Pair<IntArray, IntArray> {
     val c = s.counterOf(q) ?: return termsFor(s, s.currentPlayer)
-    val ck = s.ck != null
+    val chivalry = s.chivalry != null
     val n = tradeCards(s)
-    return IntArray(n) { if (ck) c.ckOfferWant(it) else c.offerWant(it) } to IntArray(n) { if (ck) c.ckOfferGive(it) else c.offerGive(it) }
+    return IntArray(n) { if (chivalry) c.chivalryOfferWant(it) else c.offerWant(it) } to IntArray(n) { if (chivalry) c.chivalryOfferGive(it) else c.offerGive(it) }
 }
 
 /** The counter a responder means by "I get [get], I give [give]", in the ruleset's encoding (counters are offerer-side). */
 fun counterFor(s: GameState, get: IntArray, give: IntArray): Action? = runCatching {
-    if (s.ck != null) Action.counterTradeCk(give = get, want = give) else Action.counterTrade(give = get, want = give)
+    if (s.chivalry != null) Action.counterTradeCk(give = get, want = give) else Action.counterTrade(give = get, want = give)
 }.getOrNull()
 
 /** [me] made the open offer and may withdraw it now, while the others are still answering (#114). */
@@ -139,7 +150,7 @@ fun canWithdraw(s: GameState, me: Int) = s.phase == Phase.DECIDE_TRADE && s.curr
 fun isOpenAsk(s: GameState) = s.phase == Phase.DECIDE_TRADE && !Rules.isTwoSided(s)
 
 fun bankRate(s: GameState, p: Int, r: Int): Int {
-    if (s.ck != null) return wgbg.engine.CitiesAndKnights.tradeRate(s, p, r)
+    if (s.chivalry != null) return wgbg.engine.Chivalry.tradeRate(s, p, r)
     val m = s.portMask[p]
     return if (m and (1 shl r) != 0) 2 else if (m and Port.GENERIC_BIT != 0) 3 else 4
 }
@@ -150,10 +161,12 @@ fun bankRate(s: GameState, p: Int, r: Int): Int {
 /** Parchment, Fabric, Silver: their deck colours (forest green, pale white-green, blue-grey). */
 private val COMMODITY_COLORS = listOf(TRACK_COLORS[wgbg.engine.Track.SCIENCE], TRACK_COLORS[wgbg.engine.Track.TRADE], TRACK_COLORS[wgbg.engine.Track.POLITICS])
 
-/** Illustrated resource cards (Mauro's art), indexed like RESOURCE_NAMES. */
+/** Resource cards, indexed like RESOURCE_NAMES: Ledger pages (#86, Mauro's pick; tools/import_ledger_cards.py). */
 val CARD_ART = listOf(R.drawable.card_timber, R.drawable.card_clay, R.drawable.card_fleece, R.drawable.card_grain, R.drawable.card_stone)
-/** Age of Chivalry commodities, in ALL_CARD_NAMES order: Parchment, Fabric, Silver (Crest's still lifes, #62). */
+/** Age of Chivalry commodities, in ALL_CARD_NAMES order: Parchment, Fabric, Silver, as Ledger pages too. */
 val COMMODITY_ART = listOf(R.drawable.card_parchment, R.drawable.card_weave, R.drawable.card_silver)
+/** The painted commodity still lifes (Crest's, #62), the picture inside a progress card's named face. */
+val COMMODITY_PICTURE = listOf(R.drawable.card_paint_parchment, R.drawable.card_paint_weave, R.drawable.card_paint_silver)
 /** Every card's art in ALL_CARD_NAMES order: the five resources, then the three commodities. */
 val ALL_CARD_ART = CARD_ART + COMMODITY_ART
 
@@ -249,11 +262,12 @@ fun TradePanel(
 
     if (mode == TradeMode.CLOSED) {
         Text(status(s, me, mode, names, false, false), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            modifier = modifier.chest().testTag("trade-panel"))
+            modifier = modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true })
         return
     }
-    Row(modifier.chest().testTag("trade-panel"), verticalAlignment = Alignment.CenterVertically) {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Row(modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
+        // Weighted, so the buttons on the right are measured first and the cards take what's left (0.3.4).
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Either tab starts clean: bank picks carried into a player offer made it unsendable (#122).
                 Tab("Players", !bankTab) { if (maritime) { maritime = false; get = IntArray(tradeCards(s)); give = IntArray(tradeCards(s)) } }
@@ -262,8 +276,13 @@ fun TradePanel(
                 // chest on a landscape phone.
                 if (!bankTab && s.currentPlayer == me) for (p in 0 until s.numPlayers) if (p != me) {
                     val mark = responses[p] ?: if (mode == TradeMode.WAITING && s.actingPlayer == p) "…" else ""
-                    Text("${names[p]} $mark", color = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) },
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.testTag("answer-$p"))
+                    // A long name ends in "…" and the answer mark always shows: three 16-letter names ran off the chest (0.3.4).
+                    val ink = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) }
+                    Row(Modifier.testTag("answer-$p"), verticalAlignment = Alignment.CenterVertically) {
+                        Text(names[p], Modifier.widthIn(max = 84.dp), color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text(" $mark", color = ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                    }
                 }
             }
             Text(status(s, me, mode, names, countering, bankTab, pick), color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold,
@@ -355,25 +374,20 @@ private fun Tab(label: String, selected: Boolean, onClick: () -> Unit) {
 enum class CardTap { ASK, OFFER, TAKE_BACK }
 
 /**
- * The new (get, give) after a [tap] on card [r]. Asking adds one (up to 9), offering adds one (up to [have]
- * held); a card is never both asked and offered, so tapping the other half switches it over. Take-back
- * removes one from whichever side holds it. With the bank ([bankRate] > 0) offering pays one more lot of
- * [bankRate] of that card (#122: several lots, each card at its own rate), and take-back returns one lot.
+ * The new (get, give) after a [tap] on card [r]. A card is never both asked and offered: each card counts like a
+ * number line, the top half up and the bottom half down. Tapping the top asks one more (up to 9), or, while the card
+ * is offered, offers one less; tapping the bottom offers one more (up to [have] held), or, while it is asked, asks one
+ * less. So the other half counts back to none before it switches over (players: "tapping the other side should count
+ * down to zero", not jump to the other side). Take-back removes one from whichever side holds it. With the bank
+ * ([bankRate] > 0) an offer moves in lots of [bankRate] of that card (#122: several lots, each card at its own rate).
  */
 fun askOffer(get: IntArray, give: IntArray, r: Int, tap: CardTap, have: Int, bankRate: Int = 0): Pair<IntArray, IntArray> {
     val g = get.copyOf(); val v = give.copyOf()
-    if (bankRate > 0) {
-        when (tap) {
-            CardTap.ASK -> { v[r] = 0; g[r] = (g[r] + 1).coerceAtMost(9) }
-            CardTap.OFFER -> if (have >= v[r] + bankRate) { g[r] = 0; v[r] += bankRate }
-            CardTap.TAKE_BACK -> if (g[r] > 0) g[r]-- else if (v[r] > 0) v[r] = (v[r] - bankRate).coerceAtLeast(0)
-        }
-        return g to v
-    }
+    val lot = bankRate.coerceAtLeast(1)
     when (tap) {
-        CardTap.ASK -> { if (v[r] > 0) v[r] = 0; g[r] = (g[r] + 1).coerceAtMost(9) }
-        CardTap.OFFER -> if (have > 0) { if (g[r] > 0) g[r] = 0; v[r] = (v[r] + 1).coerceAtMost(have) }
-        CardTap.TAKE_BACK -> if (g[r] > 0) g[r]-- else if (v[r] > 0) v[r]--
+        CardTap.ASK -> if (v[r] > 0) v[r] = (v[r] - lot).coerceAtLeast(0) else g[r] = (g[r] + 1).coerceAtMost(9)
+        CardTap.OFFER -> if (g[r] > 0) g[r]-- else if (have >= v[r] + lot) v[r] += lot
+        CardTap.TAKE_BACK -> if (g[r] > 0) g[r]-- else if (v[r] > 0) v[r] = (v[r] - lot).coerceAtLeast(0)
     }
     return g to v
 }
@@ -410,16 +424,78 @@ internal fun chestFits(room: Dp, cards: Int): Boolean = room >= 124.dp + (42.dp 
 internal fun tradeCardWidth(room: Dp, cards: Int): Dp =
     ((room - 124.dp) / cards.coerceAtLeast(1) - 6.dp).coerceIn(42.dp, 58.dp)
 
+/** The narrowest a chest card is drawn; a row that still doesn't fit scrolls sideways instead (0.3.4). */
+internal val MIN_CHEST_CARD = 30.dp
+
+/** Chest cards sit [CHEST_GAP] dp apart when they fit; else they overlap, like the hand, by up to [CHEST_OVERLAP] of a card. */
+internal const val CHEST_GAP = 4f
+internal const val CHEST_OVERLAP = 0.1f
+
+/** How a chest's cards are laid out: each [card] wide, [spacing] apart (negative: overlapping). */
+internal data class ChestFit(val card: Dp, val spacing: Dp)
+
+/**
+ * How [cards] chest cards fit [width], in the order Mauro asked for (0.3.4, "don't cards overlap a little"): at [max]
+ * with a small gap; else still at [max], overlapping up to [CHEST_OVERLAP] of a card ([fanSpacing], the hand's rule);
+ * only then smaller, keeping that overlap, down to [MIN_CHEST_CARD]; past that the row scrolls.
+ */
+internal fun chestFit(width: Dp, cards: Int, max: Dp): ChestFit {
+    val top = max.coerceAtLeast(MIN_CHEST_CARD)
+    val n = cards.coerceAtLeast(1)
+    val spacing = fanSpacing(width.value, n, top.value, CHEST_GAP, -CHEST_OVERLAP * top.value).dp
+    if (!width.value.isFinite() || top * n + spacing * (n - 1) <= width + 0.01.dp) return ChestFit(top, spacing)
+    val card = (width / (n - CHEST_OVERLAP * (n - 1))).coerceIn(MIN_CHEST_CARD, top)
+    return ChestFit(card, card * -CHEST_OVERLAP)
+}
+
+/**
+ * A chest's row of [cards] cards, each [content] drawn at the width that fits the room the row is given (up to
+ * [max]): a small gap, else a little overlap, then smaller cards ([chestFit]); past [MIN_CHEST_CARD] it scrolls
+ * sideways, so every card can be reached. In a chest with buttons beside it, give its column `weight(1f, fill = false)`: the buttons are then measured first and never pushed off screen
+ * (0.3.4: 8 Age of Chivalry cards at font 1.3 on a 640 dp phone hid Discard, and a player who had to discard was stuck).
+ */
+@Composable
+internal fun ChestCardRow(cards: Int, max: Dp, modifier: Modifier = Modifier, content: @Composable (cardWidth: Dp) -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+        val fit = if (constraints.hasBoundedWidth) chestFit(maxWidth, cards, max) else ChestFit(max, CHEST_GAP.dp)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(fit.spacing)) { content(fit.card) }
+    }
+}
+
+/** The smallest a chest card's label is drawn; past that it says less instead ([shortUnder]). */
+private val UNDER_MIN = 9.sp
+
+/** "have 4" (or "has 4") as just "×4", line by line; anything else (a bank rate, "4:1") as it is. */
+internal fun shortUnder(text: String): String = text.lines().joinToString("\n") { it.replace(Regex("^(have|has) (\\d+)$"), "×$2") }
+
+/**
+ * What a chest card says under it ("have 4"), kept to the card's [width] less the slice the next card may overlap
+ * ([CHEST_OVERLAP]): it shrinks rather than widen the row, and when even [UNDER_MIN] won't fit (0.3.4: 8 cards at
+ * 320x640 dp, font 1.3, read "have 4 have 4 have 4…" in tiny type) it shows just the count, "×4", under each card.
+ */
+@Composable
+internal fun UnderCard(text: String, width: Dp, color: Color = INK, lines: Int = 1) {
+    val room = width * (1 - CHEST_OVERLAP)
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val widest = with(androidx.compose.ui.platform.LocalDensity.current) {
+        text.lines().maxOf { measurer.measure(it, androidx.compose.ui.text.TextStyle(fontSize = UNDER_MIN, fontWeight = FontWeight.Bold), softWrap = false, maxLines = 1).size.width.toDp() }
+    }
+    Text(if (widest > room) shortUnder(text) else text, Modifier.width(width).padding(horizontal = width * (CHEST_OVERLAP / 2)), color = color,
+        fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = lines, softWrap = false, lineHeight = 13.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = UNDER_MIN, maxFontSize = 12.sp))
+}
+
 /**
  * One row of cards for a trade: green "+N" on a card's top edge is asked for, red "−N" on its bottom edge is
  * offered. Tap the top half to ask, the bottom half to offer; the "−" under a card (or a long press) takes one back.
  */
 @Composable
-private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWidth: Dp, under: (Int) -> String?, onTap: (Int, CardTap) -> Unit) {
+private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, maxCard: Dp, under: (Int) -> String?, onTap: (Int, CardTap) -> Unit) {
     // The tap handlers below live as long as their card; they must call today's [onTap], not the one from the card's
     // first touch, or a card used in one trade went dead for the next (#122: "can't do a second maritime trade").
     val tap by androidx.compose.runtime.rememberUpdatedState(onTap)
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    ChestCardRow(get.size, maxCard) { cardWidth ->
         for (r in get.indices) Column(horizontalAlignment = Alignment.CenterHorizontally) {
             val asked = get[r]; val offered = give[r]
             val lit = asked > 0 || offered > 0
@@ -449,13 +525,12 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
                     modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xE0C0392B), CircleShape).padding(horizontal = 6.dp))
             }
             // How many you hold (or the bank rate), big enough to read at a glance (#66).
-            under(r)?.let { Text(it, color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, softWrap = false, lineHeight = 13.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+            under(r)?.let { UnderCard(it, cardWidth, lines = 2) }
             // A "−" to take one back, down to none, like the discard sheet (Mauro: "need to be able to get back to
             // zero"; the long press that also does it was never found). The row keeps its height so nothing jumps.
-            Box(Modifier.height(18.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(cardWidth).height(18.dp), contentAlignment = Alignment.Center) {
                 if (editable && lit) Text("−", color = INK, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onTap(r, CardTap.TAKE_BACK) }.padding(horizontal = 12.dp).testTag("take-back-$r"))
+                    modifier = Modifier.clickable { onTap(r, CardTap.TAKE_BACK) }.padding(horizontal = 9.dp).testTag("take-back-$r"))
             }
         }
     }
@@ -465,29 +540,37 @@ private fun AskOfferRow(get: IntArray, give: IntArray, editable: Boolean, cardWi
 internal fun cardChoiceTitle(s: GameState, names: List<String>): String = when (s.phase) {
     Phase.AQUEDUCT -> "Science bonus: nothing came your way, so take any one card free"
     Phase.COMMERCIAL_HARBOR_RESPOND -> "${names[s.currentPlayer]} played Harbour Charter: give back one commodity"
-    Phase.MASTER_MERCHANT -> "Grand Factor: take a card from ${names[s.ck?.pendingTarget ?: 0]}"
-    Phase.WEDDING -> "${names[s.currentPlayer]} played Feast against you: give them ${s.ck?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s), one at a time"
+    Phase.MASTER_MERCHANT -> "Grand Factor: take a card from ${names[s.chivalry?.pendingTarget ?: 0]}"
+    Phase.WEDDING -> "${names[s.currentPlayer]} played Feast against you: give them ${s.chivalry?.giveOwed?.getOrNull(s.actingPlayer) ?: 2} card(s), one at a time"
     else -> "Choose a card"
 }
 
 /**
  * The trade chest's card picker, reused wherever the game asks you to pick one card (Mauro): the illustrated cards
- * on offer, with how many you (or, for Grand Factor, they) hold under each. One tap picks.
+ * on offer, with how many you (for Grand Factor: they, then you) hold under each. One tap picks.
  */
 @Composable
 fun CardChoiceSheet(s: GameState, me: Int, choices: List<Action>, names: List<String>, onMove: (Action) -> Unit, modifier: Modifier = Modifier) {
-    val owner = if (s.phase == Phase.MASTER_MERCHANT) s.ck?.pendingTarget ?: me else me
-    Column(modifier.chest().testTag("card-choice"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val owner = if (s.phase == Phase.MASTER_MERCHANT) s.chivalry?.pendingTarget ?: me else me
+    Column(modifier.chest().testTag("card-choice").semantics { testTagsAsResourceId = true }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(cardChoiceTitle(s, names), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Up to 8 cards (Age of Chivalry): they shrink, then scroll, to stay on screen (0.3.4).
+        ChestCardRow(choices.size, 42.dp) { w ->
             for (a in choices.sortedBy { it.a }) Column(horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onMove(a) }.testTag("choose-card-${a.a}")) {
-                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 42.dp, height = 60.dp))
-                Text("${if (owner == me) "have" else "has"} ${s.card(owner, a.a)}", color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                modifier = Modifier.clickable(onClick = moveTap { onMove(a) }).testTag("choose-card-${a.a}")) {
+                Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = w, height = w * (60f / 42f)))
+                UnderCard(cardChoiceUnder(s, me, owner, a.a), w, lines = if (owner == me) 1 else 2)
             }
         }
     }
 }
+
+/**
+ * What [CardChoiceSheet] says under [card]: how many you hold, or, taking from [owner] (Grand Factor), how many they
+ * hold and then how many you do (a player: "show my counts too, not only theirs").
+ */
+internal fun cardChoiceUnder(s: GameState, me: Int, owner: Int, card: Int): String =
+    if (owner == me) "have ${s.card(me, card)}" else "has ${s.card(owner, card)}\nyou ${s.card(me, card)}"
 
 /** Five resource cards; tap adds one (or picks it, for the bank), the "−" under a card takes one back. */
 @Composable
@@ -538,9 +621,11 @@ private fun BigButton(label: String, color: Color, tag: String, onClick: (() -> 
     val on = onClick != null
     val plate = when { color.green > color.red -> Plate.GO; color.red > 0.6f && color.green < 0.4f -> Plate.STOP
         color.red > 0.8f && color.green > 0.6f -> Plate.GOLD; else -> Plate.BRASS }
-    PlateBox(plate, enabled = on, onClick = { onClick?.invoke() }, modifier = Modifier.size(width = width, height = 38.dp).testTag(tag)) {
+    // Every chest button (Offer, Trade, Yes, No, Discard, Random, Done) is behind the move guard: one tap, one move.
+    PlateBox(plate, enabled = on, onClick = moveTap { onClick?.invoke() }, modifier = Modifier.size(width = width, height = 38.dp).testTag(tag)) {
         Text(label, style = Wood.sans(14.sp, FontWeight.Bold, when { !on -> INK.copy(alpha = 0.45f); plate == Plate.GOLD -> Color(0xFF3A2410); else -> Color.White }),
-            maxLines = 1, softWrap = false)
+            // Shrinks to fit its plate rather than run off it (0.3.3 report: "Withdraw" didn't fit; "(9)" makes No wider too).
+            maxLines = 1, softWrap = false, autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 14.sp))
     }
 }
 

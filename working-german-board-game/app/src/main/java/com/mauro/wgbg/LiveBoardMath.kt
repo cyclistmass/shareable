@@ -96,14 +96,15 @@ internal const val KNIGHT_BAND_HEIGHT = 0.008f // its top just above the ring's
 internal const val KNIGHT_ON_BASE = 0.031f     // the knight stands on the dark disc
 internal val KNIGHT_BAND_COLOR = androidx.compose.ui.graphics.Color(0xFF2B2622)
 
-/** The GLB file a model name loads: the pedestal discs reuse the number plate. */
-internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || model == KNIGHT_BAND) "number_plate" else model
+/** The GLB file a model name loads: the pedestal discs reuse the number plate; a graded tile (`@autumn`) loads its plain one. */
+internal fun liveModelFile(model: String): String = if (model == KNIGHT_RING || model == KNIGHT_BAND) "number_plate" else model.substringBefore('@')
 
 /** The colour to paint [material] of [model] for [owner], or null to keep its own: wood in the player colour, the pedestal whole. */
 internal fun liveTint(model: String, material: String, owner: Int): androidx.compose.ui.graphics.Color? = when {
     model == KNIGHT_BAND -> KNIGHT_BAND_COLOR
+    model == LIVE_PLATE_MODEL -> BrassPlateLook.LIVE_COLOR
     model == KNIGHT_RING -> PLAYER_COLORS.getOrNull(owner)
-    owner >= 0 && (woodTint(material) || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
+    owner >= 0 && (woodTint(material) || material == "SailCloth" || spaceGlassTint(model, material)) -> PLAYER_COLORS.getOrNull(owner)
     else -> null
 }
 
@@ -112,7 +113,14 @@ internal val LIVE_PLATE = Offset(0.36f, 0.45f)
 
 /** [stretch] scales the model's height only, on top of [scale] (roads stand taller than they're modelled). */
 internal data class LivePlacement(val model: String, val position: Offset, val height: Float = 0f,
-    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1, val stretch: Float = 1f)
+    val scale: Float = 1f, val heading: Float = 0f, val owner: Int = -1, val stretch: Float = 1f, val alpha: Float = 1f) {
+    init {
+        require(position.x.isFinite() && position.y.isFinite() && height.isFinite() && heading.isFinite())
+        require(scale.isFinite() && scale > 0f && stretch.isFinite() && stretch > 0f)
+        require(alpha.isFinite() && alpha in 0f..1f)
+        require(owner in -1 until PLAYER_COLORS.size)
+    }
+}
 
 /**
  * Column-major glTF Y-axis transform; positive heading cancels the camera's screen orbit. A [lift] (radians) then tips
@@ -159,6 +167,44 @@ internal const val LIVE_STALL_NANOS = 5_000_000_000L
  */
 internal fun liveStalled(now: Long, since: Long, lastFrame: Long): Boolean =
     since != 0L && now - maxOf(since, lastFrame) > LIVE_STALL_NANOS
+
+/**
+ * Seconds of animation for a frame at [now] after one at [last] (nanoseconds; 0 = no frame yet, so none): never
+ * negative, since some phones' frame clocks step back a little (crash reports 2026-10-11), and at most [max], so a
+ * resume after a long pause or time in the background doesn't jump the sea or critters ahead (#134).
+ */
+internal fun frameStep(now: Long, last: Long, max: Float): Float = if (last == 0L) 0f else ((now - last) / 1e9f).coerceIn(0f, max)
+
+/**
+ * Starts and stops a per-frame callback with the screen (#134): at most one frame is ever pending, a pause drops it,
+ * a resume posts exactly one, and nothing is posted once closed. [post] and [remove] are Choreographer's.
+ */
+internal class FrameLoop(private val post: () -> Unit, private val remove: () -> Unit) {
+    var running = false; private set
+    var closed = false; private set
+    private var pending = false
+    /** When it last started running (System.nanoTime), for [liveStalled]; 0 = never. */
+    var since = 0L; private set
+
+    fun start(now: Long) {
+        if (closed) return
+        if (!running) since = now
+        running = true
+        if (!pending) { pending = true; post() }
+    }
+
+    fun stop() { running = false; pending = false; remove() }
+
+    /** The posted frame arrived: true to draw it, with the next one already posted; false when stopped or closed. */
+    fun frame(): Boolean {
+        pending = false
+        if (!running || closed) return false
+        pending = true; post()
+        return true
+    }
+
+    fun close() { stop(); closed = true }
+}
 
 /** Player pieces, the Bandit and the Merchant: everything that must never hide behind the terrain (#95). */
 internal fun livePiece(model: String): Boolean = liveStanding(model) || "_road_" in model
@@ -210,9 +256,9 @@ internal fun liveLift(tilt: Float): Float = (PI.toFloat() / 2f - LIVE_PIECE_VIEW
  * `_inactive` for a knight that isn't activated. Exported by Crest with the base contact at the origin, 1 = hex side.
  */
 internal fun liveKnightModel(s: GameState, v: Int, pirate: Boolean): String? {
-    val ck = s.ck ?: return null
-    if (ck.knightOwner[v] < 0) return null
-    return "${if (pirate) "pirate" else "default"}_knight_l${ck.knightLevel[v].coerceIn(1, 3)}" + if (ck.isActive(v)) "" else "_inactive"
+    val chivalry = s.chivalry ?: return null
+    if (chivalry.knightOwner[v] < 0) return null
+    return "${if (pirate) "pirate" else "default"}_knight_l${chivalry.knightLevel[v].coerceIn(1, 3)}" + if (chivalry.isActive(v)) "" else "_inactive"
 }
 
 /** The Merchant pawn's model (the only one so far; a theme adds its own `<theme>_merchant`). */
@@ -246,7 +292,9 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     val b = s.board
     val theme = if (pirate) "pirate" else "default"
     val terrain = listOf("timber", "clay", "fleece", "grain", "stone", "desert")
-    add(LivePlacement("sea", Offset.Zero, LIVE_SEA))
+    // Codex's animated water (#63) and the surf along the coast; the harbours stay the projected ones (#104).
+    add(LivePlacement("live_water_mesh", Offset.Zero))
+    addAll(liveCoastPlacements(b))
     for (h in 0 until b.hexCount) {
         val at = liveHex(b, h)
         add(LivePlacement("tile_${terrain.getOrElse(b.hexResource[h]) { "desert" }}_lod$lod", at))
@@ -257,8 +305,8 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     }
     if (s.robberHex >= 0) add(LivePlacement("bandit", liveHex(b, s.robberHex) + LIVE_PLATE, 0.012f))
     // The Merchant pawn (#112), lower left on its tile, at the buildings' scale; the overlay draws it without the model.
-    s.ck?.takeIf { it.merchantHex >= 0 && it.merchantOwner >= 0 && hasModel(LIVE_MERCHANT) }?.let { ck ->
-        add(LivePlacement(LIVE_MERCHANT, liveHex(b, ck.merchantHex) + MERCHANT_SPOT, scale = BUILDING_SCALE, owner = ck.merchantOwner))
+    s.chivalry?.takeIf { it.merchantHex >= 0 && it.merchantOwner >= 0 && hasModel(LIVE_MERCHANT) }?.let { chivalry ->
+        add(LivePlacement(LIVE_MERCHANT, liveHex(b, chivalry.merchantHex) + MERCHANT_SPOT, scale = BUILDING_SCALE, owner = chivalry.merchantOwner))
     }
     for (e in 0 until b.edgeCount) {
         val owner = s.edgeOwner[e]
@@ -274,10 +322,10 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
         val owner = s.vertexOwner[v]
         if (owner < 0) continue
         val at = liveVertex(b, v)
-        val ck = s.ck
-        val walled = ck?.wall?.get(v) == 1
+        val chivalry = s.chivalry
+        val walled = chivalry?.wall?.get(v) == 1
         if (walled) add(LivePlacement("${theme}_ramparts", at, scale = BUILDING_SCALE, owner = owner))
-        val metro = ck?.metroVertex?.indexOf(v) ?: -1
+        val metro = chivalry?.metroVertex?.indexOf(v) ?: -1
         val kind = when {
             metro >= 0 -> liveCapital(metro)
             s.vertexBuilding[v] == Piece.CITY -> "town"
@@ -288,7 +336,7 @@ internal fun livePlacements(s: GameState, pirate: Boolean, lod: Int, knightsPira
     }
     for (v in 0 until b.vertexCount) {
         val model = liveKnightModel(s, v, knightsPirate)?.takeIf(hasModel) ?: continue
-        val owner = s.ck!!.knightOwner[v]
+        val owner = s.chivalry!!.knightOwner[v]
         add(LivePlacement(KNIGHT_RING, liveVertex(b, v), scale = KNIGHT_RING_SCALE, owner = owner))
         add(LivePlacement(KNIGHT_BAND, liveVertex(b, v), KNIGHT_BAND_HEIGHT, KNIGHT_BAND_SCALE))
         add(LivePlacement(model, liveVertex(b, v), KNIGHT_ON_BASE, LIVE_KNIGHT_MODEL_SCALE, owner = owner))
@@ -314,7 +362,7 @@ internal fun liveCapital(track: Int) = "capital_" + DECK_NAMES[track].lowercase(
 
 /** Side-by-side imported models for maintainer review; never mixed into a game state. */
 internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {
-    add(LivePlacement("sea", Offset.Zero, LIVE_SEA, 2f))
+    add(LivePlacement("live_water_mesh", Offset.Zero))
     val terrains = listOf("timber", "clay", "fleece", "grain", "stone", "desert")
     for (lod in 0..1) for ((i, terrain) in terrains.withIndex()) {
         val at = Offset(-6.5f + i * 2.6f, -4f + lod * 2.7f)
@@ -328,4 +376,10 @@ internal fun liveInventoryPlacements(): List<LivePlacement> = buildList {
     add(LivePlacement("bandit", Offset(-4f, 5.4f)))
     add(LivePlacement("number_plate", Offset(0f, 5.4f), .012f))
     add(LivePlacement("digit_6", Offset(0f, 5.4f), .039f))
+    add(LivePlacement("coast_a", Offset(3f, 5.4f)))
+    add(LivePlacement("live_sloop", Offset(-7f, 5.4f), owner = 1))
+    add(LivePlacement("live_raiders", Offset(-2f, 5.4f)))
+    for (i in 0 until 16) add(LivePlacement("live_gull_$i", Offset(-7.5f + i, 9f)))
+    for ((i, name) in listOf("sea_wavelet", "sea_wake", "sea_shadow").withIndex())
+        add(LivePlacement(name, Offset(5f + i, 10f), scale = 2f))
 }
