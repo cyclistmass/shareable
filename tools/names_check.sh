@@ -121,8 +121,16 @@ echo "NAMES $TAG: New game remembers them after closing the app"
 
 # 4. Monkey on the game-start screen (taps, swipes and the picker), no system keys.
 "$ADB" logcat -b crash -c 2>/dev/null || true
-"$ADB" shell monkey -p $PKG -s 34 --pct-syskeys 0 --pct-appswitch 0 --throttle 30 -v "$EVENTS" > "$OUT/$TAG-monkey.txt" 2>&1
-grep -q "Monkey finished" "$OUT/$TAG-monkey.txt" || fail "monkey stopped early: $(grep -m3 'CRASH\|ANR\|aborted' "$OUT/$TAG-monkey.txt")"
+# Monkey stops on any app's ANR; on a busy host the launcher or System UI can stall, so one of those gets a second try
+# (after the system's own dialog is closed). The game's own ANR or crash fails at once.
+for try in 1 2; do
+  "$ADB" shell monkey -p $PKG -s $((33 + try)) --pct-syskeys 0 --pct-appswitch 0 --throttle 30 -v "$EVENTS" > "$OUT/$TAG-monkey.txt" 2>&1
+  grep -q "Monkey finished" "$OUT/$TAG-monkey.txt" && break
+  grep -q "ANR in $PKG\|CRASH: $PKG" "$OUT/$TAG-monkey.txt" && fail "monkey: $(grep -m2 "ANR in $PKG\|CRASH: $PKG" "$OUT/$TAG-monkey.txt")"
+  [ "$try" = 2 ] && fail "monkey stopped early twice: $(grep -m3 'CRASH\|ANR\|aborted' "$OUT/$TAG-monkey.txt")"
+  echo "NAMES $TAG: monkey stopped on a system app's ANR ($(grep -m1 -o 'ANR in [^ ]*' "$OUT/$TAG-monkey.txt")); again"
+  sleep 5; system_anr "$(dump)"; "$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
+done
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || fail "a crash during monkey"
 echo "NAMES $TAG: monkey $EVENTS events, no crash"
 echo "NAMES $TAG PASSED (screenshots in $OUT)"
