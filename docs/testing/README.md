@@ -61,6 +61,7 @@ requests, and skips changes that only touch Markdown or `docs/`.
 |---|---|
 | `tools/userplay.sh` | The only full game from the start screen with real taps (local, host, join). Run by hand before a release |
 | `tools/online_sim.sh` | Two emulators play one online game (autoplay) and compare end states |
+| `tools/names_check.sh` | Bot names on CI's 640x320 screen by taps: a theme and a name per seat, kept after closing the app, shown in the game and after resuming it, then monkey on New game. Screenshots for review |
 | `tools/test_perf_framestats.sh` | Checks the frame-stats parser |
 | `tools/record_showcase.sh`, `tools/record_screenshots.sh` | README media; they assert nothing, but they break when buttons move, so they double as a UI smoke check |
 | `tools/perf_ab.sh`, `tools/publish_release.sh` | Performance A/B, release (refuses unless CI is green; then closes the issues it shipped) |

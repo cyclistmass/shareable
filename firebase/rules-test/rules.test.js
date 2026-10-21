@@ -10,7 +10,7 @@ const ref = uid => doc(db(uid),'games/g');
 async function seed(status='lobby') { await env.withSecurityRulesDisabled(async c => { const r=room(status); if(status !== 'lobby') r.seats['1']=seat('guest','Guest',null,false,true); await setDoc(doc(c.firestore(),'games/g'),r); }); }
 async function append(uid='host', seq=0, s='0', id=String(seq).padStart(10,'0'), action='1:BUILD_SETTLEMENT:0') {
   return setDoc(doc(db(uid),`games/g/moves/${id}`), {seq,seat:s,uid,action,prev:seq===0?'':String(seq-1).padStart(10,'0')});
-}before(async () => { env=await initializeTestEnvironment({projectId:'demo-wgbg',firestore:{rules:readFileSync('../../firestore.rules','utf8'),host:'127.0.0.1',port:8080}}); });
+}before(async () => { env=await initializeTestEnvironment({projectId:'demo-wgbg',firestore:{rules:readFileSync('../../firestore.rules','utf8'),host:'127.0.0.1',port:Number((process.env.FIRESTORE_EMULATOR_HOST||'').split(':')[1]||8080)}}); });
 after(async()=>{await env.cleanup();});
 beforeEach(async()=>{await env.clearFirestore();});
 test('signed-in host creates; anonymous, forged host, playing create denied',async()=>{await assertSucceeds(setDoc(ref('host'),room())); await assertFails(setDoc(doc(db(null),'games/no'),room())); await assertFails(setDoc(doc(db('other'),'games/no'),room())); await assertFails(setDoc(doc(db('host'),'games/no'),room('playing')));});
@@ -37,6 +37,7 @@ test('a guest quits a running game: the seat goes to a bot the host plays; nobod
   await assertSucceeds(append('host',0,'1'));
   await assertFails(append('guest',1,'1'));});
 test('two concurrent appends only one succeeds',async()=>{await seed('playing');const r=await Promise.allSettled([append(),append()]);if(r.filter(x=>x.status==='fulfilled').length !== 1)throw Error('append race failed');});
+test('bot names (0.3.4): a host creates a room whose bots have theme names; a guest takes a named open seat with their own name',async()=>{const r=room();r.seats['1']=seat(null,'Cooper','GREEDY',true);r.seats['2']=seat(null,'Joséphine','GREEDY',false);r.seats['3']=seat(null,'Go-Daigo','EASY',false);await assertSucceeds(setDoc(ref('host'),r));await assertFails(updateDoc(ref('guest'),{'seats.2':seat('guest','Guest','GREEDY',false)}));await assertSucceeds(updateDoc(ref('guest'),{'seats.1':seat('guest','Guest','GREEDY',false)}));await assertFails(updateDoc(ref('guest'),{'seats.3.name':'Meiji'}));await assertSucceeds(updateDoc(ref('guest'),{'seats.1':seat(null,'','GREEDY',true)}));await assertFails(setDoc(doc(db('host'),'games/long'),{...room(),seats:{...room().seats,'2':seat(null,'x'.repeat(81),'GREEDY',false)}}));});
 test('all guest seats may claim, ready and leave; lobby log is readable',async()=>{await seed();await assertSucceeds(getDocs(collection(db('other'),'games/g/moves')));for(const k of ['1','2','3']){await assertSucceeds(updateDoc(ref('host'),{['seats.'+k]:seat()}));await assertSucceeds(updateDoc(ref('guest'),{['seats.'+k]:seat('guest','Guest',null,false)}));await assertSucceeds(updateDoc(ref('guest'),{['seats.'+k+'.ready']:true}));await assertSucceeds(updateDoc(ref('guest'),{['seats.'+k]:seat()}));}});
 test('missing, forged and malformed predecessors, uid and extra fields denied',async()=>{
   await seed('playing'); await assertSucceeds(append());
