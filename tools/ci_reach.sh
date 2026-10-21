@@ -61,7 +61,7 @@ reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$no
 all() { local where=$1 l n=0 x; shift; x=${DUMP:-$(dump)}
   for l in "$@"; do { shown "$l" "$x" || reach "$l"; } && n=$((n + 1)) || bad "$where: \"$l\" can't be reached by scrolling"; done
   echo "reach: $where: $n of $# reached (${SECONDS} s)"; }
-tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(dump | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
+tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
 # The Leave dialog: "Leave for now" keeps a saved game, "Leave" when there's nothing to keep.
 leave() { on "Leave for now" && { tap "Leave for now"; return; }; on "Leave" && tap "Leave"; }
 # Taps a button and checks the screen it opens (marked by $2); stops the run if it didn't, since what follows is moot.
@@ -98,6 +98,8 @@ if [ "$MODE" = screens ]; then
   on "Players" || go "New game" "Players"
   # Age of Chivalry: its eight cards are the card guide's widest row.
   tap "Age of Chivalry"; go "Play" "Menu"; sleep 3
+  # Only Age of Chivalry has the Raiders' track: a base game here has no Silver to find, so say so, not "can't be reached".
+  on "Raiders" || bad "the game started as the base game, not Age of Chivalry"
   go "Menu" "Card guide"; all "game menu" "Leave game" "Card guide" "Fit the board" "Settings" "Report a bug or idea"
   go "Card guide" "Cards"; all "card guide" "Close" "Silver"; tap "Close"
   go "Menu" "Card guide"; go "Report a bug or idea" "Include this game"; all "game Report" "Include this game" "Send" "Share" "Close"; tap "Close"
