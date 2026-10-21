@@ -53,7 +53,18 @@ if [ -n "${APK:-}" ]; then
 fi
 # Whatever is published: the stable key, not debuggable, and the Firebase config (an APK= from a debug or a local
 # build is refused here too: local builds never have the config, and 0.3.4's hand-uploaded one had none).
-bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
+verify() { bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$1"; }
+verify "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
+APK_SHA=$(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)
+# back <what> <curl args...>: downloads the APK as players or the API serve it (three tries: the CDN can lag a moment)
+# and checks it is the one checked above, byte for byte, and passes the same check.
+back() {
+  local what="$1" f="$WORK/back.apk" got=; shift
+  for _ in 1 2 3; do rm -f "$f"; curl -sSfL -m 900 -o "$f" "$@" && got=$(sha256sum < "$f" | cut -c1-64) && [ "$got" = "$APK_SHA" ] && break; sleep 10; done
+  [ "$got" = "$APK_SHA" ] || { echo "$what: downloaded back as ${got:-nothing}, not $APK_SHA" >&2; return 1; }
+  verify "$f" >&2 || { echo "$what: the APK served fails its check" >&2; return 1; }
+  echo "$what: served APK matches ($APK_SHA) and passes its check" >&2
+}
 
 # KNOWN=<text> adds a Known issues section (read from the environment, so its quotes and $ stay as written).
 KNOWN="${KNOWN:-}" py -c "
@@ -71,14 +82,22 @@ ID=$(api -X POST "https://api.github.com/repos/$REPO/releases" -d @"$WORK/releas
 case "$ID" in *[!0-9]*) echo "release not created: $ID"; exit 1;; esac
 # The release is a draft until every file is up, so releases/latest never points at one without its APK (0.3.4 did,
 # for four minutes, after a timed-out upload). A failed upload stops here and leaves the draft to look at.
+# up prints the new asset's id.
 up() { MAXTIME=900 api -H "Content-Type: $2" --data-binary @"$1" "https://uploads.github.com/repos/$REPO/releases/$ID/assets?name=$(basename "$1")" |
-  py -c "import json,sys;d=json.load(sys.stdin);print(d['browser_download_url'])" || { echo "upload of $(basename "$1") failed; release $ID left as a draft"; exit 1; }; }
-up "$WORK/working-german-board-game.apk" application/vnd.android.package-archive
+  py -c "import json,sys;d=json.load(sys.stdin);print(d['id'])" || { echo "upload of $(basename "$1") failed; release $ID left as a draft" >&2; exit 1; }; }
+ASSET=$(up "$WORK/working-german-board-game.apk" application/vnd.android.package-archive) || exit 1
+# The draft's APK, downloaded back before anyone can see it: a broken or swapped upload stops here, still a draft.
+back "draft asset $ASSET" -H "Authorization: Bearer $(tok)" -H "Accept: application/octet-stream" \
+  "https://api.github.com/repos/$REPO/releases/assets/$ASSET" || { echo "release $ID left as a draft: fix or delete it"; exit 1; }
 # A pre-release gets no video: the showcase is recorded for real releases.
 if [ -f "$VIDEO" ] && [ -z "${PRERELEASE:-}" ]; then cp "$VIDEO" "$WORK/working-german-board-game-gameplay.mp4"; up "$WORK/working-german-board-game-gameplay.mp4" video/mp4; fi
 LATEST=true; [ -n "${PRERELEASE:-}" ] && LATEST=false
 api -X PATCH "https://api.github.com/repos/$REPO/releases/$ID" -d "{\"draft\":false,\"make_latest\":\"$LATEST\"}" |
   py -c "import json,sys;d=json.load(sys.stdin);print('published', d['html_url'])"
+# And as players get it now: the always-latest link for a release, the tag's link for a pre-release.
+URL="https://github.com/$REPO/releases/latest/download/working-german-board-game.apk"
+[ -n "${PRERELEASE:-}" ] && URL="https://github.com/$REPO/releases/download/wgbg-v$VERSION/working-german-board-game.apk"
+back "$URL" "$URL" || { echo "!!! PUBLISHED, BUT $URL DOES NOT SERVE THE CHECKED APK: set release $ID back to draft or swap its asset now"; exit 1; }
 rm -rf "$WORK"
 echo "published wgbg-v$VERSION from ${SHA:0:7}"
 # Close the issues this release shipped (named in commit subjects since the previous release).
