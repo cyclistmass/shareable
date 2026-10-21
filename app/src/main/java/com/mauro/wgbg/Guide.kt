@@ -129,7 +129,7 @@ fun CardGuide(chivalry: Boolean, pirate: Boolean, onClose: () -> Unit, modifier:
         } else {
             heading("Fortune cards")
             for (c in FORTUNE.indices) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top, modifier = Modifier.testTag("fortune-row-$c")) {
-                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = GuideArt.fortuneIsKnightCard(c) && !LocalArtChoice.current.space(ArtObject.CARDS))
+                face(FORTUNE[c], Wood.BRASS, GuideArt.fortuneArt(c, pirate), FORTUNE_HINTS[c], plain = !LocalArtChoice.current.space(ArtObject.CARDS))
                 Column {
                     Text(FORTUNE[c], color = GUIDE_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(150.dp))
                     Text(FORTUNE_HINTS[c], color = GUIDE_INK.copy(alpha = 0.85f), fontSize = 12.sp)

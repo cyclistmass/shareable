@@ -19,34 +19,37 @@ class GuideArtTest {
     }
 
     @Test
-    fun `every Fortune card gets a valid background, Sentinel in the theme's own knight art`() {
-        for (pirate in listOf(false, true)) {
-            for (c in FORTUNE.indices) {
-                val art = GuideArt.fortuneArt(c, pirate)
-                assertNotEquals(0, art, "Fortune card $c (${FORTUNE[c]}) has no art, pirate=$pirate")
-            }
-            assertEquals(GuideArt.knightCard(1, pirate), GuideArt.fortuneArt(DevCard.KNIGHT, pirate))
-        }
-        // Only the Sentinel (Knight) is the full knight card picture; the rest get the drawn cream card face.
-        assertTrue(GuideArt.fortuneIsKnightCard(DevCard.KNIGHT))
-        for (c in FORTUNE.indices) if (c != DevCard.KNIGHT) assertTrue(!GuideArt.fortuneIsKnightCard(c), "Fortune card $c should not be the plain knight card")
+    fun `every Fortune card is its own Ledger card, each a different one`() {
+        val ledger = listOf(R.drawable.card_fortune_sentinel, R.drawable.card_fortune_windfall, R.drawable.card_fortune_corner,
+            R.drawable.card_fortune_trailblazers, R.drawable.card_fortune_landmark)
+        val normal = FORTUNE.indices.map { GuideArt.fortuneArt(it, pirate = false) }
+        assertEquals(ledger.toSet(), normal.toSet())
+        assertEquals(FORTUNE.size, normal.toSet().size, "two Fortune cards share a picture: $normal")
+        // A Fortune card never borrows a resource card any more: it would show that resource's name.
+        for (c in FORTUNE.indices) for (pirate in listOf(false, true))
+            assertTrue(GuideArt.fortuneArt(c, pirate) !in ALL_CARD_ART, "Fortune card $c shows a resource card, pirate=$pirate")
+        // Break-it: an index outside the deck still gets a real card, never 0.
+        for (c in listOf(-1, FORTUNE.size, 99)) assertNotEquals(0, GuideArt.fortuneArt(c, false))
     }
 
     @Test
-    fun `the pirate theme never falls back to the normal knight cards for Sentinel`() {
+    fun `the pirate theme keeps its own knight card for Sentinel and Ledger cards for the rest`() {
         val normal = GuideArt.fortuneArt(DevCard.KNIGHT, pirate = false)
         val pirate = GuideArt.fortuneArt(DevCard.KNIGHT, pirate = true)
         assertNotEquals(normal, pirate)
         assertEquals(R.drawable.card_knight_pirate_1, pirate)
-        assertEquals(R.drawable.card_knight_normal_1, normal)
+        assertEquals(R.drawable.card_fortune_sentinel, normal)
+        for (c in FORTUNE.indices) if (c != DevCard.KNIGHT) assertEquals(GuideArt.fortuneArt(c, false), GuideArt.fortuneArt(c, true))
     }
 
     @Test
-    fun `every progress card has art for its deck's commodity`() {
+    fun `every progress card shows its deck's commodity painting, not the Ledger card`() {
         for (c in 0 until Progress.COUNT) {
             val art = progressArt(c)
-            assertNotEquals(0, art, "progress card $c has no art")
-            assertTrue(art in ALL_CARD_ART, "progress card $c's art ($art) isn't one of the commodity pictures")
+            assertTrue(art in COMMODITY_PICTURE, "progress card $c's art ($art) isn't one of the commodity paintings")
+            assertTrue(art !in ALL_CARD_ART, "progress card $c would show a Ledger card's own title through its face")
         }
+        // Each deck its own commodity: Academy Parchment, Guilds Fabric, Crown Silver.
+        assertEquals(3, (0 until Progress.COUNT).map { progressArt(it) }.toSet().size)
     }
 }

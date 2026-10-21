@@ -1322,9 +1322,13 @@ fun WatchGameScreen(
             GoButton("Done", "look-done", true, Modifier.width(120.dp).height(44.dp)) { onExit() }
             BrassButton("Card guide", "look-guide", Modifier.height(44.dp)) { guideOpen = true; settingsOpen = false }
         }
-        if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for ((r, art) in CARD_ART.withIndex()) androidx.compose.foundation.Image(
-                artPainter(art), RESOURCE_NAMES[r], Modifier.size(width = 76.dp, height = 110.dp))
+        // Every card (#86 Ledger: resources, commodities and the Fortune cards) is more than a screen wide: the row scrolls.
+        if (inventory) Row(Modifier.align(Alignment.BottomCenter).padding(8.dp).horizontalScroll(rememberScrollState()).testTag("inventory-cards"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((c, art) in ALL_CARD_ART.withIndex()) androidx.compose.foundation.Image(
+                artPainter(art), ALL_CARD_NAMES[c], Modifier.size(width = 76.dp, height = 110.dp))
+            for (c in FORTUNE.indices) androidx.compose.foundation.Image(
+                artPainter(ThemeArt.fortune(env.art, c)), FORTUNE[c], Modifier.size(width = 76.dp, height = 110.dp).testTag("inventory-fortune-$c"))
             // Knight cards in the chosen theme (Normal / Pirate themed).
             // Tap a knight card or a die to swap that set on its own.
             for (lv in 1..3) androidx.compose.foundation.Image(

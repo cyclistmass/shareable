@@ -430,7 +430,7 @@ internal fun CardPickSheet(s: GameState, me: Int, pick: CardPick, names: List<St
                         ProgressCardFace(PROGRESS_NAMES.getOrElse(a.a) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(a.a)],
                             progressArt(a.a), progressHint(a.a), w = 64, h = 90)
                     wgbg.engine.CkActionType.CHOOSE_PROGRESS_DECK ->
-                        ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], ALL_CARD_ART[wgbg.engine.Track.commodity(a.a)],
+                        ProgressCardFace(DECK_NAMES[a.a], TRACK_COLORS[a.a], deckArt(a.a),
                             "${ck.deckSize[a.a]} left", w = 64, h = 90)
                     else -> Image(artPainter(ALL_CARD_ART[a.a]), ALL_CARD_NAMES[a.a], Modifier.size(width = 50.dp, height = 70.dp))
                 }

@@ -176,8 +176,14 @@ private val MINI_STEP = 10.5.dp
 private const val MINI_MAX = 4
 private val MINI_SLOT = 21.dp + MINI_STEP * (MINI_MAX - 1)
 
-/** A progress card's art: its deck's commodity card (Guilds Fabric, Crown Silver, Academy Parchment). */
-fun progressArt(card: Int): Int = ALL_CARD_ART[wgbg.engine.Track.commodity(wgbg.engine.Progress.track(card))]
+/**
+ * A progress card's art: its deck's commodity painting (Guilds Fabric, Crown Silver, Academy Parchment), not the
+ * Ledger card, whose own title and seal would show through the named face.
+ */
+fun progressArt(card: Int): Int = deckArt(wgbg.engine.Progress.track(card))
+
+/** A progress deck's picture ([track]), on its cards and its draw pile: the deck commodity's painting. */
+fun deckArt(track: Int): Int = COMMODITY_PICTURE[wgbg.engine.Track.commodity(track) - CARD_TYPES]
 
 /** Age of Chivalry deck colours by track: Guilds gold (trade), Crown blue (politics), Academy green (science). */
 // Mauro: themed by commodity and its land. Guilds / Fabric (pasture) pale white-green, Crown / Silver (mountains)
@@ -241,7 +247,8 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
     androidx.compose.runtime.LaunchedEffect(detail) { if (detail != null) { kotlinx.coroutines.delay((12000L * pace).toLong()); detail = null } }
     fun Modifier.longPressFor(d: CardDetail) = this.pointerInput(d) { detectTapGestures(onTap = { detail = null }, onLongPress = { detail = d }) }
     @Composable
-    fun namedCard(name: String, edge: Color, n: Int, tag: String, w: Int, h: Int, small: String? = null, art: Int? = null, long: CardDetail? = null, onTap: (() -> Unit)? = null) {
+    fun namedCard(name: String, edge: Color, n: Int, tag: String, w: Int, h: Int, small: String? = null, art: Int? = null, long: CardDetail? = null,
+                  plain: Boolean = false, onTap: (() -> Unit)? = null) {
         // The tap handler outlives this call: it must run today's onTap, not the one from the card's first touch
         // (the #122 stale-tap bug, same pattern).
         val tapNow = androidx.compose.runtime.rememberUpdatedState(onTap)
@@ -249,8 +256,10 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             modifier = Modifier.testTag(tag).then(if (onTap != null || long != null) Modifier.pointerInput(long) {
                 detectTapGestures(onTap = { if (detail != null) detail = null else tapNow.value?.invoke() }, onLongPress = { long?.let { detail = it } })
             } else Modifier)) {
-            // Themed by its deck's commodity (Mauro): Guilds on Fabric, Crown on Silver, Academy on Parchment.
-            ProgressCardFace(name, edge, art, small, w, h)
+            // A full card that names itself (a Ledger Fortune card) as it is; a progress card on its drawn face, themed
+            // by its deck's commodity (Mauro): Guilds on Fabric, Crown on Silver, Academy on Parchment.
+            if (plain && art != null) Image(artPainter(art), name, Modifier.size(width = w.dp, height = h.dp))
+            else ProgressCardFace(name, edge, art, small, w, h)
             if (n > 1) count(n)
         }
     }
@@ -288,7 +297,8 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
             val now = c in fortunePlayable && onFortune != null
             Box(Modifier.zIndex(-(z++).toFloat()).dimmed(!now && c != wgbg.engine.DevCard.VICTORY_POINT)) {
                 namedCard(FORTUNE[c], Wood.BRASS, n, "hand-fortune-$c", 50, 70, art = fortuneArt(c),
-                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c]))) {
+                    long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c])),
+                    plain = !LocalArtChoice.current.space(ArtObject.CARDS)) {
                     if (now) { hint = null; onFortune?.invoke(c) }
                     else hint = "${FORTUNE[c]}: " + when {
                         c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]

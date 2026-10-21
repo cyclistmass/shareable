@@ -1,8 +1,6 @@
 package com.mauro.wgbg
 
-import wgbg.engine.Commodity
 import wgbg.engine.DevCard
-import wgbg.engine.Resource
 
 /**
  * Per-theme art for the card guide and the Inventory screen's knight cards (#71): one small place for a future
@@ -16,19 +14,15 @@ object GuideArt {
     fun knightCard(level: Int, pirate: Boolean): Int = (if (pirate) KNIGHT_PIRATE else KNIGHT_NORMAL)[(level - 1).coerceIn(0, 2)]
 
     /**
-     * A background picture for a base-game Fortune card ([card], a [DevCard] index): Sentinel shows the theme's
-     * own knight card (level 1, a full painted card already); the others get a resource or commodity that fits
-     * what they do (Windfall: Grain, Corner the Market: Silver, Trailblazers: Timber, Landmark: Stone).
+     * A base-game Fortune card ([card], a [DevCard] index) as a full card that names itself: the Ledger pages (#86,
+     * Mauro's pick), or in the Pirate theme the pirate knight card for the Sentinel.
      */
     fun fortuneArt(card: Int, pirate: Boolean): Int = when (card) {
-        DevCard.KNIGHT -> knightCard(1, pirate)
-        DevCard.YEAR_OF_PLENTY -> ALL_CARD_ART[Resource.WHEAT]
-        DevCard.MONOPOLY -> ALL_CARD_ART[Commodity.COIN]
-        DevCard.ROAD_BUILDING -> ALL_CARD_ART[Resource.WOOD]
-        DevCard.VICTORY_POINT -> ALL_CARD_ART[Resource.ORE]
-        else -> ALL_CARD_ART[Resource.WHEAT]
+        DevCard.KNIGHT -> if (pirate) knightCard(1, true) else R.drawable.card_fortune_sentinel
+        DevCard.YEAR_OF_PLENTY -> R.drawable.card_fortune_windfall
+        DevCard.MONOPOLY -> R.drawable.card_fortune_corner
+        DevCard.ROAD_BUILDING -> R.drawable.card_fortune_trailblazers
+        DevCard.VICTORY_POINT -> R.drawable.card_fortune_landmark
+        else -> R.drawable.card_fortune_windfall
     }
-
-    /** True for the one Fortune card (Sentinel) whose picture is a full knight card, not the cream card face. */
-    fun fortuneIsKnightCard(card: Int): Boolean = card == DevCard.KNIGHT
 }

@@ -16,9 +16,9 @@ no settings, picker, Look & art, game rules, names or card text change here.
 | Knight sprites | `KnightArt.levels(pirate)` through `BuildingSprites`; `MainActivity.knightsPirate/knightsNormal` provide legacy fallbacks. |
 | Knight activation | `liveKnightModel(state, v, pirate)` appends `_inactive`; flat legacy sprites also dim inactive bodies. |
 | Knight cards | `GuideArt.knightCard(level, pirate)` → `card_knight_{normal,pirate}_N`. |
-| Resource / commodity cards | `ALL_CARD_ART` and card-face drawing; shared, no Pirate flag. |
-| Fortune cards | `GuideArt.fortuneArt(card, pirate)`; only Sentinel switches its knight picture. |
-| Progress cards / deck backgrounds | `CkPlay`, card guide and card-face drawing; shared resource art/deck colours. |
+| Resource / commodity cards | `ALL_CARD_ART`, the Ledger pages (`card_<name>`); shared, no Pirate flag. |
+| Fortune cards | `GuideArt.fortuneArt(card, pirate)` → Ledger `card_fortune_<name>`, drawn plain; only Sentinel switches to the pirate knight card. |
+| Progress cards / deck backgrounds | `CkPlay`, card guide and card-face drawing; the commodity paintings (`COMMODITY_PICTURE`, `card_paint_*`) and deck colours. |
 | Production dice | `DiceArt.face/tumble(red, pirate)` → NR/NI or PR/PB; used by `Hud` and `RollingDice`. |
 | Event die | `DiceArt.eventFace/eventTumble(pirate, eventDieStyle)` → AE or PE/PE1/PE2/PE3; source face numbering remapped to engine tracks. |
 | Bandit | `BANDIT_SPRITES` / `bandit_tilt_N`; live `bandit.glb`; shared. |

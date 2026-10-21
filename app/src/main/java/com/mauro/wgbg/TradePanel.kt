@@ -156,10 +156,12 @@ fun bankRate(s: GameState, p: Int, r: Int): Int {
 /** Parchment, Fabric, Silver: their deck colours (forest green, pale white-green, blue-grey). */
 private val COMMODITY_COLORS = listOf(TRACK_COLORS[wgbg.engine.Track.SCIENCE], TRACK_COLORS[wgbg.engine.Track.TRADE], TRACK_COLORS[wgbg.engine.Track.POLITICS])
 
-/** Illustrated resource cards (Mauro's art), indexed like RESOURCE_NAMES. */
+/** Resource cards, indexed like RESOURCE_NAMES: Ledger pages (#86, Mauro's pick; tools/import_ledger_cards.py). */
 val CARD_ART = listOf(R.drawable.card_timber, R.drawable.card_clay, R.drawable.card_fleece, R.drawable.card_grain, R.drawable.card_stone)
-/** Age of Chivalry commodities, in ALL_CARD_NAMES order: Parchment, Fabric, Silver (Crest's still lifes, #62). */
+/** Age of Chivalry commodities, in ALL_CARD_NAMES order: Parchment, Fabric, Silver, as Ledger pages too. */
 val COMMODITY_ART = listOf(R.drawable.card_parchment, R.drawable.card_weave, R.drawable.card_silver)
+/** The painted commodity still lifes (Crest's, #62), the picture inside a progress card's named face. */
+val COMMODITY_PICTURE = listOf(R.drawable.card_paint_parchment, R.drawable.card_paint_weave, R.drawable.card_paint_silver)
 /** Every card's art in ALL_CARD_NAMES order: the five resources, then the three commodities. */
 val ALL_CARD_ART = CARD_ART + COMMODITY_ART
 

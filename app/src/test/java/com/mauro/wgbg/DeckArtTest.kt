@@ -63,7 +63,7 @@ class DeckArtTest {
             for ((i, c) in cards.withIndex()) for (theme in themes) {
                 val art = ThemeArt.progress(ArtChoice(theme), c)
                 if (ArtChoice(theme).space(ArtObject.CARDS)) assertEquals("space_card_${d.spaceCards[i]}", name(art), "${PROGRESS_NAMES[c]} in $theme")
-                else assertEquals(ALL_CARD_ART[d.commodity], art, "${PROGRESS_NAMES[c]} in $theme shows ${d.name}'s commodity")
+                else assertEquals(deckArt(d.track), art, "${PROGRESS_NAMES[c]} in $theme shows ${d.name}'s commodity painting")
             }
         }
         assertEquals((0 until Progress.COUNT).toSet(), seen)
@@ -73,12 +73,15 @@ class DeckArtTest {
     fun `each deck's draw pile shows its own commodity in every theme`() {
         for (d in decks) for (theme in themes) {
             val choice = ArtChoice(theme)
-            val art = ThemeArt.namedCard(choice, d.name, ALL_CARD_ART[d.commodity])!!
+            val art = ThemeArt.namedCard(choice, d.name, deckArt(d.track))!!
             if (choice.space(ArtObject.CARDS)) {
                 assertEquals("space_card_${d.spaceBack}", name(art), "${d.name} back in $theme")
                 assertEquals(spaceCommodity.getValue(d.commodity), spaceBackShows.getValue(d.spaceBack), "${d.name}'s back pictures its commodity")
                 assertEquals("space_card_${spaceCommodity.getValue(d.commodity)}", name(ThemeArt.resource(choice, d.commodity)))
-            } else assertEquals(ALL_CARD_ART[d.commodity], art, "${d.name} pile in $theme")
+            } else {
+                assertEquals(deckArt(d.track), art, "${d.name} pile in $theme")
+                assertTrue(art !in ALL_CARD_ART, "${d.name} pile would show a Ledger card's own title")
+            }
         }
     }
 
@@ -115,12 +118,13 @@ class DeckArtTest {
     fun `the five Fortune cards and their back show the right art`() {
         assertEquals(listOf("Sentinel", "Windfall", "Corner the Market", "Trailblazers", "Landmark"), FORTUNE)
         val space = listOf("space_marshal", "full_hold", "trade_beacon", "ferry_lanes", "new_horizon")
-        val classic = listOf(null, ALL_CARD_ART[Resource.WHEAT], ALL_CARD_ART[Commodity.COIN], ALL_CARD_ART[Resource.WOOD], ALL_CARD_ART[Resource.ORE])
+        val classic = listOf(R.drawable.card_fortune_sentinel, R.drawable.card_fortune_windfall, R.drawable.card_fortune_corner,
+            R.drawable.card_fortune_trailblazers, R.drawable.card_fortune_landmark)
         for (c in 0 until DevCard.COUNT) for (theme in themes) {
             val choice = ArtChoice(theme)
             val art = ThemeArt.fortune(choice, c)
             if (choice.space(ArtObject.CARDS)) assertEquals("space_card_${space[c]}", name(art), "${FORTUNE[c]} in $theme")
-            else if (c == DevCard.KNIGHT) assertTrue("knight" in name(art), "${FORTUNE[c]} in $theme: ${name(art)}")
+            else if (c == DevCard.KNIGHT && theme == ArtSet.PIRATE) assertTrue("knight" in name(art), "${FORTUNE[c]} in $theme: ${name(art)}")
             else assertEquals(classic[c], art, "${FORTUNE[c]} in $theme")
         }
         assertEquals("space_card_card_back", name(SpaceArt.cardBack))
