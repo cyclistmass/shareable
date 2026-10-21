@@ -64,6 +64,7 @@ system_anr() {
   return 0
 }
 launch() {
+  "$ADB" shell cmd statusbar collapse   # monkey's swipes from the top edge can leave the notification shade down over the game
   for _ in 1 2 3; do
     "$ADB" shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 3
     [ -n "$("$ADB" shell pidof $PKG | tr -d '\r\n')" ] && break
