@@ -89,9 +89,6 @@ object Wood {
     val READY = Color(0xFF8BD18B)
     val WAITING = Color(0xFFE0B23A)
 
-    /** Text colors for player seats on dark wood (lifted so blue and white read; design values). */
-    val SEAT_TEXT = listOf(Color(0xFFEF8A8A), Color(0xFF7FB0F0), Color(0xFFF7A24B), Color(0xFFF5F5F5))
-
     fun sans(size: TextUnit, weight: FontWeight = FontWeight.Normal, color: Color = INK) =
         TextStyle(fontFamily = ALEGREYA_SANS, fontSize = size, fontWeight = weight, color = color)
 

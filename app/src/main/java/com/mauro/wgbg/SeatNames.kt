@@ -90,5 +90,5 @@ enum class NameTheme(val label: String, val names: List<ThemeName>) {
     }
 }
 
-/** A player's name by colour when their seat has no theme name: Red, Blue, Orange, White, then "Player 5" and on. */
+/** A player's name by colour when their seat has no theme name: the game's colours ([GameColours]), then "Player 5" and on. */
 fun colourName(player: Int): String = PLAYER_NAMES.getOrElse(player) { "Player ${player + 1}" }

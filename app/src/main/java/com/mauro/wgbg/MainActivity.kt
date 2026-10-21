@@ -246,16 +246,32 @@ private val TERRAIN_COLORS = mapOf(
     Resource.NONE to Color(0xFFE8D9A8),
 )
 
-/** Seat colours. Mauro's pick (#59, 2026-10-11): scarlet and a hue-29 orange, both 20% lighter, so red and orange never blur; blue is a sky celeste (2026-10-11) so it reads on the board. */
-internal val PLAYER_COLORS = listOf(Color(0xFFFF5C59), Color(0xFF3FB4EE), Color(0xFFFF9B3E), Color(0xFFF5F5F5))
+/**
+ * The colours of the game on screen, by engine player (0.3.4: each game's own, picked on New game or drawn at random,
+ * [SeatColour]); WatchGameScreen sets them. Always [GameSetup.MAX_SEATS] long, the unused seats padded with colours
+ * nobody has, so an index past the players (the token wood after them) stays put. Outside a game: Red, Blue, Purple, White.
+ */
+internal object GameColours {
+    class Palette(seats: List<SeatColour>) {
+        val seats: List<SeatColour> = (seats + SeatColour.DEFAULT.filter { it !in seats }).take(GameSetup.MAX_SEATS)
+        val colors: List<Color> = this.seats.map { Color(it.argb) }
+        val names: List<String> = this.seats.map { it.label }
+    }
+    private val active = androidx.compose.runtime.mutableStateOf(Palette(emptyList()))
+    val palette: Palette get() = active.value
+    /** The game now on screen plays in [byPlayer]; a no-op when that's already so (it runs on every recomposition). */
+    fun use(byPlayer: List<SeatColour>) { if (active.value.seats.take(byPlayer.size) != byPlayer) active.value = Palette(byPlayer) }
+}
+/** Seat colours by engine player, for the game on screen ([GameColours]). */
+internal val PLAYER_COLORS: List<Color> get() = GameColours.palette.colors
 /** The brown (tan) for boat sails and the extra seats of six-player games (v3). */
 internal val PLAYER_BROWN = Color(0xFF8D6E63)
-internal val PLAYER_NAMES = listOf("Red", "Blue", "Orange", "White")
+internal val PLAYER_NAMES: List<String> get() = GameColours.palette.names
 private val INK = Color(0xFF2B2118)
 
 /** Natural light wood for number and port tokens; stained like the pieces but barely tinted. */
 private val TOKEN_WOOD = Color(0xFFE9CFA0)
-private val TOKEN_WOOD_INDEX = PLAYER_COLORS.size
+private val TOKEN_WOOD_INDEX = GameSetup.MAX_SEATS
 
 /** Speed setting meaning "no delays at all": moves run back to back, games auto-restart. */
 internal const val MAX_SPEED = 16
@@ -646,7 +662,9 @@ fun WatchGameScreen(
     // Debug builds: the FILAMENT_VIEW broadcast's `stress` extra swaps in the longest names (tools/ci_layout.sh).
     var stressNames by remember { mutableStateOf<List<String>?>(null) }
     // Each seat's theme name, or its colour (0.3.4); Watch mode names seat 0's bot too.
-    val names = stressNames ?: net?.names ?: setup.playerNames(if (human) setup.name.ifBlank { "You" } else null)
+    val names = stressNames ?: net?.names ?: setup.playerNames(if (human) setup.name.ifBlank { "You" } else null, seed)
+    // This game's seat colours (0.3.4): the room's online, else the ones picked on New game or drawn from the seed.
+    GameColours.use(net?.colours ?: setup.playerColours(seed))
     val seats = net?.players?.size ?: setup.players.size
     // Online, a rejected move rolls the room back: the screen then rebuilds its game from the room's moves.
     var epoch by remember { mutableIntStateOf(0) }
@@ -750,6 +768,7 @@ fun WatchGameScreen(
     val tiles3d = tiles3dLoaded.takeIf { env.tiles3d && it.isNotEmpty() }
     val sea = remember { Sea(state.board).also { it.oceanBitmap = art.ocean; it.boatColors = PLAYER_COLORS } }
     sea.gullFlap = art.gullFlap; sea.gullGlide = art.gullGlide; sea.gullShadow = art.gullShadow; sea.boatWake = art.boatWake; sea.boatSprites = art.boatSprites
+    sea.boatColors = PLAYER_COLORS   // each game's own (0.3.4)
     if (sea.sprites3d == null) sea.sprites3d = SeaSprites3d(oceanRes)
     // The sea's critters (#130 modules, the whale first): rolled once per game from the board, so both phones in an online game agree.
     var spaceCritters by remember { mutableStateOf<List<SeaCritter>>(emptyList()) }
@@ -1166,7 +1185,8 @@ fun WatchGameScreen(
         Layout.leftInset = if (inventory) 0f else with(LocalDensity.current) { 376.dp.toPx() } + cutoutLeft
         val measurer = rememberTextMeasurer()
         val resources = LocalContext.current.resources
-        val wood = remember { WoodPieces(resources, PLAYER_COLORS + TOKEN_WOOD) }
+        val colors = PLAYER_COLORS
+        val wood = remember(colors) { WoodPieces(resources, colors + TOKEN_WOOD) }
         // The board's still parts are recorded once and replayed every sea frame (see BoardPart).
         // Offscreen: the GPU keeps each layer's finished pixels, so an unchanged layer costs one image copy.
         val boardLayer = rememberGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen }
@@ -1179,11 +1199,14 @@ fun WatchGameScreen(
             }
             val projection = if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null
             // Codex's animated 3D water, boats, gulls and Raiders' ship (#63) ride the 2D sea's simulation; a Space board has its own.
+            // Its renderer tints each owner's pieces once, so a game in other colours (Play again, random colours) gets a new one.
+            androidx.compose.runtime.key(PLAYER_COLORS) {
             LiveBoardView(placements, projection, Modifier.fillMaxSize(), env.facePieces, spaceCritters, env.animating,
                 projectionNow = { if (boardSize.minDimension > 0f) liveProjection(boardSize.width, boardSize.height) else null },
                 sea = sea.takeIf { !inventory && !env.art.space(ArtObject.BOARD) }, raiders = state.ck != null) { reason ->
                 liveFailure = reason; env.liveBoard = false
                 android.widget.Toast.makeText(appContext, "3D board unavailable; using the sprite board", android.widget.Toast.LENGTH_LONG).show()
+            }
             }
         }
         LaunchedEffect(env.liveBoard) { if (env.liveBoard) liveFailure = null }

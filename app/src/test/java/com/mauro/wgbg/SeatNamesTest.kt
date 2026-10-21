@@ -24,8 +24,8 @@ class SeatNamesTest {
     @Test
     fun `Colours is the default and names everyone by colour, as before`() {
         assertEquals(NameTheme.COLOURS, GameSetup().theme)
-        assertEquals(listOf("Mauro", "Blue", "Orange", "White"), GameSetup(name = "Mauro").playerNames("Mauro"))
-        assertEquals(listOf("Red", "Blue", "Orange", "White"), GameSetup().playerNames(null), "Watch mode: bots in every seat")
+        assertEquals(listOf("Mauro", "Blue", "Purple", "White"), GameSetup(name = "Mauro").playerNames("Mauro"))
+        assertEquals(listOf("Red", "Blue", "Purple", "White"), GameSetup().playerNames(null), "Watch mode: bots in every seat")
         assertEquals(listOf(null, null, null, null), GameSetup().seatNames)
     }
 
@@ -45,8 +45,8 @@ class SeatNamesTest {
         val s = bots().withTheme(NameTheme.FRENCH_QUEENS).withSeatName(3, "Marie").withSeat(2, SeatKind.EMPTY)
         assertEquals(listOf(0, 1, 3), s.players)
         assertEquals(listOf("You", "Aliénor", "Marie"), s.playerNames("You"))
-        // Under Colours the names follow the players' colours (player 2 is Orange), as the board draws them.
-        assertEquals(listOf("You", "Blue", "Orange"), s.withTheme(NameTheme.COLOURS).playerNames("You"))
+        // Under Colours the names follow the players' colours (player 2 is Purple), as the board draws them.
+        assertEquals(listOf("You", "Blue", "Purple"), s.withTheme(NameTheme.COLOURS).playerNames("You"))
     }
 
     @Test
@@ -87,8 +87,8 @@ class SeatNamesTest {
         val v1 = "v1|Mauro||CHIVALRY|13|2|FRIEND:GREEDY,BOT:EASY,EMPTY:GREEDY,BOT:GREEDY"
         val s = GameSetup.decode(v1)!!
         assertEquals(NameTheme.COLOURS, s.theme)
-        assertEquals(listOf("Mauro", "Blue", "Orange"), s.playerNames("Mauro"))
-        assertTrue(s.encode().startsWith("v2|"))
+        assertEquals(listOf("Mauro", "Blue", "Purple"), s.playerNames("Mauro"))
+        assertTrue(s.encode().startsWith("v3|"))
     }
 
     @Test
@@ -112,7 +112,7 @@ class SeatNamesTest {
             for (n in t.names) {
                 assertTrue(n.name.length <= 11, "${n.name} is longer than Elizabeth I")
                 assertTrue(n.who.isNotBlank() && n.who.length <= 80, n.name)
-                assertFalse(n.name in PLAYER_NAMES, "${n.name} would read as a colour")
+                assertFalse(SeatColour.entries.any { it.label == n.name }, "${n.name} would read as a colour")
             }
         }
     }
@@ -139,7 +139,7 @@ class SeatNamesTest {
             val setup = CardTester.setupFor(p.state, "you")
             assertEquals(NameTheme.COLOURS, setup.theme)
             assertEquals(TESTER_NAMES.take(setup.players.size), setup.playerNames("you"), sc.id)
-            val said = Regex("""(Red|Blue|Orange|White)""").findAll(p.howTo + " " + p.expect).map { it.value }.toSet()
+            val said = Regex(SeatColour.entries.joinToString("|", """\b(""", """)\b""") { it.label }).findAll(p.howTo + " " + p.expect).map { it.value }.toSet()
             assertTrue(TESTER_NAMES.containsAll(said), "${sc.id} names $said")
         }
     }
@@ -231,7 +231,7 @@ class SeatNamesTest {
         val room = Room("ROVER-42", "h", wgbg.engine.GameConfig(numPlayers = 4), 7, listOf(
             Seat("h", "Anne", ready = true), Seat(null, "anne", "GREEDY", open = false),
             Seat(null, "", "EASY", open = false), Seat(null, "Potter", "GREEDY", open = false)))
-        assertEquals(listOf("Anne", "Blue", "Orange", "Potter"), OnlineSeats(room, "h").names)
+        assertEquals(listOf("Anne", "Blue", "Purple", "Potter"), OnlineSeats(room, "h").names)
     }
 
     @Test

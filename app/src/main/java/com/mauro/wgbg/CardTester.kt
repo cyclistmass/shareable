@@ -520,7 +520,7 @@ private fun baseScenarios(): List<CardScenario> {
                 give(1, Resource.WHEAT, 3); give(2, Resource.WHEAT, 2)
                 dev(0, DevCard.MONOPOLY)
                 howTo = "Tap Play Corner the Market… and name Grain."
-                expect = "Blue gives you 3 Grain and Orange 2 (all they have); White has none."
+                expect = "Blue gives you 3 Grain and Purple 2 (all they have); White has none."
                 change("Your Grain", +5) { it.hand(0, Resource.WHEAT) }
                 change("The others' Grain", -5) { s -> (1..3).sumOf { s.hand(it, Resource.WHEAT) } }
                 then(Action.monopoly(Resource.WHEAT))
@@ -873,7 +873,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.COMMERCIAL_HARBOR)
             give(0, Resource.WHEAT, 3)
             for (q in 1..3) give(q, Commodity.PAPER + q - 1, 1)
-            howTo = "Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue, Orange and White in turn, then tap Done."
+            howTo = "Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue, Purple and White in turn, then tap Done."
             expect = "Each of them takes a Grain and gives you a commodity back: 3 resources out, 3 commodities in."
             change("Your resources", -3) { it.handSize(0) }
             change("Your commodities", +3) { it.ck!!.commodityCount(0) }
@@ -889,7 +889,7 @@ private fun chivalryScenarios(): List<CardScenario> {
             progress(0, P.COMMERCIAL_HARBOR)
             give(0, Resource.WHEAT, 3)
             give(1, Commodity.PAPER, 1); give(2, Commodity.CLOTH, 1)
-            howTo = "White holds no commodity. Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue and Orange (White mustn't be offered), then Done."
+            howTo = "White holds no commodity. Tap Play ${name(P.COMMERCIAL_HARBOR)}…, offer Grain to Blue and Purple (White mustn't be offered), then Done."
             expect = "Two swaps; White can't be picked."
             change("Your resources", -2) { it.handSize(0) }
             change("Your commodities", +2) { it.ck!!.commodityCount(0) }
@@ -987,11 +987,11 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("field.up-to-two", P.RESOURCE_MONOPOLY, "up to 2 from each player") {
         opening(true).apply {
             progress(0, P.RESOURCE_MONOPOLY); give(1, Resource.WHEAT, 3); give(2, Resource.WHEAT, 1)
-            howTo = "Blue holds 3 Grain, Orange 1, White none. Tap Play ${name(P.RESOURCE_MONOPOLY)}… and name Grain."
-            expect = "Blue gives 2 (no more than 2), Orange its 1: 3 Grain for you."
+            howTo = "Blue holds 3 Grain, Purple 1, White none. Tap Play ${name(P.RESOURCE_MONOPOLY)}… and name Grain."
+            expect = "Blue gives 2 (no more than 2), Purple its 1: 3 Grain for you."
             change("Your Grain", +3) { it.hand(0, Resource.WHEAT) }
             change("Blue's Grain", -2) { it.hand(1, Resource.WHEAT) }
-            change("Orange's Grain", -1) { it.hand(2, Resource.WHEAT) }
+            change("Purple's Grain", -1) { it.hand(2, Resource.WHEAT) }
             then(play(P.RESOURCE_MONOPOLY, Resource.WHEAT))
         }
     }
@@ -1008,11 +1008,11 @@ private fun chivalryScenarios(): List<CardScenario> {
     add("wares.one-each", P.TRADE_MONOPOLY, "1 from each player") {
         opening(true).apply {
             progress(0, P.TRADE_MONOPOLY); give(1, Commodity.COIN, 2); give(2, Commodity.COIN, 1)
-            howTo = "Blue holds 2 Silver, Orange 1, White none. Tap Play ${name(P.TRADE_MONOPOLY)}… and name Silver."
-            expect = "Blue and Orange give you 1 Silver each (never more than 1)."
+            howTo = "Blue holds 2 Silver, Purple 1, White none. Tap Play ${name(P.TRADE_MONOPOLY)}… and name Silver."
+            expect = "Blue and Purple give you 1 Silver each (never more than 1)."
             change("Your Silver", +2) { it.card(0, Commodity.COIN) }
             change("Blue's Silver", -1) { it.card(1, Commodity.COIN) }
-            change("Orange's Silver", -1) { it.card(2, Commodity.COIN) }
+            change("Purple's Silver", -1) { it.card(2, Commodity.COIN) }
             then(play(P.TRADE_MONOPOLY, Commodity.COIN))
         }
     }
@@ -1158,10 +1158,10 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.SABOTEUR)
             give(1, Resource.WHEAT, 1); give(2, Resource.WHEAT, 2); emptyCard(3, Resource.WOOD); emptyCard(3, Resource.BRICK)
-            howTo = "Everyone has 3 points, like you. Blue holds 4 cards, Orange 5, White 1. Tap Play ${name(P.SABOTEUR)}."
-            expect = "Blue and Orange each discard 2 (half, rounded down); White keeps its 1."
+            howTo = "Everyone has 3 points, like you. Blue holds 4 cards, Purple 5, White 1. Tap Play ${name(P.SABOTEUR)}."
+            expect = "Blue and Purple each discard 2 (half, rounded down); White keeps its 1."
             change("Blue's cards", -2) { it.cardCount(1) }
-            change("Orange's cards", -2) { it.cardCount(2) }
+            change("Purple's cards", -2) { it.cardCount(2) }
             change("White's cards", 0) { it.cardCount(3) }
             change("Your cards", 0) { it.cardCount(0) }
             then(play(P.SABOTEUR))
@@ -1211,11 +1211,11 @@ private fun chivalryScenarios(): List<CardScenario> {
         opening(true).apply {
             progress(0, P.WEDDING)
             upgrade(buildings(1, Piece.SETTLEMENT).first()); upgrade(buildings(2, Piece.SETTLEMENT).first())
-            howTo = "Blue and Orange have 4 points, you 3. Tap Play ${name(P.WEDDING)}."
-            expect = "Blue and Orange each give you 2 cards of their choice; White (3 points) gives nothing."
+            howTo = "Blue and Purple have 4 points, you 3. Tap Play ${name(P.WEDDING)}."
+            expect = "Blue and Purple each give you 2 cards of their choice; White (3 points) gives nothing."
             change("Your cards", +4) { it.cardCount(0) }
             change("Blue's cards", -2) { it.cardCount(1) }
-            change("Orange's cards", -2) { it.cardCount(2) }
+            change("Purple's cards", -2) { it.cardCount(2) }
             change("White's cards", 0) { it.cardCount(3) }
             then(play(P.WEDDING))
         }

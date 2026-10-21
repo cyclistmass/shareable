@@ -45,6 +45,8 @@ data class Lobby(
     /** People played with before, for one-tap invites (stubbed until #7). */
     val recent: List<String> = emptyList(),
     val host: Boolean? = null,
+    /** Each seat's colour (0.3.4: the host picks them on New game), in seat order. */
+    val colours: List<SeatColour> = SeatColour.DEFAULT.take(GameSetup.MAX_SEATS),
 ) {
     init {
         require(seats.size == GameSetup.MAX_SEATS)
@@ -129,6 +131,7 @@ data class Lobby(
                     else -> LobbySeat(open = true)
                 }
             },
+            colours = setup.roomColours(0L),
         )
 
         /** Stub data until #7, matching the Lobby A design: three people, one not ready, one open seat. */

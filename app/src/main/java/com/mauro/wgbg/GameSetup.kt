@@ -24,8 +24,11 @@ enum class BotLevel(val label: String) {
     }
 }
 
-/** [name]: the theme name picked for this seat (null: the theme's next free name, or the colour under Colours). */
-data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, val name: String? = null)
+/**
+ * [name]: the theme name picked for this seat (null: the theme's next free name, or the colour under Colours).
+ * [colour]: the colour picked for it (null: the first default colour nobody has, [SeatColour.resolve]).
+ */
+data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, val name: String? = null, val colour: SeatColour? = null)
 
 /** Rulesets the screen offers, with our names (never the original game's). */
 enum class Ruleset(val label: String, val expansion: Expansion, val defaultPoints: Int, val players: IntRange) {
@@ -54,6 +57,8 @@ data class GameSetup(
     val randomFirst: Boolean = true,
     /** What the other seats are called (0.3.4); Colours names each player by their colour, as before. */
     val theme: NameTheme = NameTheme.COLOURS,
+    /** Each game draws its seat colours at random (0.3.4) instead of the ones picked; never two that clash. */
+    val randomColours: Boolean = false,
 ) {
     init {
         require(seats.size == MAX_SEATS) { "always $MAX_SEATS seats (empty ones are EMPTY)" }
@@ -67,11 +72,62 @@ data class GameSetup(
 
     /**
      * The names the game shows, by engine player: [you] for seat 0 (null in Watch mode, where a bot sits there and takes
-     * a theme name too), each other seat's theme name, else the player's colour.
+     * a theme name too), each other seat's theme name, else the player's colour ([seed]: the game's, for random colours).
      */
-    fun playerNames(you: String?): List<String> {
+    fun playerNames(you: String?, seed: Long = 0L): List<String> {
         val names = theme.resolve(seats.map { it.name }, seats.indices.map { (it != 0 || you == null) && seats[it].kind != SeatKind.EMPTY })
-        return players.mapIndexed { p, seat -> if (seat == 0 && you != null) you else names[seat] ?: colourName(p) }
+        val colours = playerColours(seed)
+        return players.mapIndexed { p, seat -> if (seat == 0 && you != null) you else names[seat] ?: colours[p].label }
+    }
+
+    /** The colour each seat plays in, in seat order (null where nobody sits); picked or default, never two the same. */
+    val seatColours: List<SeatColour?> get() = SeatColour.resolve(seats.map { it.colour }, seats.indices.map { it in players })
+
+    /**
+     * The colours of a game started with [seed], by seat: the picked ones, or with [randomColours] a set drawn from the
+     * seed (the same game always gets the same set: a resumed game, and every phone in an online room).
+     */
+    fun seatColoursFor(seed: Long): List<SeatColour?> {
+        if (!randomColours) return seatColours
+        val drawn = SeatColour.draw(players.size, kotlin.random.Random(seed * 1_000_003 + 0x5EA7))
+        return seats.indices.map { s -> players.indexOf(s).takeIf { it >= 0 }?.let(drawn::get) }
+    }
+
+    /** The colours of a game started with [seed], by engine player. */
+    fun playerColours(seed: Long): List<SeatColour> = seatColoursFor(seed).let { c -> players.map { c[it]!! } }
+
+    /** Seats (by index) whose colours clash; none with random colours, which never draws a clash. */
+    val colourClashes: List<Pair<Int, Int>> get() = if (randomColours) emptyList() else SeatColour.clashes(seatColours)
+
+    /**
+     * Seat i plays in [colour] (you too). No two seats share one: if another seat has it, the two swap. Every playing
+     * seat's colour is pinned, so a pick never shifts the others; picking turns random colours off.
+     */
+    fun withSeatColour(i: Int, colour: SeatColour): GameSetup {
+        if (i !in seats.indices || i !in players) return this
+        val now = seatColours
+        return copy(randomColours = false, seats = seats.mapIndexed { j, s ->
+            when {
+                j == i -> s.copy(colour = colour)
+                now[j] == colour -> s.copy(colour = now[i])
+                else -> s.copy(colour = now[j] ?: s.colour)
+            }
+        })
+    }
+
+    fun withRandomColours(on: Boolean) = copy(randomColours = on)
+
+    /**
+     * Every seat's colour for an online room started with [seed]: the game's colours for the seats that play, and for the
+     * rest (a person may still take one in the lobby) the first colours nobody has, ones that don't clash where possible.
+     */
+    fun roomColours(seed: Long): List<SeatColour> {
+        val out = seatColoursFor(seed).toMutableList()
+        for (i in out.indices) if (out[i] == null) {
+            val free = SeatColour.DEFAULT.filter { it !in out }
+            out[i] = free.firstOrNull { c -> out.none { it != null && c.clashes(it) } } ?: free.first()
+        }
+        return out.map { it!! }
     }
 
     val hasFriends get() = seats.drop(1).any { it.kind == SeatKind.FRIEND }
@@ -125,11 +181,12 @@ data class GameSetup(
 
     /**
      * Saved as one line (#68, #69: the start screen comes back with your last game and your name):
-     * v2|name|photo|ruleset|points|decks|kind:bot:seatname,…(one per seat)|theme (names and photo URL-encoded).
-     * v1 had no theme and no seat names; it still reads.
+     * v3|name|photo|ruleset|points|decks|kind:bot:seatname:colour,…(one per seat)|theme|random colours (R or empty)
+     * (names and photo URL-encoded). v2 had no colours, v1 no theme and no seat names; both still read.
      */
-    fun encode(): String = listOf("v2", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
-        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}:${enc(it.name ?: "")}" }, theme.name).joinToString("|")
+    fun encode(): String = listOf("v3", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
+        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}:${enc(it.name ?: "")}:${it.colour?.name ?: ""}" }, theme.name,
+        if (randomColours) "R" else "").joinToString("|")
 
     companion object {
         private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
@@ -137,17 +194,18 @@ data class GameSetup(
 
         /** The setup [encode] wrote, or null if [text] is missing, from an unknown version or damaged. */
         fun decode(text: String?): GameSetup? = runCatching {
-            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1" || f.size == 8 && f[0] == "v2")
-            val theme = if (f.size == 8) NameTheme.valueOf(f[7]) else NameTheme.COLOURS
+            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1" || f.size == 8 && f[0] == "v2" || f.size == 9 && f[0] == "v3" && f[8] in listOf("", "R"))
+            val theme = if (f.size >= 8) NameTheme.valueOf(f[7]) else NameTheme.COLOURS
             val seats = f[6].split(",").map { s ->
                 val p = s.split(":"); require(p.size == f.size - 5)
                 // A name the theme doesn't have (a list changed since) is dropped: the seat takes the next free one.
-                SeatSetup(SeatKind.valueOf(p[0]), BotLevel.valueOf(p[1]), p.getOrNull(2)?.let(::dec)?.takeIf { theme.who(it) != null })
+                SeatSetup(SeatKind.valueOf(p[0]), BotLevel.valueOf(p[1]), p.getOrNull(2)?.let(::dec)?.takeIf { theme.who(it) != null },
+                    p.getOrNull(3)?.takeIf { it.isNotEmpty() }?.let(SeatColour::valueOf))
             }
             require(seats.size == MAX_SEATS && seats[0].kind == SeatKind.FRIEND)
             GameSetup(name = dec(f[1]).take(40).ifBlank { "You" }, photo = dec(f[2]).ifBlank { null }, seats = seats,
                 decks = f[5].toInt().coerceIn(0, MAX_DECKS), ruleset = Ruleset.valueOf(f[3]),
-                points = f[4].toInt().coerceIn(POINTS_RANGE), theme = theme)
+                points = f[4].toInt().coerceIn(POINTS_RANGE), theme = theme, randomColours = f.getOrNull(8) == "R")
         }.getOrNull()
 
         const val MAX_SEATS = 4

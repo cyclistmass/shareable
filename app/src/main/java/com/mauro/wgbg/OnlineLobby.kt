@@ -23,7 +23,7 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
         ruleset = Ruleset.entries.first { it.expansion == room.config.expansion }, points = room.config.vpToWin),
         room.seats.map { LobbySeat(it.name.takeIf { _ -> it.uid != null }, it.bot?.let(BotLevel::valueOf), it.ready, open = it.open,
             botName = it.name.takeIf { n -> it.uid == null && n.isNotBlank() }) },
-        me = room.seats.indexOfFirst { it.uid == uid }.coerceAtLeast(0), host = room.host == uid)
+        me = room.seats.indexOfFirst { it.uid == uid }.coerceAtLeast(0), host = room.host == uid, colours = roomSeatColours(room))
     /**
      * What leaving tells the room, if anything. A guest leaving the lobby frees the seat; quitting a running game hands it
      * to a bot. A host leaving their lobby takes back its invites (#72): a guest's start screen showed the dead room's
@@ -51,7 +51,7 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
                     val seats = Lobby.host(setup, id).seats.mapIndexed { i, s ->
                         Seat(if (i == 0) uid else null, s.name ?: s.botName ?: "", s.bot?.name, s.open, s.ready, google = i == 0 && transport.google)
                     }
-                    Room(id, uid, setup.config(), seed, seats, decks = setup.decks, invited = invited)
+                    Room(id, uid, setup.config(), seed, seats, decks = setup.decks, invited = invited, colours = setup.roomColours(seed).map { it.name })
                 }
             }
 
@@ -60,7 +60,9 @@ class LobbySession(val transport: GameTransport, val setup: GameSetup, val id: S
                     nextCode: () -> String = { Lobby.newCode() }): CompletableFuture<LobbySession> =
             transport.signIn().thenCompose { uid ->
                 create(transport, setup, uid, code, attempts, nextCode) { id ->
-                    Friends.rematch(old, id, seed).let { r -> r.copy(seats = r.seats.mapIndexed { i, s -> if (i == 0) s.copy(google = transport.google) else s }) }
+                    // The same colours as the last game, or a new draw when the host plays random colours.
+                    Friends.rematch(old, id, seed).let { r -> r.copy(seats = r.seats.mapIndexed { i, s -> if (i == 0) s.copy(google = transport.google) else s },
+                        colours = if (setup.randomColours) setup.roomColours(seed).map { it.name } else r.colours) }
                 }
             }
 
@@ -147,6 +149,13 @@ internal fun connectionLabel(reconnecting: Boolean, pending: Int, stuck: Boolean
 }
 
 /**
+ * Each seat's colour in [room], in seat order: the host's, or for a seat without one (a room from before 0.3.4, a name
+ * this version doesn't know) the first default colour nobody has, as a local game picks them.
+ */
+internal fun roomSeatColours(room: Room): List<SeatColour> =
+    SeatColour.resolve(room.seats.indices.map { SeatColour.of(room.colours.getOrNull(it)) }, room.seats.map { true }).map { it!! }
+
+/**
  * Who plays which engine player in an online room (seats are frozen once it starts). Active seats map to
  * engine players in seat order; this phone is [me] (-1 if not seated); the host's phone moves for [bot] seats.
  */
@@ -156,6 +165,9 @@ class OnlineSeats(room: Room, uid: String) {
     val isHost: Boolean = room.host == uid
     val config: wgbg.engine.GameConfig = room.config.copy(numPlayers = players.size)
     val seed: Long = room.seed
+    /** Colours by engine player: the host's for each seat (0.3.4); a room without them plays the default ones in turn. */
+    val colours: List<SeatColour> =
+        if (room.colours.isEmpty()) players.indices.map { SeatColour.DEFAULT[it] } else roomSeatColours(room).let { c -> players.map { c[it] } }
     /**
      * Names by engine player; your own seat shows the name you typed (Mauro: it said "You" instead of my name). A bot
      * goes by the host's theme name (0.3.4), or its colour: never its level, which only took room (Mauro), and never a
@@ -166,8 +178,8 @@ class OnlineSeats(room: Room, uid: String) {
         val people = room.seats.filter { it.uid != null }.map { it.name.trim().lowercase() }
         when {
             i == me -> seat.name.ifBlank { "You" }
-            seat.uid != null -> seat.name.ifBlank { colourName(i) }
-            else -> seat.name.takeIf { it.isNotBlank() && it.trim().lowercase() !in people } ?: colourName(i)
+            seat.uid != null -> seat.name.ifBlank { colours[i].label }
+            else -> seat.name.takeIf { it.isNotBlank() && it.trim().lowercase() !in people } ?: colours[i].label
         }
     }
     private val bots: List<BotLevel?> = players.map { s -> room.seats[s].takeIf { it.uid == null }?.bot?.let(BotLevel::valueOf) }

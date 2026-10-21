@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -176,12 +177,13 @@ private fun SeatRow(lobby: Lobby, i: Int, onChange: (Lobby) -> Unit) {
     }.padding(horizontal = 10.dp, vertical = 4.dp)
     else Modifier.background(Color(0x52000000), shape).padding(horizontal = 10.dp, vertical = 5.dp)
     Row(rowMod.fillMaxWidth().testTag("lobby-seat-$i"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val colour = Color(lobby.colours[i].argb)
         if (seat.open) Box(
-            Modifier.size(32.dp).background(PLAYER_COLORS[i], androidx.compose.foundation.shape.CircleShape)
+            Modifier.size(32.dp).background(colour, androidx.compose.foundation.shape.CircleShape)
                 .border(2.dp, Wood.BRASS_EDGE, androidx.compose.foundation.shape.CircleShape),
             contentAlignment = Alignment.Center,
-        ) { Text("+", style = Wood.sans(16.sp, FontWeight.Bold, if (i == 3) Wood.PARCHMENT_INK else Wood.INK)) }
-        else PhotoToken(seat.photo, seat.label, PLAYER_COLORS[i], size = 32.dp)
+        ) { Text("+", style = Wood.sans(16.sp, FontWeight.Bold, if (colour.luminance() > 0.5f) Wood.PARCHMENT_INK else Wood.INK)) }
+        else PhotoToken(seat.photo, seat.label, colour, size = 32.dp)
         when {
             seat.open -> {
                 Text(

@@ -70,3 +70,12 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, bugs: unit tests can't see a VerifyError in the huge WatchGameScreen lambda (ART rejected it after three
   more inline LocalDensity reads); only a launch on a device does. Splitting that lambda into smaller composables would
   remove the risk; until then every HUD change needs one on-device launch before it is called done.
+- 2026-10-21, WGBG: six-seat games need two more seat colours. The seven in SeatColours.kt have no clean 6-set (no two
+  under 30 CIELAB dE in any sight); only two clean 5-sets exist. The code already takes any seat count (resolve, draw,
+  the picker); choosing the extra colours is Mauro's call (Bosun, 0.3.4), then add them to SeatColour and pin the new
+  clash pairs in SeatColoursTest.
+- 2026-10-21, WGBG: the 2D sea boats (GameArt.BOATS drawables) keep fixed sail colours, Orange included; only the 3D
+  boats take the game's seat colours. Fine as scenery; tint the 2D sails too if testers read them as players.
+- 2026-10-21, WGBG: two files held literal backspace bytes where `\b` was meant (SeatNamesTest's card-tester name check
+  and tools/userplay.sh's menu-build check), so neither check could ever fire. Cause: `\b` passed through a non-raw
+  string (Python, printf) in an edit script. Write edit scripts to a file and grep for [\x00-\x08] after scripted edits.

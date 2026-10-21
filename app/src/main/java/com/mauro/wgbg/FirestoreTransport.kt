@@ -288,7 +288,7 @@ internal fun Room.wire(): Map<String, Any?> = mapOf(
     "options" to mapOf("expansion" to config.expansion.name, "numPlayers" to config.numPlayers, "vpToWin" to config.vpToWin,
         "layout" to config.layout.name, "avoidAdjacentRedNumbers" to config.avoidAdjacentRedNumbers, "discardLimit" to config.discardLimit,
         "maxTurns" to config.maxTurns, "randomDiscard" to config.randomDiscard, "generateTradeOffers" to config.generateTradeOffers,
-        "randomFirstPlayer" to config.randomFirstPlayer),
+        "randomFirstPlayer" to config.randomFirstPlayer) + (if (colours.isEmpty()) emptyMap() else mapOf("colours" to colours)),
     "version" to ROOM_VERSION, "invited" to invited,
 ) + listOfNotNull(rematchOf?.let { "rematchOf" to it }, next?.let { "next" to it })
 
@@ -317,6 +317,7 @@ internal fun room(id: String, d: Map<String, Any?>): Room {
         (d["seed"] as String).toLong(), List(4) { i -> val s = seats[i.toString()]!!
             Seat(s["uid"] as String?, s["name"] as String, s["bot"] as String?, s["open"] as Boolean, s["ready"] as Boolean, s["google"] as Boolean? ?: false) },
         Status.valueOf(d["status"] as String), (d["nextSeq"] as Number).toLong(), (d["decks"] as Number).toInt(),
-        (d["invited"] as List<String>?) ?: emptyList(), d["rematchOf"] as String?, d["next"] as String?)
+        (d["invited"] as List<String>?) ?: emptyList(), d["rematchOf"] as String?, d["next"] as String?,
+        (o["colours"] as? List<*>)?.map { it as? String ?: "" } ?: emptyList())
 }
 

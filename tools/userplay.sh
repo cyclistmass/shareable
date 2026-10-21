@@ -212,7 +212,7 @@ while true; do
     if tap_desc "$label"; then
       sleep 0.6; xy=${menu_pick#*@}; tap "${xy%,*}" "${xy#*,}"; sleep 0.6; tap "${xy%,*}" "${xy#*,}"
       for _ in $(seq 1 10); do sleep 0.5; after=$("$ADB" logcat -d -s WGBG-TURN:I | tail -1); [ "$after" != "$line" ] && break; done
-      if echo "$after" | grep -q "legal=[^ ]*$mv_"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
+      if echo "$after" | grep -q "legal=[^ ]*\b$mv_\b"; then echo "MENUBUILD FAIL $label $mv_: still legal after menu, spot, confirm"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-$label"
       else echo "MENUBUILD ok $label $mv_"; MENU_OK=$((${MENU_OK:-0} + 1)); fi
     else echo "MENUBUILD FAIL $label: no $label button in the build menu while $mv_ is legal"; MENU_FAIL=$((${MENU_FAIL:-0} + 1)); shot "menufail-nobutton-$label"; fi
   elif [ -n "$spots" ] && [ $((RANDOM % 5)) != 0 ]; then
@@ -267,12 +267,12 @@ while true; do
   elif echo "$d" | grep -q 'text="Back"' && echo "$d" | grep -q 'text="Play [^"]*: '; then
     # A card's player picker ("Play Grand Factor: ... Blue / White / Back"): pick one of the named players. The
     # general list below leaves player names out because the scores panel shows them too.
-    who=$(echo "$d" | grep -o 'text="\(Red\|Blue\|Orange\|White\)"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' |
+    who=$(echo "$d" | grep -o 'text="\(Red\|Blue\|Orange\|White\|Yellow\|Purple\|Black\)"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' |
       sed 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]"/\1 \2 \3 \4/' | awk '$1 > 600 {print int(($1+$3)/2), int(($2+$4)/2)}' | shuf -n 1)
     if [ -n "$who" ]; then echo "$(date +%T) player picker" >&2; tap "${who% *}" "${who#* }"; else tap_text "Back" "$d" || true; fi
   else
     # Any other on-screen choice (pickers, victims, Age of Chivalry buttons), else End turn.
-    opts=$(echo "$d" | grep -o 'text="[^"]\+"' | cut -d'"' -f2 | grep -v -x -E 'Menu|Trade|Hide|Exit|Leave|Settings|End turn|Roll|Counter|Offer|You|Blue|Orange|White|Red|Tester|Duo|\(.*\)|Your turn|[0-9/ ]+|.*turn.*|.*Tap .*|.*built.*|.*rolled.*|.*\+[0-9].*|Raiders|Zoom|Tilt|Players|Maritime|Harbour|have [0-9]+|.*offers.*|.*chosen.*|Pause|Play|Slow|Normal|Fast|Max|Watch bots|Fit|Dice.*|v[0-9.]+|Sound|Music.*|Sounds.*|Inventory|Look.*|Card guide|Close' | shuf)
+    opts=$(echo "$d" | grep -o 'text="[^"]\+"' | cut -d'"' -f2 | grep -v -x -E 'Menu|Trade|Hide|Exit|Leave|Settings|End turn|Roll|Counter|Offer|You|Blue|Orange|White|Red|Yellow|Purple|Black|Tester|Duo|\(.*\)|Your turn|[0-9/ ]+|.*turn.*|.*Tap .*|.*built.*|.*rolled.*|.*\+[0-9].*|Raiders|Zoom|Tilt|Players|Maritime|Harbour|have [0-9]+|.*offers.*|.*chosen.*|Pause|Play|Slow|Normal|Fast|Max|Watch bots|Fit|Dice.*|v[0-9.]+|Sound|Music.*|Sounds.*|Inventory|Look.*|Card guide|Close' | shuf)
     # After a few taps that changed nothing, a player ends the turn.
     if [ -n "$opts" ] && [ "$tries" -lt 3 ] && [ $((RANDOM % 3)) != 0 ]; then tap_text "$(echo "$opts" | shuf -n 1)" "$d" || true
     else tap_text "End turn" "$d" || { [ -n "$opts" ] && tap_text "$(echo "$opts" | shuf -n 1)" "$d"; } || true; fi

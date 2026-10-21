@@ -11,10 +11,12 @@ enum class Status { lobby, playing, done }
 /**
  * [invited]: people the host asked in (#72), who see the room on their start screen. [rematchOf]: the finished room this
  * one plays again; [next]: set on a finished room once its host opens the rematch, so its players can follow.
+ * [colours]: each seat's colour by name, in seat order (0.3.4, the host's picks); empty in a room from before.
  */
 data class Room(val id: String, val host: String, val config: GameConfig, val seed: Long,
     val seats: List<Seat>, val status: Status = Status.lobby, val nextSeq: Long = 0,
-    val decks: Int = 0, val invited: List<String> = emptyList(), val rematchOf: String? = null, val next: String? = null) {
+    val decks: Int = 0, val invited: List<String> = emptyList(), val rematchOf: String? = null, val next: String? = null,
+    val colours: List<String> = emptyList()) {
     init { require(seats.size == 4); require(seats[0].uid == host) }
     val players get() = seats.indices.filter { seats[it].uid != null || seats[it].bot != null }
 }
@@ -107,7 +109,7 @@ object Friends {
                 s.uid != null -> Seat()
                 else -> s.copy(ready = false)
             }
-        }, decks = old.decks, invited = people, rematchOf = old.id)
+        }, decks = old.decks, invited = people, rematchOf = old.id, colours = old.colours)
     }
 }
 
