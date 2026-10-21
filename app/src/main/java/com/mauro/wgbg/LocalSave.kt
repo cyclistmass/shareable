@@ -50,7 +50,7 @@ data class LocalSave(val setup: GameSetup, val seed: Long, val moves: List<Actio
             val lines = text!!.trimEnd().split("\n").map { it.trimEnd('\r') }
             require(lines.size >= 3 && (lines[0] == HEADER || lines[0] == HEADER_V1))
             val setup = GameSetup.decode(lines[1])!!.copy(randomFirst = lines[0] == HEADER)
-                .let { if (lines[1].startsWith("v3|")) it else it.withColours(BEFORE_034) }
+                .let { if (lines[1].substringBefore("|") in listOf("v1", "v2")) it.withColours(BEFORE_034) else it }   // v3 on stores colours
             LocalSave(setup, lines[2].toLong(), lines.drop(3).filter { it.isNotEmpty() }.map { MoveCodec.decode(it)!! })
         }.getOrNull()
     }
