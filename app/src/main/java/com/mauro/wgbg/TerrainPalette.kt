@@ -18,9 +18,9 @@ import kotlin.math.sin
 enum class TerrainPalette(val label: String, private val grades: Map<Int, List<Grade>>) {
     TODAY("Today", emptyMap()),
     AUTUMN("Autumn", mapOf(
-        Resource.WOOD to listOf(Grade.HueRotate(-38f), Grade.Saturate(1.05f)),
+        Resource.WOOD to listOf(Grade.HueRotate(-48f), Grade.Saturate(1.2f), Grade.Brightness(.9f)), // deep rust, clear of the clay
         Resource.BRICK to listOf(Grade.HueRotate(18f), Grade.Saturate(.75f), Grade.Brightness(1.05f)),
-        Resource.SHEEP to listOf(Grade.HueRotate(-22f), Grade.Saturate(.85f)),
+        Resource.SHEEP to listOf(Grade.HueRotate(-10f), Grade.Saturate(.55f), Grade.Brightness(1.1f)), // pale straw-green, clear of the grain
         Resource.WHEAT to listOf(Grade.Saturate(.75f), Grade.Brightness(.95f)),
         Resource.ORE to listOf(Grade.Sepia(.35f), Grade.Brightness(.95f)),
         Resource.NONE to listOf(Grade.Saturate(.8f)),
@@ -39,7 +39,7 @@ enum class TerrainPalette(val label: String, private val grades: Map<Int, List<G
         Resource.SHEEP to listOf(Grade.Sepia(.5f), Grade.HueRotate(50f)),
         Resource.WHEAT to listOf(Grade.Sepia(.6f), Grade.Saturate(1.1f)),
         Resource.ORE to listOf(Grade.Sepia(.7f), Grade.HueRotate(160f), Grade.Saturate(.6f)),
-        Resource.NONE to listOf(Grade.Sepia(.7f)),
+        Resource.NONE to listOf(Grade.Sepia(.7f), Grade.Saturate(1.2f)), // warm enough that the plates stand off it
     ));
 
     /** The grades for one terrain (a [Resource] constant, [Resource.NONE] for the desert), applied in order. */
