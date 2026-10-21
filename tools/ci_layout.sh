@@ -79,12 +79,23 @@ layout $name: the stress list is not on screen (the game restarted?)"; rc=1; }
   else rm -f "$f" "$w"; fi; }
 screen() { "$ADB" shell wm size "${1%%:*}"; "$ADB" shell wm density "${1##*:}"; sleep 2; }
 
+# No first turn: say what the phone was doing (the last turn line, any crash or ANR, the activity on top) and keep its
+# screen, dump and log beside the other failures, so a CI run shows why without a device.
+noturn() { local f; f="$OUT/layout-noturn-$1-font$(setting font_scale)"
+  echo "layout: FAILED: no first turn ($1, font $(setting font_scale), screen $("$ADB" shell wm size | tr -d '\r' | tail -1 | sed 's/.*: //'))"
+  echo "  last turn line: $(turn | sed 's/.*WGBG-TURN//' | cut -c1-160)"
+  echo "  on top: $("$ADB" shell dumpsys activity activities | tr -d '\r' | grep -m1 'topResumedActivity\|mResumedActivity' | sed 's/^ *//')"
+  "$ADB" logcat -d > "$f.logcat.txt" 2>/dev/null
+  grep -E 'FATAL EXCEPTION|ANR in|AndroidRuntime' -A6 "$f.logcat.txt" | head -20 | sed 's/^/  /'
+  "$ADB" exec-out screencap -p > "$f.png" 2>/dev/null
+  "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; "$ADB" exec-out cat /sdcard/ui.xml > "$f.xml" 2>/dev/null
+  fail=1; }
 # A fresh 4-player game in mode $1 at player 0's first turn, rolled (the dice row shows, the roll's mini cards sit in
 # the list) and played to End turn, then the list at its fullest.
 fresh() { local l; "$ADB" logcat -c
   "$ADB" shell am start -n $PKG/.MainActivity --activity-clear-task --es start "$1" --ei players 4 \
     --ez autosetup true --ez quickbots true >/dev/null
-  wait_for 'ROLL' 90 >/dev/null || { echo "layout: FAILED: no first turn ($1, font $(setting font_scale))"; fail=1; return 1; }
+  wait_for 'ROLL' 90 >/dev/null || { noturn "$1"; return 1; }
   # The scenery still (sea, birds, boats), or uiautomator waits for an idle screen that never comes on a slow emulator.
   view --ef scenery 0
   move ROLL:0
@@ -129,5 +140,7 @@ done
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || { echo "layout: FAILED: the app crashed"; fail=1; }
 echo "layout: $steps screens checked in $((SECONDS - t0)) s"
+# Every step skipped (no cutout overlays on CI's aosp_atd image) is not a pass: it checked nothing.
+[ $steps -gt 0 ] || { echo "layout: FAILED: nothing was checked, every step was skipped"; fail=1; }
 [ $fail = 0 ] && echo "layout: PASSED"
 exit $fail

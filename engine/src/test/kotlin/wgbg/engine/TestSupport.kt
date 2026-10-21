@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 
+/** How many times the per-push counts the fuzz and dice tests run: WGBG_TEST_SCALE=10 for the nightly run (build.gradle.kts). */
+internal val testScale: Int = System.getProperty("wgbg.testScale")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+
 /** Helpers to build positions directly and to check state invariants. */
 object T {
     /** A state on the beginner board, setup skipped, player 0 to move before rolling. */

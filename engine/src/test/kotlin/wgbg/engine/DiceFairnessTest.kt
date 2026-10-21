@@ -13,10 +13,10 @@ class DiceFairnessTest {
     fun `the app's true-random dice are fair over 10,000 throws - totals, each die and the event die`() {
         val dice = DiceDeck.of(DiceMode.RANDOM)
         assertTrue(dice is TrueRandomDice)
-        val rolls = List(10_000) { dice.next(withEvent = true) }
+        val rolls = List(10_000 * testScale) { dice.next(withEvent = true) }
         val report = DiceFairness.check(rolls.map { it.sum }, rolls.map { it.d1 }, rolls.map { it.d2 }, rolls.map { it.event + 1 })
         saveFairness("app-local", report)
-        assertEquals(10_000, rolls.size)
+        assertEquals(10_000 * testScale, rolls.size)
         assertTrue(dice.next().event == -1, "no event die in the base game")
     }
 

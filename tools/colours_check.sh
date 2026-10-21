@@ -14,7 +14,7 @@ EVENTS="${1:-2000}"
 : "${ANDROID_SERIAL:?set ANDROID_SERIAL to the device to drive}"
 export ANDROID_SERIAL MSYS_NO_PATHCONV=1
 ADB="${ADB:-adb}"; PKG=com.mauro.wgbg
-OUT="${OUT:-$TEMP/wgbg-colours/$ANDROID_SERIAL}"; mkdir -p "$OUT"
+OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-colours/$ANDROID_SERIAL}"; mkdir -p "$OUT"
 TAG=colours
 
 if [ "${SMALL:-0}" = 1 ]; then

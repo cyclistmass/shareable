@@ -19,7 +19,7 @@ class ChivalryFuzzTest {
         var attacks = 0
         var metropolises = 0
         val buf = ActionBuffer()
-        for (game in 0 until 1000) {
+        for (game in 0 until 1000 * testScale) {
             val config = GameConfig(
                 expansion = Expansion.CHIVALRY,
                 numPlayers = 3 + game % 2,

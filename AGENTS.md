@@ -98,6 +98,11 @@ honestly. Never call something done with failing or skipped tests.
   `tag|text@x,y` for each). For the whole screen, source `tools/lib/uiread.sh` (`dump`, `at`, `tap_text`, `tap_id`):
   it asks the app (`am broadcast -a com.mauro.wgbg.UI`) and reads `files/ui.txt` in uiautomator's format in about
   0.2 s, falling back to `uiautomator dump` (2-15 s). Tap by test tag where there is one; a text can be on screen twice.
+- Before a release: `tools/release_check.sh` runs every automated check in order (unit, rules, APK and its key, then
+  every device script on GitHub's runners: `wgbg-check.yml` on a `test/<branch>`; `STEPS="unit rules apk install lanes
+  friends"` runs them on both local lanes instead) and prints one timed report plus the by-hand user-test list; a
+  `SHARDS: friends-base unit` line in the test branch's head commit message runs only those jobs (a script fix's re-run);
+  `tools/emulator_setup.sh test|user` readies a test phone (Play Store and animations off) and hands it back.
 - Scripts: `tools/ci_monkey.sh`, `tools/ci_selfplay.sh`, `tools/ci_trade.sh` (bank and player trades by touch), `tools/ci_withdraw.sh` (withdraw an open offer by touch), `tools/ci_online.sh`, `tools/online_sim.sh`,
   `tools/record_showcase.sh` (README GIFs and the gameplay video), `tools/record_screenshots.sh` (README gallery);
   `tools/emulator.ps1` launches a landscape emulator on Windows.
@@ -108,7 +113,9 @@ honestly. Never call something done with failing or skipped tests.
   multiplayer, testing, bug, age-of-chivalry). Reference the issue in commits ("#45"); close it only when
   the work is done and verified.
 - CI (`.github/workflows/wgbg-ci.yml` in the shareable repo) runs every test, builds the APK, then runs
-  monkey, bot self-play and a two-client online game on an emulator. A red CI is stop-and-fix.
+  monkey, bot self-play, touch play, withdraw, names, colours and a two-client online game on an emulator. Every night
+  `wgbg-nightly.yml` plays the rest (whole games by touch, trades, friends, every layout, the update from the last
+  release, fuzz at 10x) and files an issue when something fails. A red CI or nightly is stop-and-fix.
 - Every push that changes how the game looks re-records the README GIFs (`tools/record_showcase.sh`) and, if
   the screens changed, the gallery (`tools/record_screenshots.sh`), in the same commit.
 - **Each major merge** (a feature or art set landing): bump `versionName` (0.MINOR.PATCH until v1) and

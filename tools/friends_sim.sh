@@ -18,9 +18,9 @@ LIMIT="${2:-$([ "${1:-base}" = chivalry ] && echo 1800 || echo 900)}"
 # PORTS: the emulators' Firestore and Auth ports when not 8080/9099, e.g. PORTS="--ei fsport 8185 --ei authport 9199".
 PORTS="${PORTS:-}"
 EXTRAS="--es firebase emu --ez fakegoogle true --ez autoplay true --ez quickbots true $PORTS"
-HOST=emulator-5554
-GUEST=emulator-5556
-A="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+HOST="${HOST_SERIAL:-emulator-5554}"
+GUEST="${GUEST_SERIAL:-emulator-5556}"
+A="${ADB:-$(command -v adb || echo "$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")}"
 export MSYS_NO_PATHCONV=1
 LABEL="Base game"; [ "$RULESET" = chivalry ] && LABEL="Age of Chivalry"
 
@@ -35,6 +35,24 @@ tap_text() {
 }
 texts() { dump "$1" | grep -o 'text="[^"]\+"' | sed 's/text=//' | tr '\n' ' '; }
 wait_for() { for _ in $(seq 1 "$3"); do texts "$1" | grep -q "$2" && return 0; sleep 1; done; echo "[$1] timed out waiting for '$2'"; texts "$1"; return 1; }
+# A finger's swipe up inside each scrolling panel on device $1 (a wide screen shows two side by side; a swipe between
+# them moves nothing).
+swipe_panels() {
+  local l t r b
+  { dump "$1" | grep 'scrollable="true"' | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]\+' | paste -d' ' - - - - || true; } |
+    while read -r l t r b; do "$A" -s "$1" shell input swipe $(((l + r) / 2)) $((t + (b - t) * 7 / 10)) $(((l + r) / 2)) $((t + (b - t) * 3 / 10)) 400 </dev/null; done
+}
+# Like wait_for, but scrolls to it as a person would, a swipe every third second it's missing: on CI's 640x320 screen
+# Host and Join sit below Play in New game's right panel, which uiautomator doesn't list until it's scrolled to.
+wait_scroll() {
+  local i
+  for i in $(seq 1 "$3"); do
+    texts "$1" | grep -q "$2" && return 0
+    [ $((i % 3)) != 0 ] || swipe_panels "$1"
+    sleep 1
+  done
+  echo "[$1] timed out waiting for '$2', even scrolled"; texts "$1"; return 1
+}
 room_code() { texts "$1" | grep -o 'Room [A-Z]*-[0-9]*' | head -1 | cut -d' ' -f2 || true; }
 crashed() {
   local bad=0
@@ -52,13 +70,13 @@ FIRST=$(texts $HOST | grep -o 'Room [A-Z]*-[0-9]*' | head -1 || true)
 
 # 2. Rematch from the results.
 echo "Rematch..."
-wait_for $HOST "Play again" 30
+wait_scroll $HOST "Play again" 30
 tap_text $HOST "Play again"
 wait_for $HOST "Room [A-Z]*-[0-9]*" 30
 R2=$(room_code $HOST)
 [ -n "$R2" ] || { echo "FAIL: no rematch room on the host"; exit 1; }
 echo "rematch room $R2"
-wait_for $GUEST "Join rematch" 30
+wait_scroll $GUEST "Join rematch" 30
 tap_text $GUEST "Join rematch"
 wait_for $GUEST "Erin" 30
 wait_for $HOST "Erin" 30
@@ -86,7 +104,7 @@ echo "PASS: the guest left $R2 by its Leave button and the seat opened"
 tap_text $HOST "Leave room"
 tap_text $HOST "Leave room" 2             # the confirm box's button, over the lobby's own
 "$A" -s $HOST shell input keyevent KEYCODE_BACK    # Leave room opens the setup screen; Back to the start
-wait_for $HOST "Quick game with friends" 30
+wait_scroll $HOST "Quick game with friends" 30
 tap_text $HOST "Quick game with friends"
 wait_for $HOST "Erin" 15
 tap_text $HOST "☆" 1                    # star the guest: the star must stick
