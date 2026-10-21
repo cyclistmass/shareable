@@ -15,7 +15,7 @@ SECS="${1:-420}"
 RULESETS="${2:-base chivalry}"
 # The dice, in order and over again (debug --es dice, 0.3.5): every number but 7 once a round, so every hex you touch
 # pays each round and no 7 ever halves your hand. Two lots then always come (random dice missed them within 420 s on
-# CI, run 39656897375). DICE="" plays real dice; a build before 0.3.5 ignores the extra and plays real dice too.
+# CI, run 39656897375). DICE="" plays real dice, C included; a build before 0.3.5 ignores the extra and skips C.
 DICE="${DICE-3,3 4,4 2,3 4,5 1,3 4,6 1,2 5,6 1,1 6,6}"
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
@@ -68,6 +68,10 @@ for ruleset in $RULESETS; do
   tap_text "Menu" && tap_text "Settings" && panel_tap "This game" && panel_tap "2×" && panel_tap "4×" && panel_tap "8×" ||
     say "couldn't set full speed in Settings"; tap_text "Hide" || true
   done_ab=0; done_c=0; done_d=0; again=0; games=1; start=$(date +%s); ts_alive
+  # Step C needs the fixed dice (0.3.5's debug --es dice; the app logs WGBG-DICE when it takes them). A build without
+  # them plays random dice, where two lots may never come: C is left out there, said plainly, not left to a coin toss.
+  if [ -n "$DICE" ] && ! "$ADB" logcat -d -s WGBG-DICE:I | grep -q 'fixed dice'; then
+    echo "trade $ruleset: C skipped: this build takes no --es dice (before 0.3.5), and on random dice two lots may never come"; done_c=1; fi
   while [ $(( $(date +%s) - start )) -lt "$SECS" ] && { [ $done_c = 0 ] || [ $done_d = 0 ]; } && [ $fail = 0 ]; do
     crashed && { bad "crash"; break; }
     # The bots won (this seat never builds): play again, by touch.
