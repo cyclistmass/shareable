@@ -14,7 +14,7 @@ data class ThemeName(val name: String, val who: String)
 enum class NameTheme(val label: String, val names: List<ThemeName>) {
     COLOURS("Colours", emptyList()),
     ENGLISH_QUEENS("English queens", listOf(
-        ThemeName("Matilda", "Empress Matilda, Henry I's daughter, Lady of the English in the 1140s"),
+        ThemeName("Matilda", "Matilda of Flanders, William the Conqueror's queen"),
         ThemeName("Eleanor", "Eleanor of Aquitaine, Henry II's queen, and queen of France before that"),
         ThemeName("Isabella", "Isabella of France, Edward II's queen, the She-Wolf who deposed him"),
         ThemeName("Philippa", "Philippa of Hainault, Edward III's queen"),
