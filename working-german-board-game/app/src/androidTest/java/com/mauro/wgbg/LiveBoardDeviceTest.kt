@@ -112,7 +112,7 @@ class LiveBoardDeviceTest {
 
     @Test fun twistPinchTiltPanAndPlacementOnLiveSurface() {
         context.getSharedPreferences("wgbg-settings", 0).edit().putFloat(EnvSettings.LIVE_BOARD, 1f)
-            .putFloat(EnvSettings.ANIMATIONS, 0f).putFloat(EnvSettings.THEME, 0f).commit()
+            .putFloat(EnvSettings.DENSITY, 0f).putFloat(EnvSettings.THEME, 0f).commit()
         context.cacheDir.resolve("live-board-frames.jsonl").delete()
         instrument.uiAutomation.executeShellCommand("logcat -c").use { FileInputStream(it.fileDescriptor).readBytes() }
         val activity = instrument.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
