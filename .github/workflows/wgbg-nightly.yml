@@ -1,0 +1,113 @@
+name: wgbg nightly playtest
+
+# Every night, the full playtest on GitHub's runners (Mauro, 2026-10-21: "more efficient and complete testing and we run
+# nightly full playtesting runs"): whole games by touch in both rulesets with 3 and 4 players, 50 self-play games per
+# ruleset, long monkey runs on changing seeds, online and friends games on two phones, every screen size and font, the
+# update from the latest release, and the engine's fuzz and dice fairness at 10x. Per-push CI stays short.
+# One report at the end: an issue "Nightly YYYY-MM-DD" (label testing) when something failed, and every Monday.
+# Lives in shareable's .github/workflows; drafted in catan-android tools/ci/.
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 03:00 in Florida (EDT), 02:00 in winter
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: "Fuzz and dice-fairness multiplier"
+        default: "10"
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: wgbg-nightly
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: working-german-board-game
+
+jobs:
+  deep-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      WGBG_TEST_SCALE: ${{ inputs.scale || '10' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK packages
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null
+          "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Every unit test, fuzz and dice fairness at ${{ env.WGBG_TEST_SCALE }}x
+        run: bash ./gradlew --no-daemon :engine:test :ai:test :net:test :cli:test :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rules cross-check against Catanatron
+        run: |
+          python -m pip install --quiet catanatron==3.2.1
+          python tools/catanatron/diff.py engine/build/catanatron-traces
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-unit-reports
+          path: |
+            working-german-board-game/**/build/reports/tests/
+            working-german-board-game/**/build/dice-fairness/
+
+  firestore-rules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Rules tests, with the replay of the app's real writes
+        run: |
+          npm ci --prefix firebase/rules-test
+          npm install --global firebase-tools@15.33.0
+          firebase emulators:exec --only firestore --project demo-wgbg "npm --prefix firebase/rules-test test"
+
+  # Job minutes are the timeout (GitHub allows 360); a shard that ends sooner frees its runner. 20 shards: with apk and
+  # the two jobs above, 23 jobs against the 20 free concurrent ones, so the last few queue for a few minutes.
+  device:
+    uses: ./.github/workflows/wgbg-device.yml
+    secrets: inherit
+    with:
+      shards: >-
+        [{"shard":"touch-full-base-3","minutes":100},{"shard":"touch-full-base-4","minutes":100},
+         {"shard":"touch-full-chivalry-3","minutes":130},{"shard":"touch-full-chivalry-4","minutes":130},
+         {"shard":"end-base","minutes":60},{"shard":"end-chivalry","minutes":80},
+         {"shard":"selfplay-base","minutes":240},{"shard":"selfplay-chivalry","minutes":270},
+         {"shard":"monkey-base","minutes":90},{"shard":"monkey-chivalry","minutes":90},
+         {"shard":"online","minutes":45},{"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},
+         {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},{"shard":"names","minutes":40},{"shard":"colours","minutes":40},
+         {"shard":"trade","minutes":60},{"shard":"withdraw","minutes":45},{"shard":"reach","minutes":45},
+         {"shard":"update","minutes":40}]
+
+  report:
+    needs: [deep-unit, firestore-rules, device]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: One report for the night
+        run: bash tools/ci/nightly_report.sh
