@@ -32,7 +32,7 @@ jobs:
           "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
           echo "sdk.dir=$ANDROID_HOME" > local.properties
       - uses: gradle/actions/setup-gradle@v4
-      # No Firebase config: the shards play online against the Firebase emulators only (--es firebase emu).
+      # No Firebase config for the debug APK: the shards play online against the Firebase emulators only (--es firebase emu).
       - name: Stable debug signing key
         env:
           DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
@@ -40,11 +40,20 @@ jobs:
           if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
             echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
           else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard and the key check will fail: phones refuse a new key)"; fi
-      # The shards play the debug APK; the update shard installs the release one, as players get it (#147).
-      - name: Build the debug and release APKs (and the instrumented test APK)
-        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest
-      - name: Check the APKs' signing key, and that the release is not debuggable
-        run: bash tools/ci/apk_check.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
+      # The shards play the debug APK, built without the Firebase config: they play online against the emulators only.
+      - name: Build the debug APK (and the instrumented test APK)
+        run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      # The release APK is what players install (#147) and what tools/publish_release.sh may publish from a check run
+      # (test/* branches get no per-push run), so it is built with the Firebase config, as the per-push CI builds it.
+      # The update shard installs it too: it plays offline, so the config changes nothing there.
+      - name: Firebase config, then the release APK
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json; echo "google-services.json written"; else echo "no GOOGLE_SERVICES_JSON secret: the release APK fails its check below"; fi
+          bash ./gradlew --no-daemon :app:assembleRelease
+      - name: Check the APKs' signing key, and that the release is not debuggable and has the Firebase config
+        run: bash tools/ci/apk_check.sh --firebase app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: shards-apk
@@ -52,6 +61,11 @@ jobs:
             working-german-board-game/app/build/outputs/apk/debug/app-debug.apk
             working-german-board-game/app/build/outputs/apk/release/app-release.apk
             working-german-board-game/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      # The one APK from a check run that tools/publish_release.sh takes (shards-apk is for the shards).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-release-apk
+          path: working-german-board-game/app/build/outputs/apk/release/app-release.apk
 
   device:
     needs: apk
