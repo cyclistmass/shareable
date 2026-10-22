@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Publishes release wgbg-v<versionName> on cyclistmass/shareable: the debug APK built by CI for the pushed
-# commit, plus the gameplay video from tools/record_showcase.sh. Asset names never change, so
+# Publishes release wgbg-v<versionName> on cyclistmass/shareable: the release APK built by CI for the pushed
+# commit (not debuggable, so no test hooks, #147; the same stable key as every earlier release), plus the gameplay
+# video from tools/record_showcase.sh. Asset names never change, so
 #   https://github.com/cyclistmass/shareable/releases/latest/download/working-german-board-game.apk
 # always serves the newest version. Run from the project root after CI is green for the pushed commit.
 # The GitHub token comes from Git Credential Manager for one command at a time; it is never printed or saved.
 # Usage: [APK=<tested apk>] [KNOWN=<known issues, markdown>] [PRERELEASE=1] tools/publish_release.sh [path to gameplay mp4]
 # PRERELEASE=1: a test build from a test/* branch (SHA=<its commit>, CI = its green release check). It is marked
-# pre-release and never becomes latest, so the always-latest link keeps serving the last real release. The APK must
-# still come from a per-push CI run (built with the Firebase config): a check run's shards-apk is never published.
+# pre-release and never becomes latest, so the always-latest link keeps serving the last real release.
 set -euo pipefail
 VIDEO="${1:-$TEMP/wgbg-showcase/working-german-board-game-gameplay.mp4}"
 REPO="${REPO:-cyclistmass/shareable}"   # REPO=cyclistmass/sharable until the rename has run
@@ -29,20 +29,24 @@ r=[w for w in json.load(sys.stdin)['workflow_runs'] if 'working' in w['name'] or
 # Every green run for this commit (a re-run may still be going); none green means don't publish.
 print(' '.join(str(w['id']) for w in r if w['conclusion']=='success'))")
 [ -n "$RUNS" ] || { echo "CI is not green for ${SHA:0:7}; not publishing"; exit 1; }
-# Only the per-push CI's APK, built with the Firebase config; never a check run's shards-apk (built without it for
-# the shards). The published 0.3.4 had no config (a local build, hand-uploaded) and was swapped for CI's.
+# Only an APK built with the Firebase config: the per-push CI's release APK, or a check run's publish-release-apk.
+# Never shards-apk (the shards' debug APK, test hooks on): the 0.3.4 asset was swapped for having no config. Every
+# green run is searched: one that ran only unit tests (SHARDS: unit) has no APK.
 RUN=; ART=
 for r in $RUNS; do
   ART=$(api "https://api.github.com/repos/$REPO/actions/runs/$r/artifacts" | py -c "
 import json,sys
-print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name']=='working-german-board-game-debug-apk']+[''])[0])")
+print(([a['id'] for a in json.load(sys.stdin)['artifacts'] if a['name'] in ('working-german-board-game-release-apk','publish-release-apk')]+[''])[0])")
   [ -z "$ART" ] || { RUN=$r; break; }
 done
-[ -n "$ART" ] || { echo "no green run for ${SHA:0:7} has the per-push APK (working-german-board-game-debug-apk); not publishing"; exit 1; }
+[ -n "$ART" ] || { echo "no green run for ${SHA:0:7} has a publishable release APK (built before #147?); not publishing"; exit 1; }
 curl -sL -m 300 -H "Authorization: Bearer $(tok)" -o "$WORK/apk.zip" "https://api.github.com/repos/$REPO/actions/artifacts/$ART/zip"
-(cd "$WORK" && unzip -q apk.zip && mv "$(find . -name app-debug.apk -not -path '*androidTest*' | head -1)" working-german-board-game.apk)
-# APK=<file>: publish the exact APK that was user-tested (same commit; it must still pass verify below, so a local
-# build, which has no Firebase config, is refused). CI must still be green.
+# The release APK (#147: not debuggable, so no test hooks), never the debug one.
+REL=$(cd "$WORK" && unzip -q apk.zip && find . -name app-release.apk | head -1)
+[ -n "$REL" ] || { echo "run $RUN's artifact has no app-release.apk; not publishing a debug build"; exit 1; }
+mv "$WORK/$REL" "$WORK/working-german-board-game.apk"
+# APK=<file>: publish the exact APK that was user-tested (same commit; it must still pass apk_check --firebase below, so
+# a local build, which has no Firebase config, is refused). CI must still be green.
 if [ -n "${APK:-}" ]; then
   echo "CI's APK:    $(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)"
   echo "Tested APK:  $(sha256sum < "$APK" | cut -c1-64) (publishing this one)"
@@ -51,18 +55,9 @@ if [ -n "${APK:-}" ]; then
   [ "$(cert "$APK")" = "$(cert "$WORK/working-german-board-game.apk")" ] || { echo "Tested APK is signed with a different cert than CI's; not publishing"; exit 1; }
   cp "$APK" "$WORK/working-german-board-game.apk"
 fi
-# verify <apk>: the stable key, and the Firebase config (string/google_app_id): without it online play and in-app
-# reports are dead. Local builds never have it; CI's write it from the GOOGLE_SERVICES_JSON secret.
-verify() {
-  local bt; bt="$(ls -d "${ANDROID_HOME:-$LOCALAPPDATA/Android/Sdk}"/build-tools/*/ | tail -1)"
-  local signer="${bt}apksigner" aapt2="${bt}aapt2"; [ -e "$signer" ] || signer="$signer.bat"; [ -e "$aapt2" ] || aapt2="$aapt2.exe"
-  local cert res
-  cert=$("$signer" verify --print-certs "$1" | tr -d '\r' | sed -n 's/.*SHA-256 digest: //p' | head -1)
-  [ "$cert" = 90235a5b47da6ee29b077ea7c4ac94d2907c2126267adb5a999afcc4b5fb0093 ] || { echo "$1: not the stable key ($cert)"; return 1; }
-  res=$("$aapt2" dump resources "$1" | tr -d '\r')
-  grep -c 'string/google_app_id' <<< "$res" > /dev/null || { echo "$1: NO Firebase config (no string/google_app_id)"; return 1; }
-  echo "$1: stable key, Firebase config present"
-}
+# Whatever is published: the stable key, not debuggable, and the Firebase config (an APK= from a debug or a local
+# build is refused here too: local builds never have the config, and 0.3.4's hand-uploaded one had none).
+verify() { bash "$(dirname "$0")/ci/apk_check.sh" --firebase "$1"; }
 verify "$WORK/working-german-board-game.apk" || { echo "not publishing"; exit 1; }
 APK_SHA=$(sha256sum < "$WORK/working-german-board-game.apk" | cut -c1-64)
 # back <what> <curl args...>: downloads the APK as players or the API serve it (three tries: the CDN can lag a moment)
@@ -80,7 +75,7 @@ KNOWN="${KNOWN:-}" py -c "
 import json,sys,os
 known=os.environ.get('KNOWN','').strip()
 print(json.dumps({'tag_name':'wgbg-v$VERSION','target_commitish':'$SHA','name':'Working German Board Game $VERSION'+(' (pre-release)' if os.environ.get('PRERELEASE') else ''),'draft':True,'prerelease':bool(os.environ.get('PRERELEASE')),
- 'body':'''Android build $VERSION of Working German Board Game (debug-signed, for testing).
+ 'body':'''Android build $VERSION of Working German Board Game (signed with the project's own key, for testing).
 
 **Install:** download working-german-board-game.apk below on an Android phone (Android 8+), open it, and allow installing from this source when asked. It updates any earlier version.
 

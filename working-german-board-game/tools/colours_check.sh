@@ -102,8 +102,8 @@ colour_names() { dump | grep -o 'text="\(Red\|Blue\|Purple\|White\|Yellow\|Orang
 play() {
   local xy; "$ADB" logcat -c
   xy=$(reach 'Play' $((W * 3 / 4))) || fail "no Play"; tap $xy
-  for _ in $(seq 1 60); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
-  "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started"
+  for _ in $(seq 1 60); do grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" && break; sleep 1; done
+  grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" || fail "the game never started"
   sleep 6
 }
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Every automated check before a release, in order, each one timed, ending in one report. It does NOT replace the
 # user test (AGENTS.md: the exact APK installed fresh and over the last release, real taps from the start screen, full
-# games, close and reopen, online): the report ends with that checklist and the APK's sha256 to test.
+# games, close and reopen, online): the report ends with that checklist and the release APK's sha256 to test.
 #
-#   unit     engine, AI, net, CLI and app unit tests (rules, fuzz, break-it)
-#   rules    Firestore rules tests on a private emulator (FS_PORT)
-#   apk      the debug APK, signed with the stable key (WGBG_DEBUG_KEYSTORE), and its certificate checked
+#   unit     engine, AI, net, CLI and app unit tests (rules, fuzz, break-it, the app-writes contract)
+#   rules    Firestore rules tests on a private emulator (FS_PORT), including the replay of the app's real writes
+#   apk      the debug APK (for the device steps) and the release APK (what players install: not debuggable, #147),
+#            both signed with the stable key (WGBG_DEBUG_KEYSTORE); tools/ci/apk_check.sh checks the key and the flag
 #   install  that APK on both lanes (local device steps, install to layout: only when asked for in STEPS; remote runs
 #            all of them on GitHub's runners instead and frees both lanes, M5 2026-10-21)
 #   lanes    device scripts, lane 1 and lane 2 side by side: trade and touch play on one, withdraw, monkey, names and
@@ -14,7 +15,7 @@
 #   layout   ci_layout on lane 1 (slow: ~25 min; CI runs it too)
 #   remote   instead of install/lanes/friends/layout: all of them, plus the update from the last release, on GitHub's
 #            runners (wgbg-check.yml on a test/<branch> Bosun pushes); waits for the run and reports each shard.
-#            The default, STEPS="unit rules apk remote", leaves only the user test (on the APK built here) to a local
+#            The default, STEPS="unit rules apk remote", leaves only the user test (on the release APK built here) to a local
 #            emulator. STEPS="unit rules apk install lanes friends" is the old all-local run, for when GitHub is down.
 #
 # Usage (Git Bash, project root): [STEPS="unit rules apk remote"] [RULESETS="base chivalry"]
@@ -28,7 +29,7 @@ HOST="${HOST_SERIAL:-emulator-5554}"; GUEST="${GUEST_SERIAL:-emulator-5556}"
 FS_PORT="${FS_PORT:-8187}"; AUTH_PORT="${AUTH_PORT:-9197}"
 OUT="${OUT:-${TEMP:-${TMPDIR:-/tmp}}/wgbg-release-check/$(date +%Y%m%d-%H%M%S)}"; mkdir -p "$OUT"
 APK=app/build/outputs/apk/debug/app-debug.apk
-CERT=90235a5b47da6ee29b077ea7c4ac94d2907c2126267adb5a999afcc4b5fb0093   # the stable key CI and every release use
+RELEASE=app/build/outputs/apk/release/app-release.apk   # built here for its checks; local builds have no Firebase config
 export MSYS_NO_PATHCONV=1
 REPORT=()
 
@@ -61,11 +62,7 @@ fi
 
 if on apk; then
   [ -n "${WGBG_DEBUG_KEYSTORE:-}" ] || echo "WGBG_DEBUG_KEYSTORE is not set: the APK gets the local debug key and the cert check fails"
-  check apk bash ./gradlew :app:assembleDebug && {
-    SIGNER="$(ls -d "${ANDROID_HOME:-$LOCALAPPDATA/Android/Sdk}"/build-tools/*/ | tail -1)apksigner"; [ -f "$SIGNER" ] || SIGNER="$SIGNER.bat"
-    got=$("$SIGNER" verify --print-certs "$APK" | sed -n 's/.*SHA-256 digest: //p' | head -1)
-    [ "$got" = "$CERT" ] && REPORT+=("PASS      0 s  apk certificate") || REPORT+=("FAIL      0 s  apk certificate: $got, not the stable key")
-  }
+  check apk bash ./gradlew :app:assembleDebug :app:assembleRelease && check apk-key-and-flag bash tools/ci/apk_check.sh "$RELEASE" "$APK"
 fi
 
 # remote: every device step on GitHub's runners (shareable's wgbg-check.yml, one emulator per shard). This script
@@ -143,13 +140,15 @@ fi
 {
   echo; echo "Release check, $(git log -1 --format='%h %s' | cut -c1-70)"
   printf '  %s\n' "${REPORT[@]}"
-  [ -n "${SHA:-}" ] && echo "  local APK sha256: $SHA (no Firebase config: not the one to publish or user-test)"
+  [ -n "${SHA:-}" ] && echo "  debug APK sha256 (device steps): $SHA"
+  [ -f "$RELEASE" ] && echo "  local release APK sha256: $(sha256sum < "$RELEASE" | cut -c1-64) (no Firebase config: not the one to publish or user-test)"
   cat <<'EOF'
 
 Still to do by hand (AGENTS.md, never by hooks or debug extras):
-  [ ] HARD STEP: the exact APK to be published, downloaded from the green per-push run publish_release will take it
-      from (artifact working-german-board-game-debug-apk; never a local build: those have no Firebase config, and
-      the hand-uploaded 0.3.4 had none). Installed fresh, and as an update over the last release.
+  [ ] HARD STEP: the exact APK to be published, downloaded from the green run publish_release will take it from
+      (artifact working-german-board-game-release-apk, or a check run's publish-release-apk; never a local build:
+      those have no Firebase config, and the hand-uploaded 0.3.4 had none). Check it first:
+      tools/ci/apk_check.sh --firebase <apk>. Install it fresh, and as an update over the last release.
   [ ] HARD STEP: with that APK, host and join online against real Firebase (no --es firebase emu), and send a report
   [ ] in through the start screen with real taps; full games to the end, base and Age of Chivalry, 3 and 4 players
   [ ] closed and reopened mid-game

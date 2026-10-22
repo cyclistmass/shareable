@@ -69,20 +69,9 @@ object T {
         if (new) s.devNew[p * DevCard.COUNT + card]++
     }
 
-    /** Reseeds the RNG so the next ROLL produces [sum]. */
-    fun rigRoll(s: GameState, sum: Int) {
-        var seed = 0L
-        while (true) {
-            val r = Rng(seed)
-            if (r.nextInt(6) + 1 + r.nextInt(6) + 1 == sum) break
-            seed++
-        }
-        s.rng.seed = seed
-    }
-
+    /** Rolls [sum] with the dice in the move itself (#55), as true-random and deck dice arrive, leaving the RNG alone. */
     fun roll(s: GameState, sum: Int) {
-        rigRoll(s, sum)
-        Rules.applyChecked(s, Action.ROLL)
+        Rules.applyChecked(s, ScriptedDice.sum(sum).toAction())
         assertEquals(sum, s.lastRoll)
     }
 

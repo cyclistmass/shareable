@@ -226,6 +226,10 @@ class MainActivity : ComponentActivity() {
                 val quickBots = debug && intent.getBooleanExtra("quickbots", false)
                 // Debug builds: `--ei players 3` starts with that many players (you plus bots), like a 3-player setup.
                 val players = if (debug) intent.getIntExtra("players", 0) else 0
+                // Debug builds: `--es dice "3,3 4,4"` throws these dice in local games, in order and over again (TestDice).
+                TestDice.use(if (debug) intent.getStringExtra("dice") else null)
+                // ci_trade reads this to know the build took them (0.3.4 ignores the extra and plays real dice).
+                TestDice.rolls?.let { android.util.Log.i("WGBG-DICE", "fixed dice: ${it.size} rolls, over and over") }
                 // An invite link (wgbg://join/ROOM-42) opens the Join screen with that code filled in.
                 val inviteCode = joinCodeFrom(intent.dataString)
                 AppRoot(debugCamera(), start, autoplay, autoSetup, watch, crashTest, players, inviteCode, quickBots)
@@ -677,6 +681,10 @@ fun WatchGameScreen(
     overlay: (@Composable androidx.compose.foundation.layout.BoxScope.(GameState, Int) -> Unit)? = null,
 ) {
     var seed by remember { mutableLongStateOf(resume?.seed ?: (System.nanoTime() and 0xffffffL)) }
+    // Why the game below was last (re)built, for its WGBG-START line: a CI run once read the second setup round's
+    // homestead prompt as a restart, and only a line per new game says which it was.
+    var startCause by remember { mutableStateOf(if (resume != null) "resume" else "start") }
+    fun newGame(cause: String) { startCause = cause; seed++ }
     // Who sits where in an online room (frozen once it starts); null offline.
     val net = remember(online) { online?.let { s -> s.client.view().room?.let { OnlineSeats(it, s.uid) } } }
     // Play mode: you are seat 0 ("You"); Watch mode: bots in every seat at full speed. Online: your seat.
@@ -686,12 +694,18 @@ fun WatchGameScreen(
     var stressNames by remember { mutableStateOf<List<String>?>(null) }
     // Each seat's theme name, or its colour (0.3.4); Watch mode names seat 0's bot too.
     val names = stressNames ?: net?.names ?: setup.playerNames(if (human) setup.name.ifBlank { "You" } else null, seed)
+    // Each player's cameo (0.3.5), by engine player; offline only until the room carries them.
+    val cameos = if (net != null || stressNames != null) emptyList() else setup.playerCameos(if (human) setup.name.ifBlank { "You" } else null)
     // This game's seat colours (0.3.4): the room's online, else the ones picked on New game or drawn from the seed.
     GameColours.use(net?.colours ?: setup.playerColours(seed))
     val seats = net?.players?.size ?: setup.players.size
     // Online, a rejected move rolls the room back: the screen then rebuilds its game from the room's moves.
     var epoch by remember { mutableIntStateOf(0) }
     val state = remember(seed, seats, epoch) { if (net != null) Rules.newGame(net.config, net.seed) else prepared?.copy() ?: Rules.newGame(setup.config(), seed) }
+    // Its own tag: the WGBG-GAME readers count any line with "over" in it.
+    LaunchedEffect(seed, seats, epoch) {
+        runCatching { android.util.Log.i("WGBG-START", "game seed=$seed seats=$seats epoch=$epoch cause=$startCause online=${online != null}") }
+    }
     var onlineView by remember { mutableStateOf<ClientView?>(null) }
     // Each playing seat's bot: the level picked on the game-start screen (friends play as Greedy until #7;
     // Strong plays as Greedy until #6). In Watch mode seat 0 gets a Greedy bot too.
@@ -726,7 +740,7 @@ fun WatchGameScreen(
     var pendingAt by remember { mutableStateOf<Offset?>(null) }
     val responses = remember(seed, seats) { mutableStateMapOf<Int, String>() }
     // Dice setting cycles: random, then deck stacks of 1-4 x 36 cards (asked per game once the new-game screen exists).
-    val dice = remember { if (setup.decks == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, setup.decks) }
+    val dice = remember { TestDice.source() ?: if (setup.decks == 0) DiceDeck.of(DiceMode.RANDOM) else DiceDeck.of(DiceMode.DECK, setup.decks) }
     var tick by remember { mutableIntStateOf(0) }
     var playing by remember { mutableStateOf(true) }
     var speed by remember { mutableIntStateOf(if (human) 2 else MAX_SPEED) }
@@ -922,7 +936,7 @@ fun WatchGameScreen(
             // One line per finished game: CI self-play counts these and checks every game ends (#46).
             runCatching { android.util.Log.i("WGBG-GAME", "over ruleset=${if (state.chivalry != null) "chivalry" else "base"} winner=${state.winner} turns=${state.turn} hash=${state.stateHash()}") }
             tick++
-            if (speed == MAX_SPEED && playing && !human && !oneGame) seed++ // straight into the next game
+            if (speed == MAX_SPEED && playing && !human && !oneGame) newGame("nonstop") // straight into the next game
         }
     }
 
@@ -947,7 +961,7 @@ fun WatchGameScreen(
                 onlineView = v
                 if (v.actions.size < applied.size || v.actions.subList(0, applied.size) != applied) {
                     runCatching { android.util.Log.w("WGBG-MOVES", "${online.id} history changed at ${applied.size}: rebuilding") }
-                    epoch++; return@LaunchedEffect
+                    startCause = "online history changed"; epoch++; return@LaunchedEffect
                 }
                 var rolled = false
                 val catchingUp = applied.isEmpty() // joining, rejoining or rebuilding: the history's hits are old news
@@ -1501,7 +1515,7 @@ fun WatchGameScreen(
           if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
               .heightIn(max = stripMaxHeight(with(LocalDensity.current) { screenHeight.toDp() }))
               .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
-              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false)
+              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false, cameos = cameos)
           if (net != null && !inventory) onlineView?.let { v ->
               Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                   OnlineConnectionStatus(v)
@@ -1590,12 +1604,13 @@ fun WatchGameScreen(
                   var folded by remember(seed) { mutableStateOf(false) }
                   val room = onlineView?.room
                   val rematch: (() -> Unit)? = when {
-                      online == null -> ({ seed++; playing = true; panelOpen = false })
+                      online == null -> ({ newGame("play again"); playing = true; panelOpen = false })
                       room == null -> null
                       room.host == online.uid -> onRematch?.let { go -> { go(room) } }
                       else -> room.next?.let { code -> onJoinRematch?.let { go -> { go(code) } } }
                   }
                   CongratsScreen(players, names, state.winner, me, state.turn, folded, { folded = it }, rematch, onExit,
+                      cameos = cameos,
                       playAgainLabel = if (online != null && room?.host != online.uid) "Join rematch" else "Play again")
               }
           }
@@ -1678,13 +1693,13 @@ fun WatchGameScreen(
                         }
                         WoodButton(if (human) "Watch bots" else "Play a new game", "menu-watch") {
                             if (human && online == null) { confirmWatch = true; settingsOpen = false }
-                            else { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; seed++; playing = true }
+                            else { human = !human; speed = if (human) 2 else MAX_SPEED; tradeOpen = false; newGame("menu watch toggle"); playing = true }
                         }
                         if (!human) WoodButton(if (oneGame) "One game" else "Nonstop", "menu-one-game") {
                             oneGame = !oneGame
-                            if (!oneGame && state.isOver) seed++
+                            if (!oneGame && state.isOver) newGame("menu nonstop")
                         }
-                        if (!human && oneGame && tick.let { state.isOver }) WoodButton("Next game", "menu-next-game") { seed++ }
+                        if (!human && oneGame && tick.let { state.isOver }) WoodButton("Next game", "menu-next-game") { newGame("menu next game") }
                     }
                     if (!human) Text("Wins: " + names.indices.joinToString("  ") { "${names[it]} ${wins[it]}" } + "  · draws ${wins[4]}",
                         style = Wood.sans(13.sp, FontWeight.Bold), modifier = Modifier.testTag("menu-wins"))
@@ -1702,7 +1717,7 @@ fun WatchGameScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GoButton("Keep playing", "watch-no", true, Modifier.heightIn(min = 44.dp)) { confirmWatch = false }
                     BrassButton("Watch bots", "watch-yes", Modifier.heightIn(min = 44.dp), size = 15.sp) {
-                        confirmWatch = false; human = false; speed = MAX_SPEED; tradeOpen = false; seed++; playing = true
+                        confirmWatch = false; human = false; speed = MAX_SPEED; tradeOpen = false; newGame("watch bots"); playing = true
                     }
                 }
             }
@@ -1722,7 +1737,7 @@ fun WatchGameScreen(
             if (tick.let { state.isOver }) {
                 Text("This game is over", style = Wood.title(20.sp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (online == null) GoButton("New game", "exit-new-game", true, Modifier.heightIn(min = 44.dp)) { confirmExit = false; seed++; playing = true }
+                    if (online == null) GoButton("New game", "exit-new-game", true, Modifier.heightIn(min = 44.dp)) { confirmExit = false; newGame("exit new game"); playing = true }
                     BrassButton("Back to start", "exit-yes", Modifier.heightIn(min = 44.dp), size = 15.sp) { confirmExit = false; onExit() }
                     WoodButton("See the board", "exit-no") { confirmExit = false }
                 }

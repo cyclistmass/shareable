@@ -17,7 +17,12 @@ class TransportTest {
         p.leave("ROOM").join(); p.join("ROOM", 1, "Guest").join()
         val r = p.listOpen().join().single(); p.editLobby("ROOM", r.seats.map { if (it.uid == "guest") it.copy(ready = true) else it }).join()
         h.start("ROOM").join(); assertTrue(h.listOpen().join().isEmpty())
-        assertThrows(Exception::class.java) { p.leave("ROOM").join() }
+        assertThrows(Exception::class.java) { h.leave("ROOM").join() }   // the host can't walk out of their own game
+        // A guest quitting a running game hands the seat to a bot the host's phone plays, as on Firestore.
+        p.leave("ROOM").join()
+        var seat: Seat? = null; h.observe("ROOM", { seat = it.room.seats[1] }) { throw it }.close()
+        assertEquals(Seat(null, "", "GREEDY", open = false, ready = false), seat)
+        assertThrows(Exception::class.java) { p.leave("ROOM").join() }   // and only once
     }
     @Test fun codec() {
         for (kind in ActionType.entries + ChivalryActionType.entries) for (payload in listOf(0L, 1L, Action.PAYLOAD_MASK)) {

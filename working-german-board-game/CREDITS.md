@@ -26,6 +26,11 @@ unless another path is given.
   Fabric Ledger cards, 0.3.4, #86): short narrow scrolls with cut sheets on a scrivener's desk, and dyed red and indigo
   cloth over a drying pole above the dye vats, painted in the cards' style so the two no longer look alike in the hand
   (Mauro's picks "Narrow A" and "Option 2", 2026-10-21).
+- Player cameos (`cameo_*.webp`, 0.3.5): painted miniature portraits in style B (Mauro's pick, 2026-10-21), the
+  French queens and six for anyone (fox, owl, stag, sloop, lighthouse, navigator), cut from the picked grids. The
+  English queens, Japanese emperors and old trades: new artwork made for Mauro with ChatGPT image generation, directed
+  and reviewed by Codex (2026-10-21; original oil-miniature interpretations, no real paintings or photographs copied),
+  approved by Mauro and cut 1:1 from the grids.
 
 ## Art: generated with OpenAI Codex for Mauro DiBenedetto
 

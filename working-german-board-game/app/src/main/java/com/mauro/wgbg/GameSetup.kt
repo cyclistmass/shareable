@@ -27,8 +27,10 @@ enum class BotLevel(val label: String) {
 /**
  * [name]: the theme name picked for this seat (null: the theme's next free name, or the colour under Colours).
  * [colour]: the colour picked for it (null: the first default colour nobody has, [SeatColour.resolve]).
+ * [cameo]: the cameo picked for it (null: its name's cameo, or for you your photo or initial; [Cameos.resolve]).
  */
-data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, val name: String? = null, val colour: SeatColour? = null)
+data class SeatSetup(val kind: SeatKind, val bot: BotLevel = BotLevel.GREEDY, val name: String? = null, val colour: SeatColour? = null,
+    val cameo: String? = null)
 
 /** Rulesets the screen offers, with our names (never the original game's). */
 enum class Ruleset(val label: String, val expansion: Expansion, val defaultPoints: Int, val players: IntRange) {
@@ -80,6 +82,39 @@ data class GameSetup(
         return players.mapIndexed { p, seat -> if (seat == 0 && you != null) you else names[seat] ?: colours[p].label }
     }
 
+    /** Each seat's cameo id, by seat (null: the initial, or your photo); picked or its name's, never two the same. */
+    val seatCameos: List<String?> get() = Cameos.resolve(seats.map { it.cameo }, seatNames, theme, seats.indices.map { it in players })
+
+    /**
+     * The cameos the game shows, by engine player ([you] as in [playerNames]: null in Watch mode, where the bot in seat 0
+     * takes a theme name and so its name's cameo).
+     */
+    fun playerCameos(you: String?): List<String?> {
+        val names = theme.resolve(seats.map { it.name }, seats.indices.map { (it != 0 || you == null) && seats[it].kind != SeatKind.EMPTY })
+        val c = Cameos.resolve(seats.map { it.cameo }, names, theme, seats.indices.map { it in players })
+        return players.map { c[it] }
+    }
+
+    /**
+     * Seat i shows cameo [id] (null: its name's cameo; for you, your photo or initial). No two seats share one: if
+     * another seat has it, the two swap. Every other seat keeps the cameo it shows; one that shows its name's cameo
+     * stays "match the name", so it follows a later name pick.
+     */
+    fun withSeatCameo(i: Int, id: String?): GameSetup {
+        if (i !in players || id != null && id !in Cameos.PAINTED) return this
+        val now = seatCameos
+        val names = seatNames
+        return copy(seats = seats.mapIndexed { j, s ->
+            if (j !in players) return@mapIndexed s
+            val shows = when {
+                j == i -> id
+                id != null && now[j] == id -> now[i]
+                else -> now[j]
+            }
+            s.copy(cameo = shows?.takeIf { j == i || it != Cameos.forName(theme, names[j]) })
+        })
+    }
+
     /** The colour each seat plays in, in seat order (null where nobody sits); picked or default, never two the same. */
     val seatColours: List<SeatColour?> get() = SeatColour.resolve(seats.map { it.colour }, seats.indices.map { it in players })
 
@@ -92,6 +127,10 @@ data class GameSetup(
         val drawn = SeatColour.draw(players.size, kotlin.random.Random(seed * 1_000_003 + 0x5EA7))
         return seats.indices.map { s -> players.indexOf(s).takeIf { it >= 0 }?.let(drawn::get) }
     }
+
+    /** Every playing seat pinned to [byPlayer]'s colour for its engine player (a game saved before 0.3.4). */
+    fun withColours(byPlayer: List<SeatColour>): GameSetup = copy(randomColours = false,
+        seats = seats.mapIndexed { i, s -> players.indexOf(i).takeIf { it >= 0 }?.let { s.copy(colour = byPlayer[it]) } ?: s })
 
     /** The colours of a game started with [seed], by engine player. */
     fun playerColours(seed: Long): List<SeatColour> = seatColoursFor(seed).let { c -> players.map { c[it]!! } }
@@ -165,8 +204,13 @@ data class GameSetup(
 
     fun withBot(i: Int, level: BotLevel) = if (i == 0) this else copy(seats = seats.toMutableList().also { it[i] = it[i].copy(kind = SeatKind.BOT, bot = level) })
 
-    /** A new theme starts every seat on that theme's names in order (the old picks belong to the old theme). */
-    fun withTheme(t: NameTheme) = copy(theme = t, seats = seats.map { it.copy(name = null) })
+    /**
+     * A new theme starts every seat on that theme's names in order (the old picks belong to the old theme), and so on
+     * their cameos; your own cameo and a bot's pick from the others (the fox, the owl...) stay.
+     */
+    fun withTheme(t: NameTheme) = copy(theme = t, seats = seats.mapIndexed { i, s ->
+        s.copy(name = null, cameo = s.cameo?.takeIf { c -> i == 0 || Cameos.OTHERS.any { it.id == c } })
+    })
 
     /**
      * Seat i goes by [name], one of the theme's. No two seats share a name: if another seat has it, the two swap.
@@ -193,12 +237,12 @@ data class GameSetup(
 
     /**
      * Saved as one line (#68, #69: the start screen comes back with your last game and your name):
-     * v3|name|photo|ruleset|points|decks|kind:bot:seatname:colour,…(one per seat)|theme|random colours (R or empty)
-     * (names and photo URL-encoded). v2 had no colours, v1 no theme and no seat names; both still read.
+     * v4|name|photo|ruleset|points|decks|kind:bot:seatname:colour:cameo,…(one per seat)|theme|random colours (R or empty)
+     * (names and photo URL-encoded). v3 had no cameos, v2 no colours, v1 no theme and no seat names; all still read.
      */
-    fun encode(): String = listOf("v3", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
-        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}:${enc(it.name ?: "")}:${it.colour?.name ?: ""}" }, theme.name,
-        if (randomColours) "R" else "").joinToString("|")
+    fun encode(): String = listOf("v4", enc(name), enc(photo ?: ""), ruleset.name, points.toString(), decks.toString(),
+        seats.joinToString(",") { "${it.kind.name}:${it.bot.name}:${enc(it.name ?: "")}:${it.colour?.name ?: ""}:${it.cameo ?: ""}" },
+        theme.name, if (randomColours) "R" else "").joinToString("|")
 
     companion object {
         private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
@@ -206,13 +250,16 @@ data class GameSetup(
 
         /** The setup [encode] wrote, or null if [text] is missing, from an unknown version or damaged. */
         fun decode(text: String?): GameSetup? = runCatching {
-            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1" || f.size == 8 && f[0] == "v2" || f.size == 9 && f[0] == "v3" && f[8] in listOf("", "R"))
+            val f = text!!.split("|"); require(f.size == 7 && f[0] == "v1" || f.size == 8 && f[0] == "v2" ||
+                f.size == 9 && f[0] in listOf("v3", "v4") && f[8] in listOf("", "R"))
             val theme = if (f.size >= 8) NameTheme.valueOf(f[7]) else NameTheme.COLOURS
+            val parts = f[0].drop(1).toInt() + 1
             val seats = f[6].split(",").map { s ->
-                val p = s.split(":"); require(p.size == f.size - 5)
-                // A name the theme doesn't have (a list changed since) is dropped: the seat takes the next free one.
+                val p = s.split(":"); require(p.size == parts)
+                // A name the theme doesn't have (a list changed since) is dropped: the seat takes the next free one; so is
+                // a cameo with no art (yet, or any more): the seat shows its name's.
                 SeatSetup(SeatKind.valueOf(p[0]), BotLevel.valueOf(p[1]), p.getOrNull(2)?.let(::dec)?.takeIf { theme.who(it) != null },
-                    p.getOrNull(3)?.takeIf { it.isNotEmpty() }?.let(SeatColour::valueOf))
+                    p.getOrNull(3)?.takeIf { it.isNotEmpty() }?.let(SeatColour::valueOf), p.getOrNull(4)?.takeIf { it in Cameos.PAINTED })
             }
             require(seats.size == MAX_SEATS && seats[0].kind == SeatKind.FRIEND)
             GameSetup(name = dec(f[1]).take(40).ifBlank { "You" }, photo = dec(f[2]).ifBlank { null }, seats = seats,

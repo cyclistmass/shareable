@@ -79,21 +79,12 @@ object CK {
         error("no ${Progress.NAMES[card]} in deck")
     }
 
-    /** Reseeds the RNG so the next ROLL gives red [red], yellow [yellow] and event face [event] (0..5). */
-    fun rig(s: GameState, red: Int, yellow: Int, event: Int) {
-        var seed = 0L
-        while (true) {
-            val r = Rng(seed)
-            if (r.nextInt(6) + 1 == red && r.nextInt(6) + 1 == yellow && r.nextInt(6) == event) break
-            seed++
-        }
-        s.rng.seed = seed
-    }
-
-    /** Rolls with the given dice. Event 3 (trade gate) is harmless while nobody has trade improvements. */
+    /**
+     * Rolls with the given dice, carried in the move itself (#55) so the RNG is left alone. Event 3 (trade gate) is
+     * harmless while nobody has trade improvements.
+     */
     fun roll(s: GameState, red: Int, yellow: Int, event: Int = 3) {
-        rig(s, red, yellow, event)
-        Rules.applyChecked(s, Action.ROLL)
+        Rules.applyChecked(s, Action.roll(red, yellow, event))
     }
 
     fun legal(s: GameState) = Rules.legalActions(s)

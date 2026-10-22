@@ -42,12 +42,18 @@ data class LocalSave(val setup: GameSetup, val seed: Long, val moves: List<Actio
         const val HEADER = "wgbg-local v2"
         /** A save from before #126: seat 0 started, so it replays that way. */
         const val HEADER_V1 = "wgbg-local v1"
+        /**
+         * The colours every game had before 0.3.4, by player. A game saved then (its setup line before v3) carries no
+         * colours, and the new defaults would turn its Orange player Purple mid-game after the update; it keeps these.
+         */
+        val BEFORE_034 = listOf(SeatColour.RED, SeatColour.BLUE, SeatColour.ORANGE, SeatColour.WHITE)
 
         /** The save [encode] wrote, or null if [text] is missing, from another version or damaged. */
         fun decode(text: String?): LocalSave? = runCatching {
             val lines = text!!.trimEnd().split("\n").map { it.trimEnd('\r') }
             require(lines.size >= 3 && (lines[0] == HEADER || lines[0] == HEADER_V1))
             val setup = GameSetup.decode(lines[1])!!.copy(randomFirst = lines[0] == HEADER)
+                .let { if (lines[1].substringBefore("|") in listOf("v1", "v2")) it.withColours(BEFORE_034) else it }   // v3 on stores colours
             LocalSave(setup, lines[2].toLong(), lines.drop(3).filter { it.isNotEmpty() }.map { MoveCodec.decode(it)!! })
         }.getOrNull()
     }
