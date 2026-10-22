@@ -1401,7 +1401,7 @@ fun WatchGameScreen(
                     typeface = resources.getFont(R.font.alegreya_sans_regular)
                 }
                 fun set(name: String, pirate: Boolean) = if (env.art.pirate(ArtObject.BUILDINGS) == pirate) "$name pieces: in use" else "$name pieces: tap to use"
-                for ((text, z) in (if (ArtObject.entries.any { env.art.space(it) }) listOf("Selected terrain and harbours" to -5.2f, "Buildings, Ramparts and Capitals" to .45f, "Knights, Merchant and Bandit" to 2.8f) else listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
+                for ((text, z) in (if (ArtObject.entries.any { env.art.space(it) }) listOf("Selected terrain and harbours" to -5.2f, "Buildings, Ramparts and Capitals" to .45f, "Knights, Trader and Bandit" to 2.8f) else listOf("Terrain LOD0" to -5.3f, "Terrain LOD1" to -2.6f, set("Default", false) to .45f, set("Pirate", true) to 2.5f,
                         "Sloop, Bandit, Raiders, plate and coast" to 6.1f, "Gull wingbeat and water marks" to 10.3f))) {
                     val at = projection.project(Offset(0f, z))
                     drawContext.canvas.nativeCanvas.drawText(text, at.x, at.y, paint)
@@ -2683,7 +2683,7 @@ private fun DrawScope.drawInventory(measurer: TextMeasurer, wood: WoodPieces, ba
     val merchantAt = Offset(left + 10.6f * scale, 7.05f * scale)
     art?.buildings?.let { drawPieceSprite(it.merchant, merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0]) }
         ?: drawMerchantToken(merchantAt, scale * 2.2f, 0.55f, PLAYER_COLORS[0])
-    label("Merchant", merchantAt + Offset(0f, 0.25f * scale))
+    label("Trader", merchantAt + Offset(0f, 0.25f * scale))
     if (art == null) return
     /** Draws [b] [w] scale-units wide, centred on [c] (height from its aspect). */
     fun image(b: ImageBitmap, c: Offset, w: Float) {

@@ -29,7 +29,7 @@ Every difference found was a simplification or slip in Catanatron, not in our ru
 1. Catanatron lets you play a Fortune card bought this turn (the rules don't).
 2. Before the roll it offers only the Sentinel; we also offer the other Fortune cards.
 3. Its free roads (Trailblazers) need timber and clay in hand, and it stops early when one road can't be placed.
-4. Its longest road drops the last segment when a road ends at an opponent's building.
+4. Its Grand Highway length drops the last segment when a road ends at an opponent's building.
 5. It discards in a different order (we compare the whole discard together).
 6. When the bank is short and only one player is owed, it pays nothing; the rules pay that player what's left.
 7. It offers a one-card Windfall whenever one resource runs out.

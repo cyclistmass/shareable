@@ -17,7 +17,7 @@ enum class ArtObject(val label: String, val sets: List<ArtSet>) {
     KNIGHTS("Knights", ArtSet.entries),
     DICE("Dice", ArtSet.entries),
     /** The Age of Chivalry Merchant: the generic pawn until a theme supplies its own (#112). */
-    MERCHANT("Merchant", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
+    MERCHANT("Trader", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
     BOARD("Board", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
     BANDIT("Bandit", listOf(ArtSet.DEFAULT, ArtSet.SPACE)),
     CARDS("Cards", listOf(ArtSet.DEFAULT, ArtSet.SPACE));
