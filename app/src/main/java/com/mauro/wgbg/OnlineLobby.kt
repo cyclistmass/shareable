@@ -212,7 +212,7 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
             Modifier.width(380.dp).brassEdgedWood().padding(18.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
         ) {
-            Text("Join a room", style = Wood.title(26.sp, Wood.BRASS_INK))
+            Text("Join a room", style = Wood.title(26.sp))
             Text("Your name", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
             ParchmentField(me, { me = it.take(16) }, "join-name")
             Text("Room code", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
