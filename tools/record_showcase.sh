@@ -88,9 +88,9 @@ for try in 1 2 3 4; do
   # Only a game that ends at 8x counts: watch starts at Max, where whole games finish while the speed is tapped down.
   "$A" logcat -c
   over=""
-  for _ in $(seq 1 $((warm / 5))); do sleep 5; "$A" logcat -d -s WGBG-GAME:I | grep -q " over " && { over=1; break; }; done
+  for _ in $(seq 1 $((warm / 5))); do sleep 5; grep -q " over " <<< "$("$A" logcat -d -s WGBG-GAME:I)" && { over=1; break; }; done
   [ -z "$over" ] && { "$A" shell input tap $(( ${pause%,*} + 20 )) $(( ${pause#*,} + 20 )); sleep 0.8
-    "$A" logcat -d -s WGBG-GAME:I | grep -q " over " || break; over=1; }
+    grep -q " over " <<< "$("$A" logcat -d -s WGBG-GAME:I)" || break; over=1; }
   echo "the warm-up game ended (try $try); starting again"; warm=$((warm * 2 / 3))
 done
 [ -z "$over" ] || { echo "every warm-up game ended before the clip"; exit 1; }
@@ -102,7 +102,7 @@ for _ in 1 2 3 4; do "$A" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   [ "$label" = "1×" ] && break; [ -n "$label" ] && tap_text_opt "$label"; done
 "$A" shell input tap $(( ${pause%,*} + 20 )) $(( ${pause#*,} + 20 )); sleep 0.8
 tap_text_opt "Hide"
-"$A" logcat -d -s WGBG-GAME:I | grep -q " over " && { echo "the game ended before the clip"; exit 1; }
+grep -q " over " <<< "$("$A" logcat -d -s WGBG-GAME:I)" && { echo "the game ended before the clip"; exit 1; }
 sleep 2
 clip chivalry
 
