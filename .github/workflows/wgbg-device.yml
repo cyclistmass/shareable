@@ -32,7 +32,13 @@ jobs:
           "$SDKM" "platforms;android-37.0" "build-tools;36.1.0" "platform-tools" > /dev/null
           echo "sdk.dir=$ANDROID_HOME" > local.properties
       - uses: gradle/actions/setup-gradle@v4
-      # No Firebase config: the shards play online against the Firebase emulators only (--es firebase emu).
+      # The build players get, Firebase config included (a build without it passed names and colours
+      # while the per-push config'd build failed them, run 39682685361). Online shards still use the emulators (--es firebase emu).
+      - name: Firebase config for the APK
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json; echo "google-services.json written"; else echo "no GOOGLE_SERVICES_JSON secret: offline-only APK"; fi
       - name: Stable debug signing key
         env:
           DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
@@ -60,7 +66,8 @@ jobs:
     name: ${{ matrix.shard }}
     env:
       SHARD: ${{ matrix.shard }}
-      NEEDS_FIREBASE: ${{ startsWith(matrix.shard, 'online') || startsWith(matrix.shard, 'friends') }}
+      # reach hosts a room: with the Firebase config and debug.wgbg.firebase (shard.sh) that needs the emulators too.
+      NEEDS_FIREBASE: ${{ startsWith(matrix.shard, 'online') || startsWith(matrix.shard, 'friends') || matrix.shard == 'reach' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -70,7 +77,7 @@ jobs:
       - name: APKs where the scripts look
         run: mkdir -p apk && find apk-out -name '*.apk' -exec mv {} apk/ \; && ls -l apk
 
-      # Firebase emulators on the runner for online and friends; the Android emulator reaches them at 10.0.2.2.
+      # Firebase emulators on the runner for online, friends and reach; the Android emulator reaches them at 10.0.2.2.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

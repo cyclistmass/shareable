@@ -254,24 +254,9 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           working-directory: working-german-board-game
-          script: |
-            # Every shard needs the app; only the monkey and online scripts used to install it (the split left play and trade without it).
-            adb install -r apk/app-debug.apk
-            # Menus and a base game, then straight into an Age of Chivalry game. The snapshot boots settled, so a short wait.
-            [ "$SHARD" != monkey ] || SETTLE=10 bash tools/ci_monkey.sh apk/app-debug.apk 4000
-            [ "$SHARD" != monkey ] || SETTLE=1 START=chivalry bash tools/ci_monkey.sh apk/app-debug.apk 3000
-            # The app plays itself (#46): bots-only games at Max speed in both rulesets; stops once 3 games each finish.
-            [ "$SHARD" != selfplay ] || bash tools/ci_selfplay.sh 120 3
-            # A human seat played by tapping the screen like a finger, with 3 and 4 players; any crash fails.
-            [ "$SHARD" != touch-base ] || bash tools/ci_touchplay.sh 100 10 "base:3 base:4"
-            [ "$SHARD" != touch-chivalry ] || bash tools/ci_touchplay.sh 100 10 "chivalry:3 chivalry:4"
-            # Withdrawing an open offer by touch (#114), in both rulesets.
-            [ "$SHARD" != withdraw ] || bash tools/ci_withdraw.sh 300 "base chivalry"
-            # Online play end to end (#35): two clients, one room, a whole game on the Firebase emulators.
-            [ "$SHARD" != online ] || bash tools/ci_online.sh apk/app-debug-androidTest.apk demo-wgbg
-            # Bot names and seat colours picked by taps, kept across a restart, and remembered for the next game.
-            [ "$SHARD" != names ] || bash tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine"
-            [ "$SHARD" != colours ] || SMALL=1 bash tools/colours_check.sh
+          # One line, as in wgbg-device.yml: shard.sh is the one place a shard is defined, so the per-push run, the nightly
+          # and the release check run the same steps. It installs the APK and keeps shard.log.
+          script: bash tools/ci/shard.sh "$SHARD"
 
       - name: Upload device logs
         if: always()
@@ -280,9 +265,11 @@ jobs:
           name: device-log-${{ matrix.shard }}
           if-no-files-found: ignore
           path: |
+            working-german-board-game/shard.log
             working-german-board-game/monkey.txt
             working-german-board-game/crash.txt
             working-german-board-game/fbemu.log
             working-german-board-game/emu2.log
             working-german-board-game/*.xml
             working-german-board-game/*.png
+            working-german-board-game/*.logcat.txt
