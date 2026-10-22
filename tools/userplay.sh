@@ -93,10 +93,12 @@ shot splash
 if [ -n "${RESUME:-}" ]; then
   tap_text "Resume game" "$d" || fail "no Resume game button"
 else
-# The splash's New game opens the game-start screen (players, ruleset, Play, Host and Join).
+# The splash's New game opens the game-start screen (players, ruleset, Play, Host and Join), known by its Players
+# heading: Play can sit below the fold on a small screen (a Firebase build's sign-in row).
 tap_text "New game" "$d" || fail "no New game button"
-for _ in $(seq 1 10); do d=$(dump); grep -q 'text="Play"' <<< "$d" && break; sleep 1; done
-grep -q 'text="Play"' <<< "$d" || fail "the game-start screen never appeared"
+# A busy device can drop the tap: while New game is still there, it gets another.
+for i in $(seq 1 12); do d=$(dump); grep -q 'text="Players"' <<< "$d" && break; [ $((i % 4)) = 0 ] && tap_text "New game" "$d"; sleep 1; done
+grep -q 'text="Players"' <<< "$d" || fail "the game-start screen never appeared"
 if [ "$MODE" = join ]; then
   # The friend: Join a room, their name and the code the host read out, Join, then mark themselves ready.
   for _ in $(seq 1 90); do [ -s "$ROOM_FILE" ] && break; sleep 2; done
@@ -111,7 +113,7 @@ if [ "$MODE" = join ]; then
   [ "$(boxes | grep -c .)" -ge 2 ] || fail "the join screen has no name and code boxes"
   type_into $(boxes | sed -n 1p) "Duo"; hide_keyboard
   type_into $(boxes | sed -n 2p) "$code"; hide_keyboard
-  dump | grep -q "text=\"$code\"" || fail "the code didn't go into the code box"
+  grep -q "text=\"$code\"" <<< "$(dump)" || fail "the code didn't go into the code box"
   tap_text "Join" || fail "no Join button"
   for _ in $(seq 1 30); do sleep 1; tap_text "Not ready" && break; done || fail "joined $code but never saw my Not ready toggle"
   shot lobby
@@ -154,7 +156,10 @@ else
       tap_text "Start game" || fail "no Start game (lobby: $(dump | grep -o 'text="[^"]*ready[^"]*"' | head -2))"
     fi
   else
-    tap_text "Play" || fail "no Play button"
+    # Play heads the right panel's lower part: scroll that panel to it, as a player would.
+    read -r pw ph < <("$ADB" shell wm size | tail -1 | grep -o '[0-9]*x[0-9]*' | tr x ' '); [ "$pw" -lt "$ph" ] && { t=$pw; pw=$ph; ph=$t; }
+    ok=0; for _ in 1 2 3 4 5 6; do tap_text "Play" && { ok=1; break; }; "$ADB" shell input swipe $((pw * 3 / 4)) $((ph * 3 / 4)) $((pw * 3 / 4)) $((ph / 3)) 400 </dev/null; sleep 0.6; done
+    [ $ok = 1 ] || fail "no Play button"
   fi
 fi
 fi
@@ -172,7 +177,7 @@ if tap_text "Menu"; then
     b=$(dump | grep -o 'class="android.widget.SeekBar"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | grep -o '[0-9]*' | tr '
 ' ' ')
     if [ -n "$b" ]; then set -- $b; "$ADB" shell input swipe $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 )) $(( $1 - 40 )) $(( ($2 + $4) / 2 )) 400 </dev/null; sleep 0.5
-      dump | grep -q 'text="Density 0%"' || echo "USERPLAY $TAG: Density didn't go to 0"
+      grep -q 'text="Density 0%"' <<< "$(dump)" || echo "USERPLAY $TAG: Density didn't go to 0"
     else echo "USERPLAY $TAG: no Density slider"; fi
   fi
   tap_text "Hide"

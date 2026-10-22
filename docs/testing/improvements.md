@@ -86,3 +86,5 @@ move it to **Done** with the commit when it lands.
   friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
   :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.
 - layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d
+- Local device checks should run the APK CI built (gh run download), not a local build without the Firebase config: names and colours passed on the config-less build and failed on the config'd one (run 39682685361). Catches flavour-only layout changes; 2026-10-21, catan-android-36
+- A lane's Pixel Launcher ANR-ing after hours covers the screen and fails any script; restart the emulator before a local run of names/colours/reach (CI's aosp_atd has no launcher to hang). Saves a misread failure per run; 2026-10-21, catan-android-36

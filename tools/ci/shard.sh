@@ -18,6 +18,9 @@ echo "== $SHARD on $("$ADB" shell getprop ro.build.version.release | tr -d '\r')
 
 # Long shards read the log back many times: the default ring buffer drops a long run's early game-over and ANR lines.
 "$ADB" logcat -G 32M >/dev/null 2>&1 || true
+# The APK carries the Firebase config, as players get it: every launch (monkey's too) talks to the emulators instead
+# of the live project, so a random tap on Send report or Host can't write there. With no emulators up it just fails.
+"$ADB" shell setprop debug.wgbg.firebase emu
 "$ADB" install -r "$APK"
 
 monkey_long() {   # three seeds of 20,000 events, starting in a game of the ruleset
@@ -47,8 +50,9 @@ case "$SHARD" in
   layout-base) MODES=base CUTOUTS="" bash tools/ci_layout.sh ;;
   layout-chivalry) MODES=chivalry CUTOUTS="" bash tools/ci_layout.sh ;;
   layout-cutout) FONTS="" bash tools/ci_layout.sh ;;
-  names) bash tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine" ;;
-  colours) SMALL=1 bash tools/colours_check.sh ;;
+  # OUT=.: their screenshots land where the upload step looks.
+  names) OUT=. bash tools/names_check.sh "English queens" "Elizabeth I,Charlotte,Catherine" ;;
+  colours) OUT=. SMALL=1 bash tools/colours_check.sh ;;
   # The latest release, a game saved on it, this build's release APK (what players install, #147: not debuggable)
   # installed over it: the game resumes with the same names and colours, and the test hooks are off.
   update) bash tools/ci_update.sh apk/app-release.apk ;;

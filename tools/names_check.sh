@@ -37,6 +37,7 @@ reach() {
   # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
   for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)   # no dump (a busy device) says nothing about the screen: look again first
+    system_anr "$d" && { sleep 1; d=$(dump); }   # a system dialog (an ANR, Live Caption) over the panel hides what we look for
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
@@ -70,7 +71,18 @@ launch() {
   for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; grep -q 'text="New game"' <<< "$d" && return 0; sleep 1; done
   fail "the start screen never appeared"
 }
-new_game() { tap $(find_re "New game") || fail "no New game"; for _ in $(seq 1 10); do dump | grep -q 'text="Play"' && return 0; sleep 1; done; fail "no game-start screen"; }
+# The game-start screen, known by its Players heading: Play can sit below the fold. On CI's 640x320 a build with the
+# Firebase config adds "Playing as a guest · Sign in with Google" over it (main's per-push run 39682685361).
+# New game is tapped again while the start screen stays: right after a relaunch a busy device can drop the first tap.
+new_game() {
+  local d xy
+  for _ in $(seq 1 12); do
+    d=$(dump); system_anr "$d" && continue
+    grep -q 'text="Players"' <<< "$d" && return 0
+    xy=$(find_re "New game" "$d"); [ -n "$xy" ] && tap $xy || sleep 1
+  done
+  fail "no game-start screen"
+}
 
 # 1. Fresh, in through the front door, pick the theme and the names.
 "$ADB" shell am force-stop $PKG; "$ADB" shell pm clear $PKG >/dev/null
@@ -88,11 +100,11 @@ for k in "${!PICKS[@]}"; do
   xy=$(below); [ -n "$xy" ] || { "$ADB" shell input swipe $((W / 4)) $((H * 2 / 3)) $((W / 4)) $((H / 3)) 400; sleep 0.6; xy=$(below); }
   [ -n "$xy" ] || fail "seat $seat's name button isn't on screen"
   tap $xy; sleep 0.6
-  dump | grep -q "text=\"Seat $seat: $THEME\"" || fail "seat $seat's picker didn't open"
+  grep -q "text=\"Seat $seat: $THEME\"" <<< "$(dump)" || fail "seat $seat's picker didn't open"
   [ "$k" = 0 ] && shot picker
   xy=$(reach "$(re "$name")\\( *(Seat [0-9]: swaps)\\)\\?" $((W / 2))) || fail "no $name in the picker"
   tap $xy; sleep 0.6
-  dump | grep -q "text=\"$name ▾\"" || reach "$(re "$name") ▾" >/dev/null || fail "seat $seat didn't take $name"
+  grep -q "text=\"$name ▾\"" <<< "$(dump)" || reach "$(re "$name") ▾" >/dev/null || fail "seat $seat didn't take $name"
 done
 shot picked
 echo "NAMES $TAG: picked ${PICKS[*]}"
