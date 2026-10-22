@@ -105,6 +105,12 @@ fi
 "$ADB" uninstall $PKG >/dev/null 2>&1 || true
 "$ADB" install "$(native "$OLD")" | tail -1 | grep -q Success || fail "the old APK did not install"
 from=$(version); echo "installed $from"
+# Both builds carry the live config, and debug.wgbg.firebase (shard.sh) sends neither to the emulators: the latest
+# release predates it, and this build's release APK isn't debuggable. A launch alone signs in anonymously and runs
+# cleanExpiredOnce, so airplane mode from the first launch on keeps them off the live project (installs go over adb
+# and need no network). Off again at exit: left on, it once cut a later online test off the network (ci_monkey.sh).
+"$ADB" shell cmd connectivity airplane-mode enable || fail "could not turn airplane mode on"
+trap '"$ADB" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true' EXIT
 "$ADB" logcat -c
 timeout 60 "$ADB" shell am start -W -n $PKG/.MainActivity >/dev/null
 sleep 3
