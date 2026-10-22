@@ -7,20 +7,20 @@ import org.junit.jupiter.api.Test
 import com.mauro.wgbg.Splash.Action
 
 class SplashTest {
-    private fun actions(local: Boolean, room: String?, signIn: Boolean) = Splash.buttons(local, room, signIn).map { it.action }
+    private fun actions(local: Boolean, room: String?) = Splash.buttons(local, room).map { it.action }
 
     @Test
     fun `#132 Resume shows only with something to resume, New game and Settings always`() {
-        assertEquals(listOf(Action.NEW_GAME, Action.LOG_IN, Action.SETTINGS), actions(false, null, true))
-        assertEquals(listOf(Action.RESUME_GAME, Action.NEW_GAME, Action.LOG_IN, Action.SETTINGS), actions(true, null, true))
-        assertEquals(listOf(Action.RESUME_GAME, Action.RESUME_ROOM, Action.NEW_GAME, Action.SETTINGS), actions(true, "OAK-12", false))
+        assertEquals(listOf(Action.NEW_GAME, Action.SETTINGS), actions(false, null))
+        assertEquals(listOf(Action.RESUME_GAME, Action.NEW_GAME, Action.SETTINGS), actions(true, null))
+        assertEquals(listOf(Action.RESUME_GAME, Action.RESUME_ROOM, Action.NEW_GAME, Action.SETTINGS), actions(true, "OAK-12"))
     }
 
     @Test
     fun `#72 Quick game with friends shows when signed in with someone to play with, under New game`() {
-        assertEquals(listOf(Action.NEW_GAME, Action.FRIENDS, Action.LOG_IN, Action.SETTINGS), Splash.buttons(false, null, true, signedIn = true, friends = true).map { it.action })
-        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = false, friends = true).map { it.action })
-        assertFalse(Action.FRIENDS in Splash.buttons(false, null, true, signedIn = true, friends = false).map { it.action })
+        assertEquals(listOf(Action.NEW_GAME, Action.FRIENDS, Action.SETTINGS), Splash.buttons(false, null, signedIn = true, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, signedIn = false, friends = true).map { it.action })
+        assertFalse(Action.FRIENDS in Splash.buttons(false, null, signedIn = true, friends = false).map { it.action })
         val r = wgbg.net.Room("OAK-12", "h", GameSetup().withRuleset(Ruleset.CHIVALRY).config(), 1,
             listOf(wgbg.net.Seat("h", "Mauro"), wgbg.net.Seat(), wgbg.net.Seat(), wgbg.net.Seat()))
         assertEquals("Mauro invited you: ${Ruleset.CHIVALRY.label}", Splash.inviteLine(r))
@@ -29,23 +29,28 @@ class SplashTest {
     @Test
     fun `exactly one green button, the first one`() {
         for (local in listOf(true, false)) for (room in listOf(null, "OAK-12")) {
-            val b = Splash.buttons(local, room, true)
+            val b = Splash.buttons(local, room)
             assertEquals(1, b.count { it.go }, "$local $room")
             assertTrue(b.first().go)
         }
-        assertEquals("Resume online game OAK-12", Splash.buttons(false, "OAK-12", true).first().label)
+        assertEquals("Resume online game OAK-12", Splash.buttons(false, "OAK-12").first().label)
     }
 
     @Test
-    fun `Log in reads Account once signed in, and is gone without Firebase`() {
-        assertEquals("Log in", Splash.buttons(false, null, true).single { it.action == Action.LOG_IN }.label)
-        assertEquals("Account", Splash.buttons(false, null, true, signedIn = true).single { it.action == Action.LOG_IN }.label)
-        assertTrue(Splash.buttons(false, null, false).none { it.action == Action.LOG_IN })
+    fun `0_3_5 sign in and out sit on the front page, and a phone where online won't start says so with Retry`() {
+        // Mauro, 0.3.4: no Log in anywhere and nobody could join, until a reinstall; the button had just vanished.
+        assertEquals("Getting online…", Splash.onlineNote(started = false))
+        assertTrue("Online is off" in Splash.onlineNote(started = true) && "Retry" in Splash.onlineNote(started = true))
+        val splash = java.io.File("src/main/java/com/mauro/wgbg/Splash.kt").readText()
+        val menu = splash.substringAfter("testTag(\"start-menu\")").substringBefore("for (b in Splash.buttons(")
+        assertTrue("AccountSection(compact = true" in menu, "the account line (Sign in with Google / Sign out) heads the start menu")
+        assertTrue("\"online-retry\"" in menu && "onlineTry++" in menu, "Retry starts online again")
+        assertTrue("online.first" in menu, "Retry only once starting has finished")
     }
 
     @Test
     fun `button tags are unique and New game never clashes with the setup screen's tags`() {
-        val tags = Splash.buttons(true, "OAK-12", true).map { it.tag }
+        val tags = Splash.buttons(true, "OAK-12", signedIn = true, friends = true).map { it.tag }
         assertEquals(tags.size, tags.toSet().size)
         assertFalse("new-game" in tags, "new-game is the setup screen's own tag")
     }

@@ -42,7 +42,7 @@ class SmallScreenTest {
     @Test
     fun `the start menu, lobby, Report sheet and card guide scroll`() {
         val splash = text("Splash.kt")
-        for (tag in listOf("start-menu", "log-in-panel")) {
+        for (tag in listOf("start-menu")) {
             val line = splash.lines().first { "testTag(\"$tag\")" in it }
             assertTrue("verticalScroll(rememberScrollState())" in line && "weight(1f, fill = false)" in line, "$tag takes the height left and scrolls")
         }
