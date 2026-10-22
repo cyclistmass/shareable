@@ -190,6 +190,7 @@ class MainActivity : ComponentActivity() {
                 androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
         }
         UiLine.install(this)   // debug builds only; before setContent, so the first screen is watched too
+        val emulatorsByProperty = LobbyRepository.emulatorsByProperty(this)
         enableEdgeToEdge()
         // Full screen: draw under the camera cutout and hide the system bars (swipe to peek).
         window.attributes = window.attributes.apply {
@@ -207,8 +208,8 @@ class MainActivity : ComponentActivity() {
                 val fromHistory = intent.flags and android.content.Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
                 val debug = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && !fromHistory
                 val start = if (debug) intent.getStringExtra("start") else null
-                // Debug builds: `--es firebase emu` plays online against the Firebase emulators on the dev PC.
-                val firebaseEmu = debug && intent.getStringExtra("firebase") == "emu"
+                // Debug builds: `--es firebase emu` (or the debug.wgbg.firebase property) plays online against the Firebase emulators on the dev PC.
+                val firebaseEmu = debug && intent.getStringExtra("firebase") == "emu" || emulatorsByProperty
                 LobbyRepository.emulatorHost = if (firebaseEmu) "10.0.2.2" else null
                 // Debug builds, with the emulators only: `--ez fakegoogle true` counts this phone as signed in with Google (#72 sims).
                 LobbyRepository.fakeGoogle = firebaseEmu && intent.getBooleanExtra("fakegoogle", false)

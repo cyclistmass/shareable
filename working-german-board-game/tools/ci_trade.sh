@@ -32,7 +32,7 @@ panel_tap() { tap_text "$1" && return 0; local w h; read -r w h < <("$ADB" shell
 crashed() { [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" != 0 ]; }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }
 # Poll the screen up to $2 s for a pattern (a fixed sleep then one look raced slow CI emulators).
-seen() { for _ in $(seq 1 "$2"); do dump | grep -q "$1" && return 0; sleep 1; done; return 1; }
+seen() { for _ in $(seq 1 "$2"); do grep -q "$1" <<< "$(dump)" && return 0; sleep 1; done; return 1; }
 move() { LASTMOVE=$1; "$ADB" shell am broadcast -a $PKG.MOVE -p $PKG --es move "$1" >/dev/null; }
 # The chest's cards, left to right: "x held rate" (rate 0 on the Players tab), from the labels under them.
 cards() { dump | grep 'text="have [0-9]*' | sed 's/.*text="have \([0-9]*\)\(&#10;\([0-9]\):1\)\{0,1\}".*bounds="\[\([0-9]*\),[0-9]*\]\[\([0-9]*\),[0-9]*\]".*/\4 \5 \1 \3/' |
