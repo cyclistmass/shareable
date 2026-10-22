@@ -46,7 +46,7 @@ tap_text() {
   done
   return 1
 }
-on_screen() { dump | grep -qF "text=\"$1\""; }
+on_screen() { grep -qF "text=\"$1\"" <<< "$(dump)"; }
 # The players' names, in order: the text in the player list's area (the left 40% of the screen, under the heading),
 # without the counts and the prompts. Both 0.3.3 (no test tags) and later builds lay the list out there.
 names() {
@@ -110,6 +110,8 @@ timeout 60 "$ADB" shell am start -W -n $PKG/.MainActivity >/dev/null
 sleep 3
 on_screen "Tap to skip" && tap_text "Tap to skip" 0
 tap_text "New game" || fail "no New game on the start screen of $from"
+# A busy device can drop the tap: while New game is still there, it gets another.
+on_screen "New game" && tap_text "New game" 0
 tap_text "Play" 6 || fail "no Play on the game-start screen of $from"
 my_move || fail "never got a homestead to place in $from"
 my_move || fail "never got a road to place in $from"

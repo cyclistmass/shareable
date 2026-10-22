@@ -39,6 +39,7 @@ reach() {
   # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
   for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)
+    system_anr "$d" && { sleep 1; d=$(dump); }   # a system dialog (an ANR, Live Caption) over the panel hides what we look for
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
@@ -70,7 +71,18 @@ launch() {
   for _ in $(seq 1 15); do d=$(dump); system_anr "$d" && continue; grep -q 'text="New game"' <<< "$d" && return 0; sleep 1; done
   fail "the start screen never appeared"
 }
-new_game() { tap $(find_re "New game") || fail "no New game"; for _ in $(seq 1 10); do dump | grep -q 'text="Play"' && return 0; sleep 1; done; fail "no game-start screen"; }
+# The game-start screen, known by its Players heading: Play can sit below the fold. On CI's 640x320 a build with the
+# Firebase config adds "Playing as a guest · Sign in with Google" over it (main's per-push run 39682685361).
+# New game is tapped again while the start screen stays: right after a relaunch a busy device can drop the first tap.
+new_game() {
+  local d xy
+  for _ in $(seq 1 12); do
+    d=$(dump); system_anr "$d" && continue
+    grep -q 'text="Players"' <<< "$d" && return 0
+    xy=$(find_re "New game" "$d"); [ -n "$xy" ] && tap $xy || sleep 1
+  done
+  fail "no game-start screen"
+}
 
 # A seat's colour button reads "You: Red ▾" or "Seat 3: Purple ▾".
 who() { [ "$1" = 0 ] && echo "You" || echo "Seat $(( $1 + 1 ))"; }
@@ -79,7 +91,7 @@ expect_colour() { reach "$(who "$1"): $2 ▾" >/dev/null || fail "$(who "$1") is
 pick() {
   local xy; xy=$(reach "$(who "$1"): [A-Za-z?]* ▾") || fail "no colour button for $(who "$1")"
   tap $xy; sleep 0.6
-  dump | grep -q "text=\"\(Your colour\|Seat $(( $1 + 1 ))'s colour\)\"" || fail "$(who "$1")'s colour picker didn't open"
+  grep -q "text=\"\(Your colour\|Seat $(( $1 + 1 ))'s colour\)\"" <<< "$(dump)" || fail "$(who "$1")'s colour picker didn't open"
   [ -n "${3:-}" ] && shot "$3"
   xy=$(reach "$2\\(  (.*)\\)\\?" $((W / 2))) || fail "no $2 in the picker"
   tap $xy; sleep 0.6
@@ -100,7 +112,7 @@ play() {
 "$ADB" logcat -c; "$ADB" logcat -b crash -c 2>/dev/null || true
 sleep 2; launch; new_game
 for s in "0 Red" "1 Blue" "2 Purple" "3 White"; do expect_colour $s; done
-dump | grep -q 'text="[^"]*look alike[^"]*"' && fail "the default warns of a clash"
+grep -q 'text="[^"]*look alike[^"]*"' <<< "$(dump)" && fail "the default warns of a clash"
 shot default
 echo "COLOURS: the default is Red, Blue, Purple, White, no warning"
 pick 0 Black picker                                     # Black next to Purple: allowed, with a warning
@@ -111,7 +123,7 @@ pick 2 Red                                              # Red is free since you 
 pick 1 Yellow
 pick 3 Blue                                             # nobody has Blue now
 for s in "0 Black" "1 Yellow" "2 Red" "3 Blue"; do expect_colour $s; done
-dump | grep -q 'text="[^"]*look alike[^"]*"' && fail "a clean set still warns"
+grep -q 'text="[^"]*look alike[^"]*"' <<< "$(dump)" && fail "a clean set still warns"
 pick 3 Yellow                                           # Seat 2 has Yellow: the two swap
 expect_colour 3 Yellow; expect_colour 1 Blue
 shot picked

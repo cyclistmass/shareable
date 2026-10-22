@@ -17,7 +17,7 @@ fail=0
 . "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-on() { dump | grep -q "text=\"$1\""; }
+on() { grep -q "text=\"$1\"" <<< "$(dump)"; }
 # The failure's screen, screen read and log land in the working dir (or $OUT), like the other CI scripts: CI uploads
 # *.png, *.xml and *.logcat.txt from there. Numbered, so a second failure doesn't overwrite the first.
 nbad=0
@@ -65,7 +65,8 @@ tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local
 # The Leave dialog: "Leave for now" keeps a saved game, "Leave" when there's nothing to keep.
 leave() { on "Leave for now" && { tap "Leave for now"; return; }; on "Leave" && tap "Leave"; }
 # Taps a button and checks the screen it opens (marked by $2); stops the run if it didn't, since what follows is moot.
-go() { tap "$1" && { for _ in 1 2 3 4 5; do on "$2" && return 0; sleep 1; done; }
+# A busy device can drop a tap (names_check after a relaunch): while the button is still there, it gets one more.
+go() { local t; for t in 1 2; do tap "$1" || break; for _ in 1 2 3 4 5; do on "$2" && return 0; sleep 1; done; on "$1" || break; done
   bad "\"$1\" didn't open its screen"; echo "reach: FAILED"; exit 1; }
 
 if [ "$MODE" = screens ]; then

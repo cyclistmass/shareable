@@ -30,7 +30,7 @@ r=[w for w in json.load(sys.stdin)['workflow_runs'] if 'working' in w['name'] or
 print(' '.join(str(w['id']) for w in r if w['conclusion']=='success'))")
 [ -n "$RUNS" ] || { echo "CI is not green for ${SHA:0:7}; not publishing"; exit 1; }
 # Only an APK built with the Firebase config: the per-push CI's release APK, or a check run's publish-release-apk.
-# Never shards-apk (built without the config for the shards): the 0.3.4 asset was swapped for having none. Every
+# Never shards-apk (the shards' debug APK, test hooks on): the 0.3.4 asset was swapped for having no config. Every
 # green run is searched: one that ran only unit tests (SHARDS: unit) has no APK.
 RUN=; ART=
 for r in $RUNS; do

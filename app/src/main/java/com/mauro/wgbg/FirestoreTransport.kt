@@ -32,6 +32,15 @@ object LobbyRepository {
      */
     @Volatile var emulatorHost: String? = null
     /**
+     * Debug builds only: `adb shell setprop debug.wgbg.firebase emu` points every launch at the emulators, also the
+     * launcher's and monkey's, which carry no extras. CI's device shards set it (tools/ci/shard.sh), so a build with the
+     * Firebase config tapped at random never writes to the live project: 9 reports in `crashes` came from CI's emulators.
+     */
+    fun emulatorsByProperty(context: Context): Boolean =
+        context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 && runCatching {
+            Runtime.getRuntime().exec(arrayOf("getprop", "debug.wgbg.firebase")).inputStream.bufferedReader().use { it.readLine()?.trim() }
+        }.getOrNull() == "emu"
+    /**
      * Debug builds only (`--ez fakegoogle true`), and only against the emulators: this phone counts as signed in with
      * Google, so two-phone sims can reach the friends list, invites and rematch (#72) without real Google accounts.
      */
