@@ -19,6 +19,12 @@ it with this page.
 5. **Cards**: the 5 resources and the 3 commodities (commodities framed differently from resources), a background
    per progress deck tied to its commodity, and the Fortune cards.
 6. **Dice**: the two number dice and the event die faces.
+7. **Commodity colours** (Mauro, 0.3.5): one colour per commodity, the colour of the land its resource comes from, so
+   the colour reminds you of the commodity. It is used wherever the commodity or its progress deck shows: the
+   commodity's icons and card frames, its deck's cards and pile, the event die's gate, and the level dots and bar
+   under the town-improvement plates in the build row. Default: Parchment (forest) green, Fabric (sheep) white,
+   Silver (mountains) blue. Two lands of the same colour (forest and pasture are both green) take different colours;
+   no orange.
 
 ## Recommended sizes
 

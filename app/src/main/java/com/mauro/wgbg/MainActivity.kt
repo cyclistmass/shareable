@@ -74,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.draw.clipToBounds
@@ -1042,6 +1043,7 @@ fun WatchGameScreen(
     // after 6 s untouched). Menu > Fit and a double-tap still reset it; Camera.clamped keeps it on screen.
     var boardSize by remember { mutableStateOf(Size.Zero) }
     var boardOrigin by remember { mutableStateOf(Offset.Zero) }
+    var menuHost by remember { mutableStateOf(Offset.Zero) }   // where the object menu's layer sits on screen
     // Each player's supply can be slid around the water (#52); a double-tap on it puts it back. Kept per game.
     var pileOffsets by remember(seed, seats) { mutableStateOf(List(seats) { Offset.Zero }) }
     val viewer = me.coerceAtLeast(0)
@@ -1159,7 +1161,15 @@ fun WatchGameScreen(
     var knightPick by remember { mutableStateOf<Int?>(null) }
     if (knightPick != null && knightPick !in movableKnights(boardLegal)) knightPick = null
     val knightPickNow by rememberUpdatedState(knightPick)
-    val targets = if (cardPick.isNotEmpty()) Targets.ofCards(cardPick, cardSecond) else knightTargets(boardLegal, knightPick)
+    // A tapped knight or town of yours (0.3.5): its menu right above it, and the line picked waiting for the check / X.
+    var tapMenu by remember { mutableStateOf<TapHit?>(null) }
+    var tapLine by remember { mutableStateOf<TapLine?>(null) }
+    if (tapMenu != null && (me < 0 || tapMenu!!.target.lines.none { lineMoves(it, legal, tapMenu!!.vertex).isNotEmpty() })) { tapMenu = null; tapLine = null } // the turn moved on
+    val tapMenuNow by rememberUpdatedState(tapMenu)
+    val targets = if (cardPick.isNotEmpty()) Targets.ofCards(cardPick, cardSecond) else knightTargets(boardLegal, knightPick).let { t ->
+        // Objects with something to do glow (the table's highlight rows: the knight's lit base).
+        if (buildMode != null || knightPick != null) t else Targets(t.vertices + tapHighlights(state, legal, me), t.edges, t.hexes)
+    }
     val chosen = pending.filter { it in legal } // a stale pick (the turn moved on) is dropped
     // White: the move waiting for its second tap, and the knight picked to move.
     val chosenTargets = Targets.of(chosen).let { t -> knightPick?.let { Targets(t.vertices + it, t.edges, t.hexes) } ?: t }
@@ -1350,6 +1360,13 @@ fun WatchGameScreen(
                         val p = if (liveBoardNow && inventory) liveProjection(size.width.toFloat(), size.height.toFloat()).unproject(at)
                             else if (liveBoardNow) LiveProjection(l.center, l.scale, camera.tilt, boardRotation).unproject(at, liveBoardTop(env.art)) else l.unproject(at)
                         val picking = cardPickNow.isNotEmpty()
+                        // A tap off an open object menu closes it.
+                        if (tapMenuNow != null) { tapMenu = null; tapLine = null; return@detectTapGestures }
+                        // A tap on your knight or town with something to do opens its menu above it (TAP_TARGETS).
+                        if (!inventory && !picking && buildModeNow == null && knightPickNow == null) tapTargetAt(stateNow, legalNow, p, me)?.let {
+                            tapMenu = it; tapLine = null; pending = emptyList()
+                            hostView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); return@detectTapGestures
+                        }
                         // A tap on a knight that can move picks it (or lets it go), and only its moves glow.
                         val knight = if (inventory || picking) knightPickNow else knightPickAt(stateNow, boardLegalNow, p, knightPickNow)
                         if (knight != knightPickNow) { knightPick = knight; pending = emptyList(); hostView.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); return@detectTapGestures }
@@ -1775,8 +1792,46 @@ fun WatchGameScreen(
         val sheetOpen = guideOpen || feedbackOpen || confirmExit || confirmEnd || histogramOpen || confirmWatch
         if (me >= 0 && !inventory && !panelOpen && !settingsOpen && !chestOpen && !sheetOpen && tick.let {
                 (state.phase == Phase.PLAY_TURN && state.currentPlayer == me || inSetup(state)) && state.actingPlayer == me })
-            BuildMenu(state.chivalry != null, legal, buildMode, { buildMode = it }, { a -> pending = emptyList(); humanMoves.trySend(a) },
-                Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
+            BuildMenu(state.chivalry != null, legal, buildMode, level = { t -> state.chivalry?.level(me, t) ?: 0 }, onPick = { pick ->
+                tapMenu = null; tapLine = null
+                when (pick) {
+                    is Pick.Mode -> buildMode = pick.kind
+                    is Pick.Now -> { pending = emptyList(); humanMoves.trySend(pick.move) }
+                    is Pick.Ask -> { pending = pick.moves; pendingAt = null }
+                    is Pick.Hint -> tapHint = pick.text
+                }
+            }, modifier = Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
+        // The tapped object's menu, centred right above it (Mauro: "the menu right above the knight").
+        tapMenu?.let { hit ->
+            val density = LocalDensity.current
+            val l = if (boardSize.minDimension > 0f) Layout.fit(state.board, boardSize.width, boardSize.height, camera) else null
+            val spot = vertexLattice(state.board, hit.vertex)
+            val at = l?.let { lay -> (if (liveBoard) liveProjection(boardSize.width, boardSize.height).project(spot, liveBoardTop(env.art)) else lay.project(spot.x, spot.y)) + boardOrigin }
+            if (at != null) Box(Modifier.fillMaxSize().onGloballyPositioned { menuHost = it.positionInWindow() }) {
+                ObjectMenu(hit, legal, tapLine, onLine = { line ->
+                    val moves = lineMoves(line, legal, hit.vertex)
+                    when {
+                        moves.isEmpty() -> Unit
+                        line.pick -> { knightPick = hit.vertex; tapMenu = null; tapLine = null }   // then tap where it goes
+                        !hit.target.confirm -> { tapMenu = null; tapLine = null; humanMoves.trySend(moves.first()) }
+                        else -> tapLine = line
+                    }
+                }, onConfirm = moveTap {
+                    tapLine?.let { lineMoves(it, legal, hit.vertex).firstOrNull() }?.let { pending = emptyList(); humanMoves.trySend(it) }
+                    tapMenu = null; tapLine = null
+                }, onCancel = { tapLine = null },
+                    modifier = Modifier.zIndex(3f).layout { m, c ->
+                        val pl = m.measure(c.copy(minWidth = 0, minHeight = 0))
+                        val gap = with(density) { 22.dp.roundToPx() }
+                        val x = (at.x - menuHost.x).toInt() - pl.width / 2
+                        val y = (at.y - menuHost.y).toInt() - pl.height - gap
+                        layout(pl.width, pl.height) {
+                            // Kept on screen; when there's no room above the object it goes below it.
+                            pl.place(x.coerceIn(0, maxOf(0, c.maxWidth - pl.width)), if (y >= 0) y else (at.y - menuHost.y).toInt() + gap)
+                        }
+                    })
+            }
+        }
         // Zoom, Tilt and Turn bars on the right edge, only when switched on under the gear (#137, Mauro: gestures by
         // default). Pinch zooms, two-finger drag tilts and a two-finger twist turns the 3D board without them.
         if (env.viewBars && !inventory && !panelOpen && !settingsOpen && !sheetOpen && boardSize.minDimension > 0f) ViewBarsPanel(camera,
@@ -3077,5 +3132,5 @@ object AgentHooks {
 }
 
 /** What a screen reader says for an icon-only button (the confirm box's check and cross). */
-private fun androidx.compose.ui.Modifier.confirmA11y(label: String) =
+internal fun androidx.compose.ui.Modifier.confirmA11y(label: String) =
     this.semantics { contentDescription = label }

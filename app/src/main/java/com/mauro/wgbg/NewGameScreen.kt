@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -288,14 +289,16 @@ private fun seatInk(setup: GameSetup, i: Int, fill: Boolean = false): androidx.c
 @Composable
 private fun SeatColourButton(i: Int, colour: SeatColour?, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
+    val pull = remember { mutableFloatStateOf(0f) }
     Row(
-        Modifier.height(30.dp).clip(shape).background(Wood.WOOD_DARK).border(2.dp, Wood.BRASS, shape)
+        Modifier.height(30.dp).clip(shape).background(Wood.WOOD_DARK).border(2.dp, Wood.BRASS, shape).claspPull(pull, onClick)
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 8.dp).testTag("seat-$i-colour"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Box(Modifier.size(14.dp).background(colour?.let { androidx.compose.ui.graphics.Color(it.argb) } ?: Wood.WOOD_DARK, CircleShape)
             .border(1.dp, Wood.BRASS_LIGHT, CircleShape))
-        Text("${if (i == 0) "You" else "Seat ${i + 1}"}: ${colour?.label ?: "?"} ▾", style = Wood.sans(12.sp, FontWeight.SemiBold))
+        Text("${if (i == 0) "You" else "Seat ${i + 1}"}: ${colour?.label ?: "?"}", style = Wood.sans(12.sp, FontWeight.SemiBold))
+        Clasp(pull.floatValue)
     }
 }
 
@@ -370,8 +373,13 @@ private fun SeatCard(i: Int, seat: SeatSetup, name: String?, ink: androidx.compo
                 style = Wood.sans(12.sp, color = Wood.INK_SOFT))
             SeatKind.EMPTY -> Text("Nobody sits here", style = Wood.sans(12.sp, color = Wood.INK_SOFT))
         }
-        if (name != null && seat.kind != SeatKind.EMPTY) Choice("$name ▾", false, "seat-$i-name", Modifier.fillMaxWidth().height(28.dp),
-            radius = 7.dp, size = 13.sp, onClick = onName)
+        if (name != null && seat.kind != SeatKind.EMPTY) {
+            val pull = remember { mutableFloatStateOf(0f) }
+            Box(Modifier.fillMaxWidth().height(28.dp).claspPull(pull, onName), contentAlignment = Alignment.CenterEnd) {
+                Choice(name, false, "seat-$i-name", Modifier.fillMaxSize(), radius = 7.dp, size = 13.sp, onClick = onName)
+                Clasp(pull.floatValue, Modifier.padding(end = 8.dp))
+            }
+        }
     }
 }
 
