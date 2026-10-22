@@ -117,8 +117,8 @@ echo "NAMES $TAG: kept after closing the app before Play"
 
 # 2. Play: the player list shows them; close mid-game and resume, still there.
 xy=$(reach 'Play' $((W * 3 / 4))) || fail "no Play"; tap $xy
-for _ in $(seq 1 60); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
-"$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started"
+for _ in $(seq 1 60); do grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" && break; sleep 1; done
+grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" || fail "the game never started"
 sleep 6; shot game
 d=$(dump); for name in "${PICKS[@]}"; do grep -q "text=\"$name\"" <<< "$d" || fail "$name isn't in the player list"; done
 echo "NAMES $TAG: in the game's player list"

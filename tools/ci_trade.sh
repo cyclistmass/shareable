@@ -64,7 +64,7 @@ for ruleset in $RULESETS; do
   done_ab=0; done_c=0; done_d=0; again=0; games=1; start=$(date +%s); ts_alive
   # Step C needs the fixed dice (0.3.5's debug --es dice; the app logs WGBG-DICE when it takes them). A build without
   # them plays random dice, where two lots may never come: C is left out there, said plainly, not left to a coin toss.
-  if [ -n "$DICE" ] && ! "$ADB" logcat -d -s WGBG-DICE:I | grep -q 'fixed dice'; then
+  if [ -n "$DICE" ] && ! grep -q 'fixed dice' <<< "$("$ADB" logcat -d -s WGBG-DICE:I)"; then
     echo "trade $ruleset: C skipped: this build takes no --es dice (before 0.3.5), and on random dice two lots may never come"; done_c=1; fi
   while [ $(( $(date +%s) - start )) -lt "$SECS" ] && { [ $done_c = 0 ] || [ $done_d = 0 ]; } && [ $fail = 0 ]; do
     crashed && { bad "crash"; break; }
