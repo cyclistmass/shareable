@@ -21,9 +21,20 @@ class ClaspTest {
     }
 
     @Test
+    fun `the clasp box follows the approved timeline`() {
+        assertEquals(0, claspBoxHasp(0f)); assertEquals(1, claspBoxHasp(32f)); assertEquals(7, claspBoxHasp(600f))
+        assertEquals(null, claspBoxFront(219f)); assertEquals(0, claspBoxFront(220f)); assertEquals(5, claspBoxFront(600f))
+        assertEquals(CLASPBOX_HASP_MS.last(), CLASPBOX_FRONT_MS.first(), "the front drops as the hasp lets go")
+        assertTrue(CLASPBOX_PULL_MS in CLASPBOX_FRONT_MS.first() until CLASPBOX_OPEN_MS, "a pull takes it partway down")
+        // Closing reverses it: every frame the open passes, the close passes back through.
+        assertEquals((0..7).toList(), (0..600).map { claspBoxHasp(it.toFloat()) }.distinct())
+    }
+
+    @Test
     fun `no picker on the setup screen still shows the text arrow`() {
         val src = java.io.File("src/main/java/com/mauro/wgbg/NewGameScreen.kt").readText(Charsets.UTF_8)
         assertFalse("▾" in src, "the text arrow is the clasp now")
-        assertEquals(2, Regex("claspPull\\(").findAll(src).count(), "seat colour and seat name pull open")
+        assertEquals(1, Regex("claspPull\\(").findAll(src).count(), "seat colour pulls open")
+        assertEquals(1, Regex("ClaspBox\\(").findAll(src).count(), "seat name is a clasp box")
     }
 }

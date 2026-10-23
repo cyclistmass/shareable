@@ -58,6 +58,7 @@ unless another path is given.
   Mauro's PC, 8 tilt steps, imported by `tools/import_tiles3d.py`. The Pirate buildings' flat view was re-rendered
   (it was turned 180 degrees).
 - Build row and tap-menu art (`plate_*_on/off`, `btn_check*`, `btn_x*`, `icon_supply`, `icon_promote`, `clasp_*`, 0.3.5): our own brass plates (raised when you can build, engraved when you can't), enamelled check and X, the knight menu's Supply and Promote icons and the setup screen's box clasp, made with OpenAI Codex built-in image generation (round 3, 2026-10-22), imported by `tools/import_buildrow.py`.
+- Clasp box name picker (`claspbox_*`, 0.3.5): the hasp's swing, the box, its dropping front, the list panel and its rows, from the storyboard Mauro approved, made with OpenAI Codex built-in image generation (2026-10-22), imported at native size by `tools/import_buildrow.py`.
 
 ## Art: made with Claude Code for Mauro DiBenedetto
 

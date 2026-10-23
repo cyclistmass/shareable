@@ -6,6 +6,9 @@ from C:/Users/mauro/wgbg-art/buildrow-0.3.5/final, see its ../NOTES.md):
   icon_supply / icon_promote       the knight menu's Supply and Promote lines, at ICON px
   clasp_closed / _open_33 / _open_66 / _open   the box clasp on the setup screen's pickers (re-exported 2026-10-22 to
       fill its canvas), cropped to the clasp, all four frames to one box so the hinge stays put
+  claspbox_*   the clasp box picker (approved storyboard, 2026-10-22, final/claspbox/): the hasp's 8 frames and keeper,
+      the front's 6 drop frames, the box, the list panel and its wood fill, the selected row and divider. Kept at their
+      native size and canvas so timeline.json's anchors and slices.json's insets hold as they are.
 
 Usage: py -3.12 tools/import_buildrow.py            import
        py -3.12 tools/import_buildrow.py --check    check the shipped files
@@ -24,6 +27,12 @@ SIZES.update({b: BUTTON for b in ("btn_check", "btn_check_pressed", "btn_x", "bt
 SIZES.update({"icon_supply": ICON, "icon_promote": ICON})
 CLASPS = ["clasp_closed", "clasp_open_33", "clasp_open_66", "clasp_open"]
 SIZES.update({c: CLASP for c in CLASPS})
+# The clasp box's sprites, by their file in final/claspbox/ and the long side they keep (native, not resized).
+CLASPBOX = {f"hasp_{k:02}": 128 for k in range(8)}
+CLASPBOX.update({f"front_{k:02}": 384 for k in range(6)})
+CLASPBOX.update({"keeper": 128, "hinge_strip": 384, "box_frame": 384, "panel_frame": 384, "panel_wood_fill": 256, "row_selected": 352,
+                 "row_divider": 352})
+SIZES.update({f"claspbox_{n}": px for n, px in CLASPBOX.items()})
 
 
 def problems():
@@ -52,8 +61,13 @@ def main():
         print("\n".join(bad) or "ok")
         return 1 if bad else 0
     for name, px in SIZES.items():
-        if name not in CLASPS:
+        if name not in CLASPS and not name.startswith("claspbox_"):
             save(Image.open(SRC / f"{name}.png"), name, px)
+    for n, px in CLASPBOX.items():
+        im = Image.open(SRC / "claspbox" / f"{n}.png")
+        assert max(im.size) == px, f"{n}.png is {im.size}, want {px} on its long side"
+        # Lossless: the 9-slice edges and the registered frames must not smear.
+        im.convert("RGBA").save(OUT / f"claspbox_{n}.webp", "WEBP", lossless=True, method=6)
     frames = [Image.open(SRC / f"{c}.png").convert("RGBA") for c in CLASPS]
     boxes = [f.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox() for f in frames]
     box = (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
