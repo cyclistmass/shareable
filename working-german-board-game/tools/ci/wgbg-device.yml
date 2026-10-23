@@ -1,6 +1,6 @@
 name: wgbg device shards
 
-# Reusable: builds the debug APK (stable key) and runs the given device shards side by side, one emulator each
+# Reusable: builds the debug and release APKs (stable key) and runs the given device shards side by side, one emulator each
 # (tools/ci/shard.sh says what each shard runs). Called by the nightly full playtest (wgbg-nightly.yml) and the remote
 # release check (wgbg-check.yml). Lives in shareable's .github/workflows; drafted in catan-android tools/ci/.
 on:
@@ -45,15 +45,30 @@ jobs:
         run: |
           if [ -n "$DEBUG_KEYSTORE_B64" ]; then printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
             echo "WGBG_DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"; echo "debug keystore installed"
-          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard will fail: phones refuse a new key)"; fi
-      - name: Build debug APK (and the instrumented test APK)
+          else echo "no DEBUG_KEYSTORE_B64 secret: throwaway debug key (the update shard and the key check will fail: phones refuse a new key)"; fi
+      # The shards play the debug APK, Firebase config included: tools/ci/shard.sh sets debug.wgbg.firebase, so every launch
+      # talks to the Firebase emulators, never the live project.
+      - name: Build the debug APK (and the instrumented test APK)
         run: bash ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      # The release APK is what players install (#147) and what tools/publish_release.sh may publish from a check run
+      # (test/* branches get no per-push run), so it is built with the Firebase config written above, as the per-push CI
+      # builds it (without the secret it fails its check below). The update shard installs it too: it plays offline.
+      - name: Build the release APK
+        run: bash ./gradlew --no-daemon :app:assembleRelease
+      - name: Check the APKs' signing key, and that the release is not debuggable and has the Firebase config
+        run: bash tools/ci/apk_check.sh --firebase app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: shards-apk
           path: |
             working-german-board-game/app/build/outputs/apk/debug/app-debug.apk
+            working-german-board-game/app/build/outputs/apk/release/app-release.apk
             working-german-board-game/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      # The one APK from a check run that tools/publish_release.sh takes (shards-apk is for the shards).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-release-apk
+          path: working-german-board-game/app/build/outputs/apk/release/app-release.apk
 
   device:
     needs: apk
@@ -168,3 +183,4 @@ jobs:
             working-german-board-game/*.png
             working-german-board-game/*.xml
             working-german-board-game/*.logcat.txt
+            working-german-board-game/*.trace.txt

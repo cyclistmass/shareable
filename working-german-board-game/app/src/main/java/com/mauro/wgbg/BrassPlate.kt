@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.testTag
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -67,6 +69,7 @@ fun PlateBox(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    pad: androidx.compose.ui.unit.Dp = 16.dp,
     content: @Composable () -> Unit,
 ) {
     val src = remember { MutableInteractionSource() }
@@ -80,13 +83,13 @@ fun PlateBox(
                 if (!enabled) drawRect(androidx.compose.ui.graphics.Color(0x8C1A0F07))
             }
             .clickable(interactionSource = src, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = pad, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
 
 /** The drawn icons on the move buttons (Mauro: "buttons not words, with icons on them"). */
-enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUSE, PROMOTE, MOVE_KNIGHT, RAMPARTS, CLOSE }
+enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUSE, PROMOTE, MOVE_KNIGHT, RAMPARTS, CLOSE, GUILDS, ACADEMY, CROWN, CHASE, CHECK }
 
 /**
  * A brass plate with an engraved [icon] instead of words; [label] is what a screen reader (and the test scripts)
@@ -95,13 +98,48 @@ enum class MoveIcon { TRADE, END_TURN, ROAD, HOMESTEAD, TOWN, CARD, KNIGHT, ROUS
 @Composable
 fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifier = Modifier, plate: Plate = Plate.BRASS, lit: Boolean = false,
                     enabled: Boolean = true, width: androidx.compose.ui.unit.Dp = 66.dp, height: androidx.compose.ui.unit.Dp = 54.dp,
-                    caption: String? = null, onClick: () -> Unit) {
-    PlateBox(if (lit) Plate.GOLD else plate, enabled = enabled, onClick = onClick,
+                    caption: String? = null, iconSize: androidx.compose.ui.unit.Dp = if (caption != null) 24.dp else 30.dp,
+                    pad: androidx.compose.ui.unit.Dp = 16.dp, onClick: () -> Unit) {
+    PlateBox(if (lit) Plate.GOLD else plate, enabled = enabled, onClick = onClick, pad = pad,
         modifier = modifier.size(width = width, height = height).testTag(tag).semantics(mergeDescendants = true) { contentDescription = label }) {
       // An optional word under the icon, for buttons a new player hunts for (Fable review W8: End turn).
       androidx.compose.foundation.layout.Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-        androidx.compose.foundation.Canvas(Modifier.size(if (caption != null) 24.dp else 30.dp)) {
-            val ink = androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)
+        MoveGlyph(icon, androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8), Modifier.size(iconSize))
+        if (caption != null) Text(caption, style = Wood.sans(10.sp, FontWeight.Bold,
+            androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)), maxLines = 1)
+      }
+    }
+}
+
+/**
+ * A plate drawn whole as art (the 0.3.5 reports, Codex): [on] lit while it can be pressed, [off] engraved while it can't.
+ * [label] is what a screen reader (and the test scripts) call it. It sinks a little while held.
+ */
+@Composable
+fun ArtPlateButton(on: Int, off: Int, label: String, tag: String, modifier: Modifier = Modifier, enabled: Boolean = true,
+                   size: androidx.compose.ui.unit.Dp = TURN_PLATE, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(if (enabled) on else off), null,
+        modifier.size(size).testTag(tag).semantics(mergeDescendants = true) { contentDescription = label }
+            .graphicsLayer { val k = if (pressed) 0.94f else 1f; scaleX = k; scaleY = k }
+            .clickable(interactionSource = src, indication = null, enabled = enabled, role = Role.Button, onClick = onClick))
+}
+
+/** The Roll / End turn plate's size. */
+val TURN_PLATE = 60.dp
+
+/** The game's Menu button: shut, the three bars' plate (0.3.5 reports); its other words (Hide, Settings) stay words. */
+@Composable
+fun MenuButton(label: String, tag: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    if (label == "Menu") ArtPlateButton(R.drawable.icon_menu_on, R.drawable.icon_menu_off, label, tag, modifier, size = 44.dp, onClick = onClick)
+    else BrassButton(label, tag, modifier.height(40.dp), onClick = onClick)
+}
+
+/** [icon] drawn in [ink]: the engraving on a plate, or the mark beside a tap-menu line. */
+@Composable
+fun MoveGlyph(icon: MoveIcon, ink: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+        androidx.compose.foundation.Canvas(modifier) {
             val w = size.width; val h = size.height; val sw = w * 0.11f
             val stroke = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
             when (icon) {
@@ -178,10 +216,40 @@ fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifi
                     val sand = androidx.compose.ui.graphics.Path().apply { moveTo(0.5f * w, 0.62f * h); lineTo(0.66f * w, 0.86f * h); lineTo(0.34f * w, 0.86f * h); close() }
                     drawPath(sand, ink)
                 }
+                MoveIcon.GUILDS -> {
+                    // Scales: a beam on a post, a pan hanging from each end.
+                    drawLine(ink, androidx.compose.ui.geometry.Offset(0.5f * w, 0.1f * h), androidx.compose.ui.geometry.Offset(0.5f * w, 0.9f * h), sw)
+                    drawLine(ink, androidx.compose.ui.geometry.Offset(0.12f * w, 0.25f * h), androidx.compose.ui.geometry.Offset(0.88f * w, 0.25f * h), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(ink, androidx.compose.ui.geometry.Offset(0.3f * w, 0.9f * h), androidx.compose.ui.geometry.Offset(0.7f * w, 0.9f * h), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                    for (x in listOf(0.2f, 0.8f)) drawArc(ink, 0f, 180f, true, androidx.compose.ui.geometry.Offset((x - 0.16f) * w, 0.4f * h), androidx.compose.ui.geometry.Size(0.32f * w, 0.24f * h))
+                }
+                MoveIcon.ACADEMY -> {
+                    // An open book: two pages from the spine.
+                    for (left in listOf(true, false)) {
+                        val x = if (left) 0.06f else 0.94f
+                        val p = androidx.compose.ui.graphics.Path().apply { moveTo(0.5f * w, 0.28f * h); quadraticTo((x + 0.5f) / 2 * w, 0.12f * h, x * w, 0.22f * h)
+                            lineTo(x * w, 0.84f * h); quadraticTo((x + 0.5f) / 2 * w, 0.74f * h, 0.5f * w, 0.9f * h); close() }
+                        drawPath(p, ink)
+                    }
+                }
+                MoveIcon.CROWN -> {
+                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(0.1f * w, 0.85f * h); lineTo(0.06f * w, 0.25f * h); lineTo(0.3f * w, 0.55f * h); lineTo(0.5f * w, 0.15f * h)
+                        lineTo(0.7f * w, 0.55f * h); lineTo(0.94f * w, 0.25f * h); lineTo(0.9f * w, 0.85f * h); close() }
+                    drawPath(p, ink)
+                }
+                MoveIcon.CHASE -> {
+                    // A shield driving a mask off: the shield, and an arrow out.
+                    val shield = androidx.compose.ui.graphics.Path().apply { moveTo(0.06f * w, 0.18f * h); lineTo(0.5f * w, 0.18f * h); lineTo(0.5f * w, 0.5f * h)
+                        quadraticTo(0.48f * w, 0.8f * h, 0.28f * w, 0.92f * h); quadraticTo(0.08f * w, 0.8f * h, 0.06f * w, 0.5f * h); close() }
+                    drawPath(shield, ink, style = stroke)
+                    drawLine(ink, androidx.compose.ui.geometry.Offset(0.58f * w, 0.52f * h), androidx.compose.ui.geometry.Offset(0.94f * w, 0.52f * h), sw)
+                    val head = androidx.compose.ui.graphics.Path().apply { moveTo(0.8f * w, 0.38f * h); lineTo(0.94f * w, 0.52f * h); lineTo(0.8f * w, 0.66f * h) }
+                    drawPath(head, ink, style = stroke)
+                }
+                MoveIcon.CHECK -> {
+                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(0.14f * w, 0.52f * h); lineTo(0.4f * w, 0.78f * h); lineTo(0.88f * w, 0.22f * h) }
+                    drawPath(p, ink, style = androidx.compose.ui.graphics.drawscope.Stroke(sw * 1.5f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
             }
         }
-        if (caption != null) Text(caption, style = Wood.sans(10.sp, FontWeight.Bold,
-            androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)), maxLines = 1)
-      }
-    }
 }

@@ -66,6 +66,9 @@ class AutoNoTest {
         assertTrue(effect.indexOf("delay(1000)") < effect.indexOf("humanMoves.trySend(Action.REJECT_TRADE)"), "No only after the countdown")
         // The Menu's move log is gone (#91): the reason is the turn history's, from TurnTracker.
         assertFalse("log.add" in effect, effect)
+        // Settings > Play: Off leaves the No to the player; the countdown runs for the chosen seconds.
+        assertTrue(effect.indexOf("env.autoNoSeconds == 0) return@LaunchedEffect") in 0 until effect.indexOf("delay(1000)"), "Off returns before any countdown")
+        assertTrue("for (left in env.autoNoSeconds downTo 1)" in effect)
     }
 
     @Test

@@ -124,7 +124,7 @@ internal val FORTUNE = listOf("Sentinel", "Windfall", "Corner the Market", "Trai
 /** What each Fortune card does (same order as [FORTUNE]). */
 val FORTUNE_HINTS = listOf(
     "Move the bandit and take a card from a player next to it. Three or more win the Strongest Watch.",
-    "Take any 2 resources from the bank.",
+    "Pick 2 resources from the bank, alike or different.",
     "Name a resource: everyone gives you all of theirs.",
     "Build 2 roads for free.",
     "Worth 1 point (kept hidden until the end).",
@@ -205,6 +205,8 @@ fun HumanControls(
         onFortuneDone()
     }
     var chivalryChoices by remember { mutableStateOf<Pair<String, List<Action>>?>(null) }
+    // What a picker says under each card: open, it covers the hand row, so the counts would be nowhere on screen.
+    val have = { card: Int -> cardChoiceUnder(s, me, me, card) }
     val types = legal.map { it.type }.toSet()
     // A picker left open after its moves stopped being legal (a new turn, a bot's move, a resumed game) hid the
     // Roll button under a prompt that said roll (#105). Drop any sheet that has nothing left to pick.
@@ -222,14 +224,14 @@ fun HumanControls(
         ) {
             when (sheet) {
                 "yop" -> Picker("Windfall: ${FORTUNE_HINTS[DevCard.YEAR_OF_PLENTY]}", legal.filter { it.type == ActionType.PLAY_YEAR_OF_PLENTY }
-                    .map { a -> (RES[a.yopFirst] + if (a.yopSecond >= 0) " + ${RES[a.yopSecond]}" else "") to a }, onMove) { sheet = null }
+                    .map { a -> (RES[a.yopFirst] + if (a.yopSecond >= 0) " + ${RES[a.yopSecond]}" else "") to a }, onMove, have) { sheet = null }
                 "mono" -> Picker("Corner the Market: everyone hands you all of the one you name:", legal.filter { it.type == ActionType.PLAY_MONOPOLY }
-                    .map { a -> RES[a.payload.toInt()] to a }, onMove) { sheet = null }
+                    .map { a -> RES[a.payload.toInt()] to a }, onMove, have) { sheet = null }
                 "chivalry" -> chivalryChoices?.let { (label, acts) ->
                     // The Transmuter picks two dice: show two rows of dice, not 36 "1 / 5" buttons (Mauro, 2026-10-12).
                     if (isAlchemist(acts)) { DicePicker(label, acts, onMove) { sheet = null }; return@let }
                     val hint = acts.firstOrNull { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS }?.let { progressHint(it.a) }
-                    Picker(if (hint.isNullOrEmpty()) label else "$label: $hint", acts.map { a -> (if (a.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS) progressOption(s, a, names) else if (a.type == ActionType.MARITIME_TRADE) bankLabel(a) else chivalryLabel(s, a, names) ?: a.toString()) to a }, onMove) { sheet = null }
+                    Picker(if (hint.isNullOrEmpty()) label else "$label: $hint", acts.map { a -> (if (a.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS) progressOption(s, a, names) else if (a.type == ActionType.MARITIME_TRADE) bankLabel(a) else chivalryLabel(s, a, names) ?: a.toString()) to a }, onMove, have) { sheet = null }
                 }
             }
         }
@@ -257,11 +259,17 @@ fun HumanControls(
                 else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
                 else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
             }
-            // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro).
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro). Where
+            // the build menu down the right edge reaches the corner (a short phone), they sit left of it.
+            val clear = buildMenuReaches(s.chivalry != null, androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp, TURN_PLATE)
+            Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
-                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp, onClick = moveTap { onMove(a) }) }
-                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn", onClick = moveTap { onMove(a) }) }
+                // Roll and End turn share one plate (0.3.5 reports): the dice until you roll, then the hourglass. The rules
+                // never offer both at once.
+                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a ->
+                    ArtPlateButton(R.drawable.icon_roll_on, R.drawable.icon_roll_off, "Roll", "move-Roll", onClick = moveTap { onMove(a) }) }
+                    ?: legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a ->
+                        ArtPlateButton(R.drawable.icon_end_turn_on, R.drawable.icon_end_turn_off, "End turn", "move-End turn", onClick = moveTap { onMove(a) }) }
             }
         }
     }
@@ -360,7 +368,7 @@ private fun DicePicker(label: String, acts: List<Action>, onMove: (Action) -> Un
 }
 
 @Composable
-private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, close: () -> Unit) {
+private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>>, onMove: (Action) -> Unit, under: (Int) -> String, close: () -> Unit) {
     Text(title, color = INK_LIGHT, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     // Choices that are cards show the card art, as in the trade chest; the rest stay worded buttons. Weighted and
     // scrolling, so Back stays on screen however many rows they wrap to (0.3.4: Windfall's 15 pairs on a 320 dp screen).
@@ -370,8 +378,13 @@ private fun ColumnScope.Picker(title: String, options: List<Pair<String, Action>
             val cards = optionCards(a)
             if (cards != null) Column(horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable(onClick = moveTap { close(); onMove(a) }).testTag("pick-$label")) {
-                Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-                    for (c in cards) Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
+                // "have N" under each card, Windfall's pair included (players: the open picker hides the hand row), so the
+                // pair sits side by side rather than overlapping.
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (c in cards) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Image(artPainter(ALL_CARD_ART[c]), ALL_CARD_NAMES[c], Modifier.size(width = 42.dp, height = 60.dp))
+                        UnderCard(under(c), 42.dp, INK_LIGHT)
+                    }
                 }
                 Text(label, color = INK_LIGHT, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             } else MoveButton(label) { close(); onMove(a) }

@@ -145,13 +145,13 @@ else
       shot lobby
       for _ in $(seq 1 90); do
         orphaned
-        "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break
+        grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" && break
         [ -e "$ROOM_FILE.failed" ] && break
         d=$(dump); grep -q 'text="Duo"' <<< "$d" && tap_text "Start game" "$d"; sleep 3
       done
       rm -f "$ROOM_FILE"
       # A friend who never made it in would leave the host sitting in the lobby until its time limit.
-      "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || { rm -f "$ROOM_FILE.failed"; fail "the friend never joined (see the join log)"; }
+      grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" || { rm -f "$ROOM_FILE.failed"; fail "the friend never joined (see the join log)"; }
     else
       tap_text "Start game" || fail "no Start game (lobby: $(dump | grep -o 'text="[^"]*ready[^"]*"' | head -2))"
     fi
@@ -166,8 +166,8 @@ fi
 sleep 6
 shot start
 # The game must actually be on: the board asks for the first placement (the joiner waits for the host's Start).
-for _ in $(seq 1 120); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
-"$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started (still on the start screen?)"
+for _ in $(seq 1 120); do grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" && break; sleep 1; done
+grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" || fail "the game never started (still on the start screen?)"
 # Animations off from the menu, like a player can (Mauro: test games skip the animation; it also makes reading the
 # screen fast, since a still screen needs no waiting): Menu, Settings, Scenery, drag Density to 0, Hide (it saves as
 # you go). Settings opens with its groups shut (Fable review T4); Density is the first slider in Scenery. (0.3.4 dropped
@@ -188,7 +188,7 @@ while true; do
   orphaned
   [ $(( $(date +%s) - start )) -gt $((MINUTES * 60)) ] && fail "game not over after $MINUTES minutes ($moves moves)"
   crashed && fail "crash after $moves moves"
-  if "$ADB" logcat -d -s WGBG-GAME:I WGBG-ONLINE:I | grep -q -E "over|game over"; then
+  if grep -q -E "over|game over" <<< "$("$ADB" logcat -d -s WGBG-GAME:I WGBG-ONLINE:I)"; then
     echo "USERPLAY $TAG: game over after $moves of my moves, $(( ($(date +%s) - start) / 60 )) min: $("$ADB" logcat -d -s WGBG-GAME:I WGBG-ONLINE:I | grep -E 'over' | tail -1 | grep -o 'over.*\|game over.*')"
     shot end; break
   fi

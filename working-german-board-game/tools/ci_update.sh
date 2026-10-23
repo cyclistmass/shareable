@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# The update a player gets: the latest release installed fresh, a game started from the start screen by taps and a
-# homestead and road placed, then this build installed over it. The start screen must offer Resume, the game must come
-# back with the same players under the same names (bots are named by their colour, so a seat whose colour changed shows
-# here: 0.3.4 turned a 0.3.3 save's Orange into Purple) and play must go on. Screenshots before and after land in $OUT.
-# Board taps use the WGBG-TURN line's spots= (debug builds, which the releases are); everything else is a tap on a label.
+# The update a player gets: the latest release installed fresh, a game started from the start screen by taps and both
+# setup rounds placed (up to the player's Roll), then this build installed over it. The start screen must offer Resume,
+# the game must come back with the same players under the same names (bots are named by their colour, so a seat whose
+# colour changed shows here: 0.3.4 turned a 0.3.3 save's Orange into Purple) and play must go on: Roll, tapped by its
+# label. Screenshots before and after land in $OUT. Board taps (the old build only) use the WGBG-TURN line's spots=,
+# which only debug builds log: releases up to 0.3.4 are. A new build that isn't debuggable (the release APK, #147) must
+# also have its test hooks off: no run-as, and the MOVE, FILAMENT_VIEW and UI broadcasts change nothing and log nothing.
 # Usage: tools/ci_update.sh <new apk> [old apk, default: the latest release from GitHub]   ($ANDROID_SERIAL or the only device)
 set -uo pipefail
 NEW="${1:?new apk}"; OLD="${2:-}"
@@ -38,13 +40,13 @@ scroll() {
 tap_text() {
   local xy i
   for i in $(seq 0 "${2:-4}"); do
-    xy=$(dump | grep -F "text=\"$1\"" | centre)
+    xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre)   # Roll is an icon since 0.3.5, named by its description
     [ -n "$xy" ] && { echo "  tap '$1'"; "$ADB" shell input tap $xy; sleep 1.5; return 0; }
     scroll
   done
   return 1
 }
-on_screen() { grep -qF "text=\"$1\"" <<< "$(dump)"; }
+on_screen() { grep -q "\(text\|content-desc\)=\"$1\"" <<< "$(dump)"; }
 # The players' names, in order: the text in the player list's area (the left 40% of the screen, under the heading),
 # without the counts and the prompts. Both 0.3.3 (no test tags) and later builds lay the list out there.
 names() {
@@ -60,20 +62,38 @@ names() {
   done
 }
 turn_line() { "$ADB" logcat -d -s WGBG-TURN:I | tail -1; }
-# my_move: waits (up to 120 s) for a prompt with board spots for player 0 and taps one twice (select, then confirm).
+# my_move: waits (up to 120 s) for a new prompt with board spots for player 0 and taps one twice (select, then
+# confirm). New: not the line it last acted on, which stays the newest while the bots place between two setup rounds.
+ACTED=
 my_move() {
   local line spots xy
   for _ in $(seq 120); do
     line=$(turn_line)
     case "$line" in *" player=0 "*spots=*)
+      [ "$line" = "$ACTED" ] && { sleep 1; continue; }
       spots=$(echo "$line" | sed -n 's/.* spots=\([^ ]*\).*/\1/p' | tr ';' '\n' | head -1); xy=${spots#*@}
-      [ -n "$xy" ] && { "$ADB" shell input tap "${xy%,*}" "${xy#*,}"; sleep 0.6; "$ADB" shell input tap "${xy%,*}" "${xy#*,}"; sleep 2; return 0; };;
+      [ -n "$xy" ] && { ACTED=$line; "$ADB" shell input tap "${xy%,*}" "${xy#*,}"; sleep 0.6; "$ADB" shell input tap "${xy%,*}" "${xy#*,}"; sleep 2; return 0; };;
     esac
     sleep 1
   done
   return 1
 }
 version() { "$ADB" shell dumpsys package $PKG | tr -d '\r' | sed -n 's/.*versionName=//p' | head -1; }
+debuggable() { [ "$("$ADB" shell dumpsys package $PKG | tr -d '\r' | grep -c 'flags=\[.* DEBUGGABLE ')" != 0 ]; }
+# wait_screen <label> <seconds>: the label is on screen within that time.
+wait_screen() { for _ in $(seq "$2"); do on_screen "$1" && return 0; sleep 1; done; return 1; }
+# wait_roll <seconds>: this seat's Roll is on screen within that time. A bot's turn can stop on a trade offer to this
+# seat ("White offers you a trade", Yes / No / Counter offer), which 0.3.4 waits on for good: a player says No.
+wait_roll() {
+  local end=$((SECONDS + $1)) x
+  while [ $SECONDS -lt $end ]; do
+    x=$(dump)
+    grep -q '\(text\|content-desc\)="Roll"' <<< "$x" && return 0
+    if grep -qF 'offers you a trade' <<< "$x"; then echo "  a bot offers a trade: No"; tap_text "No" 0; continue; fi
+    sleep 1
+  done
+  return 1
+}
 
 if [ -z "$OLD" ]; then
   OLD="$OUT/latest-release.apk"
@@ -85,6 +105,12 @@ fi
 "$ADB" uninstall $PKG >/dev/null 2>&1 || true
 "$ADB" install "$(native "$OLD")" | tail -1 | grep -q Success || fail "the old APK did not install"
 from=$(version); echo "installed $from"
+# Both builds carry the live config, and debug.wgbg.firebase (shard.sh) sends neither to the emulators: the latest
+# release predates it, and this build's release APK isn't debuggable. A launch alone signs in anonymously and runs
+# cleanExpiredOnce, so airplane mode from the first launch on keeps them off the live project (installs go over adb
+# and need no network). Off again at exit: left on, it once cut a later online test off the network (ci_monkey.sh).
+"$ADB" shell cmd connectivity airplane-mode enable || fail "could not turn airplane mode on"
+trap '"$ADB" shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true' EXIT
 "$ADB" logcat -c
 timeout 60 "$ADB" shell am start -W -n $PKG/.MainActivity >/dev/null
 sleep 3
@@ -95,7 +121,10 @@ on_screen "New game" && tap_text "New game" 0
 tap_text "Play" 6 || fail "no Play on the game-start screen of $from"
 my_move || fail "never got a homestead to place in $from"
 my_move || fail "never got a road to place in $from"
-sleep 2
+# The second setup round, then the bots play until it's this seat's Roll (the first seat may be a bot, #126).
+my_move || fail "never got the second homestead to place in $from"
+my_move || fail "never got the second road to place in $from"
+wait_roll 180 || fail "no Roll after both setup rounds in $from"
 before=$(names); echo "players in $from: $before"
 [ -n "$before" ] || fail "no player names on the screen in $from"
 "$ADB" exec-out screencap -p > "$OUT/update-1-before.png"
@@ -113,12 +142,30 @@ sleep 3
 after=$(names); echo "players in $to:  $after"
 "$ADB" exec-out screencap -p > "$OUT/update-2-after.png"
 [ "$before" = "$after" ] || fail "the players changed with the update: '$before' became '$after'"
-line=$(turn_line)
-my_move || {
-  # Not a board move for me yet (a bot's turn, or a roll): a roll by its label is a move too.
-  tap_text "Roll" 0 || fail "play did not go on after the update (last turn line: ${line:0:300})"; }
-sleep 3
-[ "$(turn_line)" != "$line" ] || fail "nothing happened after a move in the resumed game"
+wait_roll 30 || fail "the resumed game doesn't offer this seat's Roll"
+if debuggable; then
+  hooks="debug build: hooks on"
+else
+  # The release (#147): every test hook is off. run-as is refused, and a move, a layout stress (which rewrites every
+  # hand and name) and a screen read sent from outside change nothing: still this seat's Roll, the same players.
+  ras=$("$ADB" shell run-as $PKG id 2>&1 | tr -d '\r' || true)
+  case "$ras" in *uid=*) fail "run-as works on the release build: $ras";; esac
+  "$ADB" shell am broadcast -a com.mauro.wgbg.MOVE -p $PKG --es move ROLL:0 >/dev/null
+  "$ADB" shell am broadcast -a com.mauro.wgbg.FILAMENT_VIEW --es stress full >/dev/null
+  "$ADB" shell am broadcast -a com.mauro.wgbg.UI -p $PKG >/dev/null
+  sleep 3
+  on_screen "Roll" || fail "a MOVE broadcast from outside moved the release build's game"
+  [ "$(names)" = "$after" ] || fail "a FILAMENT_VIEW broadcast changed the release build's players: '$(names)'"
+  hooks="release build: not debuggable, run-as refused, broadcasts ignored"
+fi
+# The move a player makes: Roll, by its label. The button goes once the dice are thrown.
+tap_text "Roll" 0 || fail "no Roll to tap after the update"
+gone=; for _ in $(seq 10); do on_screen "Roll" || { gone=1; break; }; sleep 1; done
+[ -n "$gone" ] || fail "nothing happened after Roll in the resumed game"
+if ! debuggable; then
+  lines=$("$ADB" logcat -d -s WGBG-TURN:I WGBG-UI:I WGBG-LAYOUT:I WGBG-3D-VIEW:I | grep -c ' WGBG-' || true)
+  [ "$lines" = 0 ] || fail "the release build logged $lines test lines (WGBG-TURN/UI/LAYOUT/3D-VIEW)"
+fi
 crash=$("$ADB" logcat -d -b crash | grep -c "FATAL EXCEPTION" || true)
 [ "$crash" = 0 ] || fail "the app crashed after the update"
-echo "update $from -> $to: ok (Resume, same players: $after, play goes on)"
+echo "update $from -> $to: ok (Resume, same players: $after, Roll goes on; $hooks)"

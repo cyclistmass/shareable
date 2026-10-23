@@ -22,9 +22,9 @@ class DeckArtTest {
                             val gate: Int, val spaceBack: String, val spaceCards: List<String>)
 
     private val decks = listOf(
-        Deck(Track.TRADE, "Guilds", Commodity.CLOTH, "guilds", 0xFFD3E8C4, 3, "nano_alliance_back",
+        Deck(Track.TRADE, "Guilds", Commodity.CLOTH, "guilds", 0xFFF2EDE0, 3, "nano_alliance_back",
             listOf("dock_accord", "cargo_audit", "exchange_envoy", "jump_manifest", "supply_signal", "rare_cargo")),
-        Deck(Track.POLITICS, "Crown", Commodity.COIN, "crown", 0xFF8A9FB2, 4, "platinum_exchange_back",
+        Deck(Track.POLITICS, "Crown", Commodity.COIN, "crown", 0xFF3F7FC4, 4, "platinum_exchange_back",
             listOf("drone_override", "free_orbits", "crew_transfer", "lane_redirect", "quiet_intercept", "cargo_embargo",
                 "signal_listener", "ranger_rally", "orbital_banquet")),
         Deck(Track.SCIENCE, "Academy", Commodity.PAPER, "academy", 0xFF3E8E48, 5, "data_network_back",

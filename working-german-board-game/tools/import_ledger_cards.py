@@ -5,7 +5,8 @@ ledger with a large rectangular picture, made by C:/Users/mauro/wgbg-art/cards-l
   card_timber, card_clay, card_fleece, card_grain, card_stone, card_parchment, card_weave, card_silver
       the resource and commodity cards, replacing the painted cards in place;
   card_fortune_sentinel, card_fortune_windfall, card_fortune_corner, card_fortune_trailblazers, card_fortune_landmark
-      the Fortune cards (the Pirate theme keeps its own knight card for the Sentinel).
+      the Fortune cards (the Pirate theme keeps its own knight card for the Sentinel). The Landmark's picture is the
+      lighthouse from the 0.3.5 reports (Codex, 2026-10-22), read from REPLACED instead of the Ledger maker's page.
 
 The commodity paintings card_paint_parchment / _weave / _silver are the picture inside the Age of Chivalry progress
 cards' own named face and the deck piles. Parchment and Fabric have new ChatGPT paintings (Mauro's picks, 2026-10-21:
@@ -30,6 +31,8 @@ CARDS = {
     "card_fortune_sentinel": "sentinel", "card_fortune_windfall": "windfall", "card_fortune_corner": "corner",
     "card_fortune_trailblazers": "trailblazers", "card_fortune_landmark": "landmark",
 }
+# Shipped name: a finished card that replaces the Ledger maker's page (already 280x390, lettered).
+REPLACED = {"card_fortune_landmark": Path(r"C:/Users/mauro/wgbg-art/reports-0.3.5/out/card_fortune_landmark.png")}
 PAINTINGS = ["card_paint_parchment", "card_paint_weave", "card_paint_silver"]
 # Shipped painting: Ledger key, for the paintings the Ledger maker writes (paint_<key>.png).
 PAINTED = {"card_paint_parchment": "parchment", "card_paint_weave": "fabric"}
@@ -56,7 +59,7 @@ def problems():
 def main():
     if "--check" not in sys.argv:
         for name, key in CARDS.items():
-            Image.open(SRC / f"ledger_rect_{key}.png").convert("RGBA").resize(SIZE, Image.LANCZOS) \
+            Image.open(REPLACED.get(name, SRC / f"ledger_rect_{key}.png")).convert("RGBA").resize(SIZE, Image.LANCZOS) \
                 .save(OUT / f"{name}.webp", quality=88, method=6)
         for name, key in PAINTED.items():
             Image.open(SRC / f"paint_{key}.png").convert("RGBA").resize(SIZE, Image.LANCZOS)                 .save(OUT / f"{name}.webp", quality=88, method=6)

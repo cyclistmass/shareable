@@ -12,10 +12,12 @@ import wgbg.engine.ActionBuffer
 import wgbg.engine.Rules
 
 class BuildMenuTest {
+    private fun improve(track: Int, b: Int) = Action.of(wgbg.engine.ChivalryActionType.IMPROVE_CITY, (b.toLong() shl 8) or track.toLong())
+
     @Test
     fun `each ruleset gets its own entries, Fortune cards only in the base game`() {
         assertEquals(listOf("Road", "Homestead", "Town", "Fortune card"), BuildKind.forRuleset(false).map { it.label })
-        assertEquals(listOf("Road", "Homestead", "Town", "New knight", "Supply knight", "Promote knight", "Move knight", "Ramparts"), BuildKind.forRuleset(true).map { it.label })
+        assertEquals(listOf("Road", "Homestead", "Town", "New knight", "Ramparts", "Guilds", "Academy", "Crown"), BuildKind.forRuleset(true).map { it.label })
     }
 
     @Test
@@ -37,10 +39,23 @@ class BuildMenuTest {
     }
 
     @Test
-    fun `the menu shows only what can be done now, plus the picked entry`() {
+    fun `0_3_5 every plate shows always, engraved when it can't be done (one row, nothing jumps)`() {
+        assertEquals(BuildKind.forRuleset(false), shownKinds(false))
+        assertEquals(BuildKind.forRuleset(true), shownKinds(true))
+    }
+
+    @Test
+    fun `a plate tap narrows the board, buys at once, asks, or says which town to tap`() {
         val road = Action.of(ActionType.BUILD_ROAD, 3L)
-        assertEquals(listOf(BuildKind.ROAD), shownKinds(false, listOf(road), null))
-        assertEquals(emptyList<BuildKind>(), shownKinds(true, emptyList(), null))
-        assertEquals(listOf(BuildKind.ROAD, BuildKind.TOWN), shownKinds(false, listOf(road), BuildKind.TOWN))
+        assertEquals(null, plateTap(BuildKind.ROAD, emptyList(), null), "an engraved plate does nothing")
+        assertEquals(Pick.Mode(BuildKind.ROAD), plateTap(BuildKind.ROAD, listOf(road), null))
+        assertEquals(Pick.Mode(null), plateTap(BuildKind.ROAD, listOf(road), BuildKind.ROAD), "a second tap lets go")
+        val card = Action.of(ActionType.BUY_DEVELOPMENT_CARD, 0L)
+        assertEquals(Pick.Now(card), plateTap(BuildKind.FORTUNE, listOf(card), null))
+        val guild = improve(wgbg.engine.Track.TRADE, 0)
+        assertEquals(Pick.Ask(listOf(guild)), plateTap(BuildKind.GUILDS, listOf(guild), null))
+        val capitals = listOf(improve(wgbg.engine.Track.TRADE, 5), improve(wgbg.engine.Track.TRADE, 9))
+        assertTrue(plateTap(BuildKind.GUILDS, capitals, null) is Pick.Hint)
+        assertTrue(BuildKind.GUILDS.offers(guild) && !BuildKind.ACADEMY.offers(guild))
     }
 }

@@ -26,6 +26,11 @@ unless another path is given.
   Fabric Ledger cards, 0.3.4, #86): short narrow scrolls with cut sheets on a scrivener's desk, and dyed red and indigo
   cloth over a drying pole above the dye vats, painted in the cards' style so the two no longer look alike in the hand
   (Mauro's picks "Narrow A" and "Option 2", 2026-10-21).
+- Player cameos (`cameo_*.webp`, 0.3.5): painted miniature portraits in style B (Mauro's pick, 2026-10-21), the
+  French queens and six for anyone (fox, owl, stag, sloop, lighthouse, navigator), cut from the picked grids. The
+  English queens, Japanese emperors and old trades: new artwork made for Mauro with ChatGPT image generation, directed
+  and reviewed by Codex (2026-10-21; original oil-miniature interpretations, no real paintings or photographs copied),
+  approved by Mauro and cut 1:1 from the grids.
 
 ## Art: generated with OpenAI Codex for Mauro DiBenedetto
 
@@ -52,6 +57,10 @@ unless another path is given.
 - V3 3D tiles (`t3d_*`), Settings › Tiles › 3D (preview): original Blender models built by OpenAI Codex and rendered on
   Mauro's PC, 8 tilt steps, imported by `tools/import_tiles3d.py`. The Pirate buildings' flat view was re-rendered
   (it was turned 180 degrees).
+- Build row and tap-menu art (`plate_*_on/off`, `btn_check*`, `btn_x*`, `icon_supply`, `icon_promote`, `clasp_*`, 0.3.5): our own brass plates (raised when you can build, engraved when you can't), enamelled check and X, the knight menu's Supply and Promote icons and the setup screen's box clasp, made with OpenAI Codex built-in image generation (round 3, 2026-10-22), imported by `tools/import_buildrow.py`.
+- Clasp box name picker (`claspbox_*`, 0.3.5): the hasp's swing, the box, its dropping front, the list panel and its rows, from the storyboard Mauro approved, made with OpenAI Codex built-in image generation (2026-10-22), imported at native size by `tools/import_buildrow.py`.
+- Turn plates (`icon_roll_on/off`, `icon_end_turn_on/off`, `icon_menu_on/off`, 0.3.5): the Roll dice, the End turn hourglass and the Menu's three bars on brass plates, lit when you can press them and engraved when you can't. Codex, our own, 2026-10-22 (OpenAI Codex built-in image generation, for the player reports), imported by `tools/import_buildrow.py`.
+- Landmark card (`card_fortune_landmark`, 0.3.5): the lighthouse on its headland, a new picture for the Landmark Fortune card. Codex, our own, 2026-10-22 (OpenAI Codex built-in image generation, for the player reports), imported by `tools/import_ledger_cards.py`.
 
 ## Art: made with Claude Code for Mauro DiBenedetto
 

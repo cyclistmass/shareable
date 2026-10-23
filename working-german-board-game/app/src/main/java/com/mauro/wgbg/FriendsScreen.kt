@@ -49,7 +49,7 @@ fun FriendsScreen(
     Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("friends"), contentAlignment = Alignment.Center) {
         Column(Modifier.width(420.dp).padding(vertical = 10.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Quick game with friends", style = Wood.title(24.sp, Wood.BRASS_INK))
+            Text("Quick game with friends", style = Wood.title(24.sp))
             Text(if (friends.isEmpty()) "Nobody here yet: people you play online with while signed in show up here."
                 else "Pick up to $QUICK_PICKS. They see your invite on their start screen.",
                 style = Wood.sans(13.sp, color = Wood.INK_MUTED))

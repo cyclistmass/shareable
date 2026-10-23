@@ -107,6 +107,7 @@ class TurnTracker(private val names: List<String>) {
         }
         // #26: a No from a player who couldn't pay says why in the turn's history (the offer is gone after the move).
         val lacked = if (action.type == ActionType.REJECT_TRADE && wgbg.engine.Rules.cantPayOffer(s, who)) shortfallText(s, who) else null
+        val defenders = s.chivalry?.defenderVp?.copyOf()
         applyFn()
         val heldAfter = holdings(s)
         noteHits(s, owner, who, action, held, heldAfter, phaseBefore)
@@ -170,6 +171,8 @@ class TurnTracker(private val names: List<String>) {
             })
             else -> r.plus("$n ${describe(action.type)}")
         }
+        // The knights beat the Raiders: the top defender's card, by name (Mauro, 0.3.5); it was only a silent point.
+        s.chivalry?.defenderVp?.forEachIndexed { p, v -> if (defenders != null && v > defenders[p]) current = current!!.plus("${names[p]} won the $DEFENDER: 1 point") }
     }
 
     /**

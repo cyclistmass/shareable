@@ -33,14 +33,15 @@ find_re() {
 tap() { [ $# -ge 2 ] || return 1; "$ADB" shell input tap "$1" "$2" </dev/null; sleep 0.8; }   # no coordinates (nothing found): fail, so `|| fail` runs
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 fail() { echo "COLOURS FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
-# Find a regex on screen, scrolling the panel under x=$2 (the left one by default) a little at a time, as a player would.
+# Find a regex on screen, scrolling the panel under x=$2 (the left one by default, at its left edge) a little at a time, as a player would.
 reach() {
-  local x="${2:-$((W / 4))}" xy d
+  local x="${2:-}" xy d
   # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
   for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)
     system_anr "$d" && { sleep 1; d=$(dump); }   # a system dialog (an ANR, Live Caption) over the panel hides what we look for
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
+    [ -n "${2:-}" ] || x=$(ui_scroll_x "$d" $((W / 4)))   # off the clasps
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
   done
@@ -84,12 +85,12 @@ new_game() {
   fail "no game-start screen"
 }
 
-# A seat's colour button reads "You: Red ▾" or "Seat 3: Purple ▾".
+# A seat's colour button reads "You: Red" or "Seat 3: Purple", with the box clasp beside it (0.3.5).
 who() { [ "$1" = 0 ] && echo "You" || echo "Seat $(( $1 + 1 ))"; }
-expect_colour() { reach "$(who "$1"): $2 ▾" >/dev/null || fail "$(who "$1") isn't $2"; }
+expect_colour() { reach "$(who "$1"): $2" >/dev/null || fail "$(who "$1") isn't $2"; }
 # Opens seat $1's picker and taps colour $2 (its row may say who it swaps with, or what it looks like).
 pick() {
-  local xy; xy=$(reach "$(who "$1"): [A-Za-z?]* ▾") || fail "no colour button for $(who "$1")"
+  local xy; xy=$(reach "$(who "$1"): [A-Za-z?]*") || fail "no colour button for $(who "$1")"
   tap $xy; sleep 0.6
   grep -q "text=\"\(Your colour\|Seat $(( $1 + 1 ))'s colour\)\"" <<< "$(dump)" || fail "$(who "$1")'s colour picker didn't open"
   [ -n "${3:-}" ] && shot "$3"
@@ -102,8 +103,8 @@ colour_names() { dump | grep -o 'text="\(Red\|Blue\|Purple\|White\|Yellow\|Orang
 play() {
   local xy; "$ADB" logcat -c
   xy=$(reach 'Play' $((W * 3 / 4))) || fail "no Play"; tap $xy
-  for _ in $(seq 1 60); do "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' && break; sleep 1; done
-  "$ADB" logcat -d -s WGBG-TURN:I | grep -q 'phase=' || fail "the game never started"
+  for _ in $(seq 1 60); do grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" && break; sleep 1; done
+  grep -q 'phase=' <<< "$("$ADB" logcat -d -s WGBG-TURN:I)" || fail "the game never started"
   sleep 6
 }
 

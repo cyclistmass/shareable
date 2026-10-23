@@ -98,3 +98,40 @@ class DiceDeck(
         }
     }
 }
+
+/**
+ * Dice thrown in a fixed order, for tests and debug runs only (#55): [rolls] in turn, then [then]; running out with
+ * nothing after it is an error, so a scripted game never silently goes random. A roll scripted without an event face
+ * (event -1) leaves the event die to the engine's seeded RNG when played through [DiceRoll.toAction].
+ * Never offered to players: their dice are [TrueRandomDice] or a [DiceDeck], whose fairness is tested.
+ */
+class ScriptedDice(rolls: List<DiceRoll>, private val then: DiceSource? = null) : DiceSource {
+    private val queue = ArrayDeque(rolls)
+
+    /** Scripted rolls not thrown yet. */
+    val left get() = queue.size
+
+    override fun next(withEvent: Boolean): DiceRoll {
+        val r = queue.removeFirstOrNull() ?: return then?.next(withEvent) ?: error("the scripted dice ran out")
+        return if (withEvent || r.event < 0) r else r.copy(event = -1)
+    }
+
+    companion object {
+        /**
+         * Rolls written "d1,d2" or "d1,d2,event" (event face 0..5), separated by spaces: "6,6 3,4 1,2,5". The form
+         * a debug launch extra or a scenario file would carry.
+         */
+        fun parse(text: String): List<DiceRoll> = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.map { t ->
+            val n = t.split(",").map { it.trim().toIntOrNull() ?: throw IllegalArgumentException("bad roll '$t'") }
+            require(n.size in 2..3 && n[0] in 1..6 && n[1] in 1..6 && (n.size == 2 || n[2] in 0..5)) { "bad roll '$t'" }
+            DiceRoll(n[0], n[1], n.getOrElse(2) { -1 })
+        }
+
+        /** A roll of [sum] (2..12), split as evenly as the faces allow. */
+        fun sum(sum: Int, event: Int = -1): DiceRoll {
+            require(sum in 2..12) { "no roll of $sum" }
+            val d1 = (sum + 1) / 2
+            return DiceRoll(minOf(d1, 6), sum - minOf(d1, 6), event)
+        }
+    }
+}

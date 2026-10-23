@@ -115,9 +115,6 @@ fun shortfallText(s: GameState, p: Int): String {
     return short.indices.filter { short[it] > 0 }.joinToString(", ") { "${short[it]} ${ALL_CARD_NAMES[it]}" }
 }
 
-/** How long an offer you can't pay waits before it is declined for you, seconds (Mauro: 5). */
-const val AUTO_NO_SECONDS = 5
-
 /**
  * The open offer seen from [me]'s side: (what I get, what I give). For the offerer that is the
  * offer itself; for anyone else it is mirrored.
@@ -261,7 +258,7 @@ fun TradePanel(
     androidx.compose.runtime.LaunchedEffect(s.turn) { afterTrade = null }
 
     if (mode == TradeMode.CLOSED) {
-        Text(status(s, me, mode, names, false, false), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+        Text(status(s, me, mode, names, false, false, autoNo = autoNoSeconds), color = INK, fontSize = 13.sp, fontWeight = FontWeight.Bold,
             modifier = modifier.chest().testTag("trade-panel").semantics { testTagsAsResourceId = true })
         return
     }
@@ -275,7 +272,7 @@ fun TradePanel(
                 // Everyone's answer to your offer, up here beside the tabs: a row at the bottom ran off the
                 // chest on a landscape phone.
                 if (!bankTab && s.currentPlayer == me) for (p in 0 until s.numPlayers) if (p != me) {
-                    val mark = responses[p] ?: if (mode == TradeMode.WAITING && s.actingPlayer == p) "…" else ""
+                    val mark = answerMark(responses[p], mode == TradeMode.WAITING && s.actingPlayer == p)
                     // A long name ends in "…" and the answer mark always shows: three 16-letter names ran off the chest (0.3.4).
                     val ink = when (mark) { "✓" -> Color(0xFF8BD18B); "✗" -> Color(0xFFE57373); "⇄" -> COUNTER; else -> INK.copy(alpha = 0.7f) }
                     Row(Modifier.testTag("answer-$p"), verticalAlignment = Alignment.CenterVertically) {
@@ -285,7 +282,7 @@ fun TradePanel(
                     }
                 }
             }
-            Text(status(s, me, mode, names, countering, bankTab, pick), color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            Text(status(s, me, mode, names, countering, bankTab, pick, autoNoSeconds), color = INK, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                 maxLines = 1, modifier = Modifier.width(214.dp))
             afterTrade?.let { Text(it, color = Color(0xFF8BD18B), fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("trade-after")) }
             if (editing) Text(if (bankTab) "Top: cards you want · bottom: pay a lot for each" else "Tap top to ask · bottom to offer · either alone is fine",
@@ -348,12 +345,16 @@ internal fun tradeButtonLabels(mode: TradeMode, countering: Boolean, bank: Boole
     else -> "Yes" to "No"
 }
 
-private fun status(s: GameState, me: Int, mode: TradeMode, names: List<String>, countering: Boolean, bank: Boolean, pick: Int = -1): String = when {
+internal fun status(s: GameState, me: Int, mode: TradeMode, names: List<String>, countering: Boolean, bank: Boolean, pick: Int = -1,
+    autoNo: Int? = null): String = when {
     bank -> "Trade with the bank"
     countering -> "Your counter to ${names[s.currentPlayer]}"
     mode == TradeMode.COMPOSE -> "Offer the other players"
     mode == TradeMode.RESPOND && isOpenAsk(s) ->
         if (termsFor(s, me).first.sum() == 0) "${names[s.currentPlayer]} asks: Counter with your price" else "${names[s.currentPlayer]} offers: Counter with what you want"
+    // Mauro's report (2026-10-22): a 7's steal took the card the offer asked for and the offer vanished; say why.
+    mode == TradeMode.RESPOND && Rules.cantPayOffer(s, me) ->
+        "You can't pay ${names[s.currentPlayer]}: you need ${shortfallText(s, me)}" + (autoNo?.let { " · No in $it" } ?: "")
     mode == TradeMode.RESPOND -> "${names[s.currentPlayer]} offers you a trade"
     mode == TradeMode.PICK_PARTNER && pick >= 0 -> "${names[pick]} ${if (s.counterOf(pick) != null) "countered" else "said yes"} · Trade or Cancel"
     mode == TradeMode.PICK_PARTNER -> "Pick who to trade with"
@@ -369,6 +370,12 @@ private fun Tab(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp).testTag("tab-$label"),
     ) { Text(label, color = if (selected) WOOD_DARK else INK, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
 }
+
+/**
+ * The mark after a player's name beside the trade tabs: their answer (✓ yes, ✗ no, ⇄ countered), ⌛ while they're
+ * still [answering], else nothing. Never "…": after a name it read as a name cut short (Mauro's pick, 0.3.5).
+ */
+internal fun answerMark(answer: String?, answering: Boolean): String = answer ?: if (answering) "⌛" else ""
 
 /** What a tap on a trade card does (#49). */
 enum class CardTap { ASK, OFFER, TAKE_BACK }

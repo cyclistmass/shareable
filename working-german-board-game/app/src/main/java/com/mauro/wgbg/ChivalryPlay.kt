@@ -13,6 +13,9 @@ import wgbg.engine.Track
 /** Improvement tracks / progress decks by engine track index: Guilds (trade), Crown (politics), Academy (science). */
 val DECK_NAMES = listOf("Guilds", "Crown", "Academy")
 
+/** The Raiders' reward card: 1 point for the one player whose knights did most to beat them (Mauro, 0.3.5). */
+const val DEFENDER = "Defender of the Realm"
+
 /** Progress cards in engine order, with our own names (never the original game's). */
 val PROGRESS_NAMES = listOf(
     // Academy
@@ -29,30 +32,30 @@ val PROGRESS_HINTS = listOf(
     "Before you roll: choose what the two number dice show.",
     "Improve a town upgrade (Guilds, Academy or Crown) for one commodity less.",
     "Build Ramparts on one of your towns for free.",
-    "Swap the numbers on two tiles (not 2, 12, 6 or 8).",
-    "Take 2 Grain for every Grainfield next to your homesteads and towns.",
+    "Two tiles trade numbers; 2, 12, 6 and 8 never move.",
+    "Each Grainfield touching your homesteads or towns pays you 2 Grain.",
     "Turn a homestead into a town for 2 Stone and 1 Grain.",
-    "Take 2 Stone for every Quarry next to your homesteads and towns.",
+    "Each Quarry touching your homesteads or towns pays you 2 Stone.",
     "Worth 1 point; played at once.",
     "Build 2 roads for free.",
-    "Promote up to 2 of your knights for free.",
+    "Up to 2 of your knights go up a strength, free.",
     // Guilds
     "Offer each other player a resource; each must give you a commodity back.",
-    "Look at the hand of a player with more points and take 2 cards.",
-    "Put the merchant on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.",
+    "Pick a player ahead of you on points: see their hand and take 2 cards.",
+    "Put the Trader on a tile next to you: trade its resource 2 for 1, and hold 1 point while it's yours.",
     "This turn, trade one card type with the bank 2 for 1.",
-    "Name a resource: every other player gives you up to 2 of it.",
-    "Name a commodity: every other player gives you 1 of it.",
+    "Name a resource: each other player hands you 2 of it, or all they have.",
+    "Name a commodity: each other player hands you 1 of it, if they have one.",
     // Crown
     "Move the bandit and take a random card from each player on that tile.",
     "Worth 1 point; played at once.",
-    "A player removes one of their knights; you place one of the same strength.",
-    "Remove an open road. If it's yours, place it again at once.",
+    "A player takes one of their knights off; you may set down one of yours of that strength.",
+    "Lift any road with a loose end; if it was yours, you may lay it again.",
     "Knock an enemy knight off one of your roads.",
-    "Every player with as many points as you or more discards half their cards.",
+    "Everyone level with you on points or ahead throws away half their cards.",
     "Look at a player's progress cards and take one.",
     "Supply all your knights for free.",
-    "Every player with more points than you gives you 2 cards.",
+    "Everyone ahead of you on points hands you 2 cards of their choosing.",
 )
 
 /** What a progress card's choice points at on the board: a corner, an edge or a tile; null if it isn't a board spot. */

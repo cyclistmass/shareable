@@ -149,11 +149,20 @@ internal fun connectionLabel(reconnecting: Boolean, pending: Int, stuck: Boolean
 }
 
 /**
- * Each seat's colour in [room], in seat order: the host's, or for a seat without one (a room from before 0.3.4, a name
- * this version doesn't know) the first default colour nobody has, as a local game picks them.
+ * Each seat's colour in [room], in seat order: the host's, or for a seat without one (a name this version doesn't know)
+ * the first default colour nobody has, as a local game picks them. A room from before 0.3.4 has no colours and keeps
+ * the ones its game started with ([before034Colours]), as an old local save does.
  */
 internal fun roomSeatColours(room: Room): List<SeatColour> =
-    SeatColour.resolve(room.seats.indices.map { SeatColour.of(room.colours.getOrNull(it)) }, room.seats.map { true }).map { it!! }
+    if (room.colours.isEmpty()) before034Colours(room.seats.size)
+    else SeatColour.resolve(room.seats.indices.map { SeatColour.of(room.colours.getOrNull(it)) }, room.seats.map { true }).map { it!! }
+
+/**
+ * The colours of [n] seats in a room from before 0.3.4: Red, Blue, Orange, White in turn ([LocalSave.BEFORE_034]),
+ * then the first free defaults. The new defaults would turn its Orange player Purple on the updated phone only.
+ */
+internal fun before034Colours(n: Int): List<SeatColour> =
+    SeatColour.resolve(List(n) { LocalSave.BEFORE_034.getOrNull(it) }, List(n) { true }).map { it!! }
 
 /**
  * Who plays which engine player in an online room (seats are frozen once it starts). Active seats map to
@@ -165,9 +174,11 @@ class OnlineSeats(room: Room, uid: String) {
     val isHost: Boolean = room.host == uid
     val config: wgbg.engine.GameConfig = room.config.copy(numPlayers = players.size)
     val seed: Long = room.seed
-    /** Colours by engine player: the host's for each seat (0.3.4); a room without them plays the default ones in turn. */
-    val colours: List<SeatColour> =
-        if (room.colours.isEmpty()) players.indices.map { SeatColour.DEFAULT[it] } else roomSeatColours(room).let { c -> players.map { c[it] } }
+    /**
+     * Colours by engine player: each seat's ([roomSeatColours]: the host's, or the pre-0.3.4 ones in a room without
+     * them), so the game shows the colours the lobby did and every phone derives the same ones from the same doc.
+     */
+    val colours: List<SeatColour> = roomSeatColours(room).let { c -> players.map { c[it] } }
     /**
      * Names by engine player; your own seat shows the name you typed (Mauro: it said "You" instead of my name). A bot
      * goes by the host's theme name (0.3.4), or its colour: never its level, which only took room (Mauro), and never a
@@ -193,7 +204,7 @@ class OnlineSeats(room: Room, uid: String) {
 @Composable
 fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: String) -> Unit, onBack: () -> Unit,
                    modifier: Modifier = Modifier, initialCode: String = "") {
-    var typed by remember { mutableStateOf(initialCode) }
+    var typed by remember { mutableStateOf(Lobby.typedCode(initialCode)) }
     var me by remember { mutableStateOf(if (onlineName(name)) name else "") }
     val code = Lobby.normalizeCode(typed)
     androidx.compose.foundation.layout.Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("join"), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -201,13 +212,14 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
             Modifier.width(380.dp).brassEdgedWood().padding(18.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
         ) {
-            Text("Join a room", style = Wood.title(26.sp, Wood.BRASS_INK))
+            Text("Join a room", style = Wood.title(26.sp))
             Text("Your name", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
             ParchmentField(me, { me = it.take(16) }, "join-name")
             Text("Room code", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
-            ParchmentField(typed, { typed = it.take(12) }, "join-code", androidx.compose.ui.text.input.KeyboardCapitalization.Characters)
+            ParchmentField(typed, { typed = Lobby.typedCode(it) }, "join-code", androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                RoomCodeDash)
             Text(when {
-                typed.isBlank() -> "The host reads it out or shares the link: like ROVER-42"
+                typed.isBlank() -> "The host reads it out or shares the link: like ROVER-427"
                 code == null -> "That doesn't look like a room code"
                 else -> "Room $code"
             }, style = Wood.sans(13.sp, color = if (typed.isNotBlank() && code == null) Wood.WAITING else Wood.INK_MUTED), modifier = Modifier.testTag("join-hint"))
@@ -217,5 +229,19 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
                     Modifier.weight(1f).height(44.dp)) { onJoin(code!!, me.trim()) }
             }
         }
+    }
+}
+
+/** Draws the room code's dash while you type (REEF604 shows REEF-604); the box itself keeps only letters and digits. */
+internal object RoomCodeDash : androidx.compose.ui.text.input.VisualTransformation {
+    override fun filter(text: androidx.compose.ui.text.AnnotatedString): androidx.compose.ui.text.input.TransformedText {
+        val raw = text.text
+        val at = Lobby.codeDashAt(raw)
+        if (at < 0) return androidx.compose.ui.text.input.TransformedText(text, androidx.compose.ui.text.input.OffsetMapping.Identity)
+        val shown = androidx.compose.ui.text.AnnotatedString(raw.substring(0, at) + "-" + raw.substring(at))
+        return androidx.compose.ui.text.input.TransformedText(shown, object : androidx.compose.ui.text.input.OffsetMapping {
+            override fun originalToTransformed(offset: Int) = if (offset >= at) offset + 1 else offset
+            override fun transformedToOriginal(offset: Int) = (if (offset > at) offset - 1 else offset).coerceIn(0, raw.length)
+        })
     }
 }

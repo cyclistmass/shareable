@@ -319,3 +319,32 @@ test('every real write of a full rematch fits the rules budget with room to spar
     await assertSucceeds(updateDoc(doc(as('host',true),'games/old'),{next:'re'}));
   } finally { await e.cleanup(); }
 });
+// The app's own writes (app-writes.json, recorded by the app's AppWritesTest through its real code paths): every one is
+// allowed, under the real rules and again with 20 spare terms on each write, so the 1000-expression budget has room.
+const appWrites = JSON.parse(readFileSync('app-writes.json','utf8'));
+const fromFixture = v => Array.isArray(v) ? v.map(fromFixture) : v && typeof v === 'object'
+  ? ('$serverTime' in v ? serverTimestamp() : '$inDays' in v ? inDays(v.$inDays) : '$millis' in v ? Timestamp.fromMillis(v.$millis)
+    : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fromFixture(x)]))) : v;
+async function replayAppWrites(rules, projectId) {
+  const e = await initializeTestEnvironment({projectId,firestore:{rules,host:'127.0.0.1',port:Number((process.env.FIRESTORE_EMULATOR_HOST||'').split(':')[1]||8080)}});
+  try {
+    await e.clearFirestore();
+    for (const s of appWrites) {
+      const f = (s.google ? e.authenticatedContext(s.uid,{firebase:{sign_in_provider:'google.com',identities:{'google.com':['g-'+s.uid]}}}) : e.authenticatedContext(s.uid)).firestore();
+      const data = fromFixture(s.data);
+      try { await assertSucceeds(s.write === 'set' ? setDoc(doc(f, s.path), data) : updateDoc(doc(f, s.path), data)); }
+      catch (err) { throw new Error(`app write refused at "${s.step}" (${s.path}): ${err.message}`); }
+    }
+  } finally { await e.cleanup(); }
+}
+test('the app\'s real writes over a friends game and its rematch are all allowed', async () => {
+  assert.ok(appWrites.length >= 15, 'app-writes.json looks truncated');
+  await replayAppWrites(readFileSync('../../firestore.rules','utf8'), 'demo-wgbg-app');
+});
+test('the app\'s real writes still fit the rules budget with 20 terms to spare', async () => {
+  const pad = ' && ' + Array(20).fill('request.time != null').join(' && ');
+  const rules = readFileSync('../../firestore.rules','utf8').replace('createOk(request.resource.data);',`createOk(request.resource.data)${pad};`)
+    .replace('updateOk(resource.data, request.resource.data);',`updateOk(resource.data, request.resource.data)${pad};`);
+  assert.equal((rules.match(/request\.time != null/g)||[]).length, 40);
+  await replayAppWrites(rules, 'demo-wgbg-app-margin');
+});

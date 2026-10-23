@@ -187,4 +187,22 @@ class EnvSettingsTest {
         assertEquals(0L, botPauseAfter(wgbg.engine.ActionType.REJECT_TRADE, 2, 5f))
         assertEquals(1000L, botPauseAfter(wgbg.engine.ActionType.REJECT_TRADE, 2, 2f, personOffered = true), "#114: answers to your offer take the half beat")
     }
+
+    @Test
+    fun `the automatic No for offers you can't pay starts at 5 s, persists, and refuses odd values`() {
+        val store = MapStore()
+        assertEquals(5, EnvSettings(store).autoNoSeconds)
+        EnvSettings(store).autoNoSeconds = 0
+        assertEquals(0, EnvSettings(store).autoNoSeconds, "Off survives a restart")
+        EnvSettings(store).autoNoSeconds = 20
+        assertEquals(20, EnvSettings(store).autoNoSeconds)
+        EnvSettings(store).autoNoSeconds = 7
+        assertEquals(EnvSettings.AUTO_NO_DEFAULT, EnvSettings(store).autoNoSeconds, "not a choice: back to the default")
+        for (bad in listOf(Float.NaN, -3f, 13f, Float.POSITIVE_INFINITY)) {
+            store.map[EnvSettings.AUTO_NO] = bad
+            assertEquals(EnvSettings.AUTO_NO_DEFAULT, EnvSettings(store).autoNoSeconds, "stored $bad")
+        }
+        EnvSettings(store).apply { autoNoSeconds = 10; reset() }
+        assertEquals(EnvSettings.AUTO_NO_DEFAULT, EnvSettings(store).autoNoSeconds)
+    }
 }

@@ -6,18 +6,20 @@
 # 0.3.2 cut off the game-start screen's Points, Report and Intro and the start menu's Settings (with a saved game) at
 # 320 dp tall, and squashed the in-game Report's Send and Close; none of them scrolled.
 # A taller device is switched to CI's screen (320x640 at 160 dpi) for the run and put back after.
-# Usage: tools/ci_reach.sh [end]   (the app installed on $ANDROID_SERIAL or the only device)
+# Usage: tools/ci_reach.sh [end [base|chivalry]]   (the app installed on $ANDROID_SERIAL or the only device)
 set -uo pipefail
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 MODE="${1:-screens}"
+RULES="${2:-chivalry}"   # end: the finished game's ruleset; only Age of Chivalry's histogram has the event die
 export MSYS_NO_PATHCONV=1
 fail=0
 
 . "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-on() { grep -q "text=\"$1\"" <<< "$(dump)"; }
+# By text or content description: Roll, End turn and Menu are icons since 0.3.5, named only by their description.
+on() { grep -q "\(text\|content-desc\)=\"$1\"" <<< "$(dump)"; }
 # The failure's screen, screen read and log land in the working dir (or $OUT), like the other CI scripts: CI uploads
 # *.png, *.xml and *.logcat.txt from there. Numbered, so a second failure doesn't overwrite the first.
 nbad=0
@@ -41,7 +43,7 @@ MIN=$(( 10 * DENSITY / 160 ))
 
 # Shown in full on screen: the label's text inside the screen and not cut to a sliver. $2 is a dump to read instead of a new one.
 fits() { [ -n "$1" ] && echo "$1" | awk -v w=$W -v h=$H -v m=$MIN '{ exit !($1 >= 0 && $2 >= 0 && $3 <= w && $4 <= h && $4 - $2 >= m) }'; }
-shown() { fits "$(echo "${2:-$(dump)}" | grep "text=\"$1\"" | bounds)"; }
+shown() { fits "$(echo "${2:-$(dump)}" | grep "\(text\|content-desc\)=\"$1\"" | bounds)"; }
 # Scrolls each scrollable panel on the screen (as the app reports them) to its top, then down to its end, until the
 # label is shown in full.
 reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$now" && return 0
@@ -61,7 +63,7 @@ reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$no
 all() { local where=$1 l n=0 x; shift; x=${DUMP:-$(dump)}
   for l in "$@"; do { shown "$l" "$x" || reach "$l"; } && n=$((n + 1)) || bad "$where: \"$l\" can't be reached by scrolling"; done
   echo "reach: $where: $n of $# reached (${SECONDS} s)"; }
-tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
+tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
 # The Leave dialog: "Leave for now" keeps a saved game, "Leave" when there's nothing to keep.
 leave() { on "Leave for now" && { tap "Leave for now"; return; }; on "Leave" && tap "Leave"; }
 # Taps a button and checks the screen it opens (marked by $2); stops the run if it didn't, since what follows is moot.
@@ -87,7 +89,8 @@ if [ "$MODE" = screens ]; then
   go "Look &amp; art" "Done"; all "Look & art" "Done" "Card guide"; tap "Done"
   # Online needs a real name: type one (the name box is the screen's first text box, at the left panel's top).
   box() { fits "$(dump | grep 'class="android.widget.EditText"' | head -1 | bounds)"; }
-  box || for _ in 1 2 3; do "$ADB" shell input swipe $((W / 4)) $((H / 4)) $((W / 4)) $((H * 3 / 4)) 200; sleep 0.4; box && break; done
+  sx=$(ui_scroll_x "$(dump)" $((W / 4)))   # off the colour clasps, which a downward pull opens
+  box || for _ in 1 2 3; do "$ADB" shell input swipe $sx $((H / 4)) $sx $((H * 3 / 4)) 200; sleep 0.4; box && break; done
   box || bad "game-start: the name box can't be reached"
   xy=$(dump | grep 'class="android.widget.EditText"' | head -1 | centre); "$ADB" shell input tap $xy; sleep 1
   "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in 1 2 3 4 5 6 7 8; do "$ADB" shell input keyevent KEYCODE_DEL; done
@@ -108,7 +111,7 @@ if [ "$MODE" = screens ]; then
   for _ in 1 2 3 4 5; do on "Resume game" && break; "$ADB" shell input keyevent KEYCODE_BACK; sleep 2; leave; done
   all "start menu with a saved game" "Resume game" "End saved game" "New game" "Settings" "ⓘ  About and credits"
 else
-  # Game over and the dice histogram (with the event die, its tallest form) on a game played to its end. The dice row only
+  # Game over and the dice histogram (in Age of Chivalry with the event die, its tallest form) on a game played to its end. The dice row only
   # shows once someone has rolled.
   for _ in $(seq 1 20); do on "See the board" && break; sleep 3; done
   all "game over" "Play again" "See the board" "Exit"
@@ -125,10 +128,12 @@ else
   x=""
   for gap in 0.12 0.06 0.2; do
     [ -n "$xy" ] && "$ADB" shell "input tap $xy & sleep $gap; input tap $xy; wait"; sleep 1.5
-    x=$(dump); grep -q 'text="Event die"' <<< "$x" && break
+    x=$(dump); grep -q 'resource-id="dice-histogram"' <<< "$x" && break
   done
-  grep -q 'text="Event die"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
-  DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
+  # Opened is its tag, not "Event die": a base game's histogram has no event die (0.3.5-pre2 nightly, end-base).
+  grep -q 'resource-id="dice-histogram"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
+  if [ "$RULES" = chivalry ]; then DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
+  else DUMP=$x all "dice histogram" "The line on each bar is what fair dice would give."; fi
 fi
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || bad "the app crashed"

@@ -42,6 +42,11 @@ ui_centre() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | t
 ui_still() { local a b; a=$(ui_dump); case "$a" in *"<hierarchy screen="*) ;; *) printf '%s\n' "$a"; return 0;; esac
   for _ in 1 2 3; do sleep 0.25; b=$(ui_dump); [ "$a" = "$b" ] && break; a=$b; done; printf '%s\n' "$a"; }
 at() { local m; m=$(ui_still | grep "\(text\|content-desc\)=\"$1\""); { echo "$m" | grep 'clickable="true"'; echo "$m"; } | ui_centre; }
+# Where to swipe to scroll the first scrolling panel: just inside its left edge, on the left ends of its rows and away from
+# their clasps (a downward pull on a clasp opens its picker; at 640x320 a quarter of the way across lands on one). [$1] a
+# dump, [$2] the x to fall back on when nothing scrolls.
+ui_scroll_x() { local l; l=$(grep -o 'scrollable="true"[^/]*bounds="\[[0-9]*' <<< "$1" | head -1 | grep -o '[0-9]*$')
+  if [ -n "$l" ]; then echo $((l + 8)); else echo "$2"; fi; }
 ui_say() { declare -F say >/dev/null && say "$@"; return 0; }
 tap_text() { local xy; xy=$(at "$1"); [ -n "$xy" ] || return 1; ui_say "tap '$1' at $xy"; ui_adb shell input tap $xy; sleep "${UI_TAP_WAIT:-0.8}"; }
 tap_id() { local xy; xy=$(ui_still | grep "resource-id=\"$1\"" | ui_centre); [ -n "$xy" ] || return 1; ui_say "tap #$1 at $xy"; ui_adb shell input tap $xy; sleep "${UI_TAP_WAIT:-0.8}"; }
