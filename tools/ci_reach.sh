@@ -88,7 +88,8 @@ if [ "$MODE" = screens ]; then
   go "Look &amp; art" "Done"; all "Look & art" "Done" "Card guide"; tap "Done"
   # Online needs a real name: type one (the name box is the screen's first text box, at the left panel's top).
   box() { fits "$(dump | grep 'class="android.widget.EditText"' | head -1 | bounds)"; }
-  box || for _ in 1 2 3; do "$ADB" shell input swipe $((W / 4)) $((H / 4)) $((W / 4)) $((H * 3 / 4)) 200; sleep 0.4; box && break; done
+  sx=$(ui_scroll_x "$(dump)" $((W / 4)))   # off the colour clasps, which a downward pull opens
+  box || for _ in 1 2 3; do "$ADB" shell input swipe $sx $((H / 4)) $sx $((H * 3 / 4)) 200; sleep 0.4; box && break; done
   box || bad "game-start: the name box can't be reached"
   xy=$(dump | grep 'class="android.widget.EditText"' | head -1 | centre); "$ADB" shell input tap $xy; sleep 1
   "$ADB" shell input keyevent KEYCODE_MOVE_END; for _ in 1 2 3 4 5 6 7 8; do "$ADB" shell input keyevent KEYCODE_DEL; done

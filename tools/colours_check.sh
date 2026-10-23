@@ -33,14 +33,15 @@ find_re() {
 tap() { [ $# -ge 2 ] || return 1; "$ADB" shell input tap "$1" "$2" </dev/null; sleep 0.8; }   # no coordinates (nothing found): fail, so `|| fail` runs
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 fail() { echo "COLOURS FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
-# Find a regex on screen, scrolling the panel under x=$2 (the left one by default) a little at a time, as a player would.
+# Find a regex on screen, scrolling the panel under x=$2 (the left one by default, at its left edge) a little at a time, as a player would.
 reach() {
-  local x="${2:-$((W / 4))}" xy d
+  local x="${2:-}" xy d
   # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
   for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)
     system_anr "$d" && { sleep 1; d=$(dump); }   # a system dialog (an ANR, Live Caption) over the panel hides what we look for
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
+    [ -n "${2:-}" ] || x=$(ui_scroll_x "$d" $((W / 4)))   # off the clasps
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
   done

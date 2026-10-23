@@ -259,8 +259,10 @@ fun HumanControls(
                 else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
                 else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
             }
-            // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro).
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro). Where
+            // the build menu down the right edge reaches the corner (a short phone), they sit left of it.
+            val clear = buildMenuReaches(s.chivalry != null, androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp, TURN_PLATE)
+            Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
                 // Roll and End turn share one plate (0.3.5 reports): the dice until you roll, then the hourglass. The rules
                 // never offer both at once.

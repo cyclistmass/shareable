@@ -37,6 +37,9 @@ fun claspFrame(pull: Float): Int = (pull.coerceIn(0f, 1f) * (CLASP_FRAMES.size -
 fun claspOpens(pull: Float): Boolean = claspFrame(pull) == CLASP_FRAMES.size - 1
 
 /** The clasp, [pull] of the way open. */
+/** How much of a clasped element's right end a pull must start on: the clasp, and a finger's width around it. */
+val CLASP_GRIP: Dp = 40.dp
+
 @Composable
 fun Clasp(pull: Float, modifier: Modifier = Modifier, size: Dp = 18.dp) {
     Image(painterResource(CLASP_FRAMES[claspFrame(pull)]), null, modifier.size(size))
@@ -44,15 +47,18 @@ fun Clasp(pull: Float, modifier: Modifier = Modifier, size: Dp = 18.dp) {
 
 /**
  * A downward pull on this element swings the clasp ([pull], 0 to 1) and opens the picker ([onOpen]) when let go fully
- * open. Only a downward pull is the clasp's: an upward one, or a tap, goes on to the screen's scroll and the click as before.
+ * open. Only a downward pull that starts on the clasp, the last [grip] of the element, is the clasp's: one anywhere else,
+ * an upward one, or a tap goes on to the screen's scroll and the click as before (on a 320 dp tall phone, scrolling the
+ * setup over a colour button opened its picker: CI, 0.3.5-pre2).
  */
-fun Modifier.claspPull(pull: MutableFloatState, onOpen: () -> Unit): Modifier = composed {
+fun Modifier.claspPull(pull: MutableFloatState, onOpen: () -> Unit, grip: Dp = CLASP_GRIP): Modifier = composed {
     // The pull recomposes the picker (a new onOpen each time); keyed on Unit so that doesn't restart the gesture.
     val open by rememberUpdatedState(onOpen)
     pointerInput(Unit) {
         val reach = CLASP_REACH.toPx()
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            if (down.position.x < size.width - grip.toPx()) return@awaitEachGesture
             val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over -> if (over > 0f) change.consume() } ?: return@awaitEachGesture
             pull.floatValue = 0f
             verticalDrag(start.id) { change ->

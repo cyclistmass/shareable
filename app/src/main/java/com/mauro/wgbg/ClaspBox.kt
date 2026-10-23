@@ -96,6 +96,9 @@ fun claspBoxFront(t: Float): Int? = if (t < CLASPBOX_FRONT_MS[0]) null else CLAS
 
 // Where things sit, in the art's own pixels (timeline.json's assembly, slices.json).
 private const val ART_W = 384f
+
+/** Where on the box, as a share of its width, a pull must start to open it: the hasp, with a little room before it. */
+fun claspBoxGripFrom(): Float = (HASP_X - 24f) / ART_W
 private const val BOX_H = 96f
 private const val HASP_X = 280f           // the keeper and hasp: their 128 px canvas at 0.75, at the box's right end
 private const val HASP_SIZE = 96f
@@ -158,11 +161,12 @@ fun ClaspBox(
         Box(
             Modifier.size(widthDp, boxH)
                 .pointerInput(Unit) {
-                    // A downward pull on the shut box opens it with the finger: past CLASPBOX_PULL_MS it finishes on its own.
+                    // A downward pull on the shut box's hasp opens it with the finger: past CLASPBOX_PULL_MS it finishes on its
+                    // own. A pull on the rest of the box is the screen's scroll (on a small phone the box fills the panel).
                     val reach = CLASP_REACH.toPx()
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        if (isOpen) return@awaitEachGesture
+                        if (isOpen || down.position.x < size.width * claspBoxGripFrom()) return@awaitEachGesture
                         val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over -> if (over > 0f) change.consume() }
                             ?: return@awaitEachGesture
                         var pull = 0f

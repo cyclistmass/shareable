@@ -117,7 +117,7 @@ fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifi
  */
 @Composable
 fun ArtPlateButton(on: Int, off: Int, label: String, tag: String, modifier: Modifier = Modifier, enabled: Boolean = true,
-                   size: androidx.compose.ui.unit.Dp = 60.dp, onClick: () -> Unit) {
+                   size: androidx.compose.ui.unit.Dp = TURN_PLATE, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(if (enabled) on else off), null,
@@ -125,6 +125,9 @@ fun ArtPlateButton(on: Int, off: Int, label: String, tag: String, modifier: Modi
             .graphicsLayer { val k = if (pressed) 0.94f else 1f; scaleX = k; scaleY = k }
             .clickable(interactionSource = src, indication = null, enabled = enabled, role = Role.Button, onClick = onClick))
 }
+
+/** The Roll / End turn plate's size. */
+val TURN_PLATE = 60.dp
 
 /** The game's Menu button: shut, the three bars' plate (0.3.5 reports); its other words (Hide, Settings) stay words. */
 @Composable

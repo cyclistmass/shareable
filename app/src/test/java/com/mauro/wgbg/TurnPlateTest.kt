@@ -10,6 +10,7 @@ import wgbg.engine.ActionType
 import wgbg.engine.Expansion
 import wgbg.engine.GameConfig
 import wgbg.engine.Rules
+import androidx.compose.ui.unit.dp
 import java.io.File
 
 /**
@@ -35,6 +36,17 @@ class TurnPlateTest {
         // The plate carries its name for the screen reader and the scripts' dump.
         val plate = src("BrassPlate.kt").substringAfter("fun ArtPlateButton(").substringBefore("\n}\n")
         assertTrue("contentDescription = label" in plate && ".testTag(tag)" in plate, plate)
+    }
+
+    @Test
+    fun `on a short phone the turn plate moves out from under the build menu, and only there`() {
+        println("build menu: chivalry ${buildMenuHeight(true)}, base ${buildMenuHeight(false)}")
+        // CI's 640x320 at density 160: the Age of Chivalry menu ran over the Roll plate and touchplay stuck at the roll.
+        assertTrue(buildMenuReaches(true, 320.dp, TURN_PLATE))
+        assertFalse(buildMenuReaches(false, 320.dp, TURN_PLATE), "base's four plates stop well above it")
+        // A Pixel 6 held sideways (411 dp): the plate stays in the corner, as Mauro saw it.
+        assertFalse(buildMenuReaches(true, 411.dp, TURN_PLATE))
+        assertTrue("Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
     }
 
     @Test

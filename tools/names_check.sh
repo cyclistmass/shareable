@@ -31,14 +31,15 @@ find_re() {
 tap() { [ $# -ge 2 ] || return 1; "$ADB" shell input tap "$1" "$2" </dev/null; sleep 0.8; }   # no coordinates (nothing found): fail, so `|| fail` runs
 shot() { "$ADB" exec-out screencap -p > "$OUT/$TAG-$1.png"; }
 fail() { echo "NAMES $TAG FAILED: $1"; shot fail; "$ADB" logcat -d -b crash | grep -A30 "FATAL EXCEPTION" | head -40; exit 1; }
-# Find a regex on screen, scrolling the panel under x=$2 (the left one by default) a little at a time, as a player would.
+# Find a regex on screen, scrolling the panel under x=$2 (the left one by default, at its left edge) a little at a time, as a player would.
 reach() {
-  local x="${2:-$((W / 4))}" xy d
+  local x="${2:-}" xy d
   # Down 4 swipes, then up 9: back past the start: a fling on Android 14 goes less far than on 16, and 4 up missed Seat 2 there.
   for i in $(seq 0 13); do
     d=$(dump); [ -n "$d" ] || d=$(dump)   # no dump (a busy device) says nothing about the screen: look again first
     system_anr "$d" && { sleep 1; d=$(dump); }   # a system dialog (an ANR, Live Caption) over the panel hides what we look for
     xy=$(find_re "$1" "$d"); [ -n "$xy" ] && { echo "$xy"; return 0; }
+    [ -n "${2:-}" ] || x=$(ui_scroll_x "$d" $((W / 4)))   # off the clasps
     if [ "$i" -lt 4 ]; then "$ADB" shell input swipe "$x" $((H * 3 / 4)) "$x" $((H / 3)) 400; else "$ADB" shell input swipe "$x" $((H / 3)) "$x" $((H * 3 / 4)) 400; fi
     sleep 0.6
   done
@@ -95,7 +96,7 @@ for k in "${!PICKS[@]}"; do
   # A seat's name is a clasp box (0.3.5), tagged seat-<index>-name; tapped, it opens to a panel of the theme's names.
   below() { dump | grep "resource-id=\"seat-$((seat - 1))-name\"" | ui_centre; }
   reach "Seat $seat" >/dev/null || fail "no Seat $seat"
-  xy=$(below); [ -n "$xy" ] || { "$ADB" shell input swipe $((W / 4)) $((H * 2 / 3)) $((W / 4)) $((H / 3)) 400; sleep 0.6; xy=$(below); }
+  xy=$(below); [ -n "$xy" ] || { sx=$(ui_scroll_x "$(dump)" $((W / 4))); "$ADB" shell input swipe $sx $((H * 2 / 3)) $sx $((H / 3)) 400; sleep 0.6; xy=$(below); }
   [ -n "$xy" ] || fail "seat $seat's name button isn't on screen"
   tap $xy
   # The box takes 0.6-0.72 s to open; its names can be tapped once the panel has settled.

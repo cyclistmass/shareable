@@ -1801,7 +1801,7 @@ fun WatchGameScreen(
                     is Pick.Ask -> { pending = pick.moves; pendingAt = null }
                     is Pick.Hint -> tapHint = pick.text
                 }
-            }, modifier = Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = if (env.viewBars) 156.dp else 8.dp))
+            }, modifier = Modifier.align(Alignment.TopEnd).padding(top = BUILD_MENU_TOP, end = if (env.viewBars) 156.dp else 8.dp))
         // The tapped object's menu, centred right above it (Mauro: "the menu right above the knight").
         tapMenu?.let { hit ->
             val density = LocalDensity.current

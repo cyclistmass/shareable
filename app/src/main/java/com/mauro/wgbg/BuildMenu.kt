@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import wgbg.engine.Action
 import wgbg.engine.ActionKind
@@ -55,6 +56,19 @@ val BUILD_PLATE = 30.dp
  * (0.3.5, replacing "only avail options should show": one fixed column, so a plate never jumps about).
  */
 fun shownKinds(chivalry: Boolean): List<BuildKind> = BuildKind.forRuleset(chivalry)
+
+/** How far down the screen the build menu starts (MainActivity places it under the Menu button). */
+val BUILD_MENU_TOP = 60.dp
+
+/** The build menu's height: a plate per kind 3 dp apart, and under each track's plate its level dots (1 + 7 dp). */
+fun buildMenuHeight(chivalry: Boolean): Dp = shownKinds(chivalry).let { ks ->
+    BUILD_PLATE * ks.size + 3.dp * (ks.size - 1) + 8.dp * ks.count { it.track >= 0 } }
+
+/**
+ * Whether the build menu down the right edge reaches a [buttonH] tall button in the bottom-right corner of a screen
+ * [screenH] tall. On a 320 dp phone (CI's 640x320) the Age of Chivalry menu runs over the Roll plate (0.3.5-pre2).
+ */
+fun buildMenuReaches(chivalry: Boolean, screenH: Dp, buttonH: Dp): Boolean = BUILD_MENU_TOP + buildMenuHeight(chivalry) > screenH - buttonH
 
 /** The legal moves the board should offer while [mode] is picked (all of them when nothing is). */
 fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { mode.offers(it) }

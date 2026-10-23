@@ -21,6 +21,17 @@ class ClaspTest {
     }
 
     @Test
+    fun `only a pull on the clasp opens it, so scrolling over a box or button doesn't`() {
+        // The hasp starts at 280 of the box's 384; the grip begins a little before it and well right of the middle.
+        assertTrue(claspBoxGripFrom() in 0.6f..(280f / 384f), "grip from ${claspBoxGripFrom()}")
+        assertTrue(CLASP_GRIP.value in 30f..56f, "the colour button's clasp end, a finger wide")
+        val clasp = java.io.File("src/main/java/com/mauro/wgbg/Clasp.kt").readText()
+        assertTrue("if (down.position.x < size.width - grip.toPx()) return@awaitEachGesture" in clasp)
+        val box = java.io.File("src/main/java/com/mauro/wgbg/ClaspBox.kt").readText()
+        assertTrue("down.position.x < size.width * claspBoxGripFrom()" in box)
+    }
+
+    @Test
     fun `the clasp box follows the approved timeline`() {
         assertEquals(0, claspBoxHasp(0f)); assertEquals(1, claspBoxHasp(32f)); assertEquals(7, claspBoxHasp(600f))
         assertEquals(null, claspBoxFront(219f)); assertEquals(0, claspBoxFront(220f)); assertEquals(5, claspBoxFront(600f))
