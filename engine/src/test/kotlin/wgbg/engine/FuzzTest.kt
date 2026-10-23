@@ -50,7 +50,7 @@ class FuzzTest {
         println("fuzz: $wins wins, $draws draws, $actions actions")
         println("action mix: " + ActionType.entries.joinToString { "${it.name}=${types[it.ordinal]}" })
         coverage.print()
-        assertEquals(2000, wins + draws)
+        assertEquals(2000 * testScale, wins + draws)
         assertTrue(wins > 1000, "random games should mostly finish")
         // Every action type must have been exercised.
         for (t in ActionType.entries) assertTrue(types[t.ordinal] > 0, "$t never played")
