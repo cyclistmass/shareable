@@ -204,7 +204,7 @@ class OnlineSeats(room: Room, uid: String) {
 @Composable
 fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: String) -> Unit, onBack: () -> Unit,
                    modifier: Modifier = Modifier, initialCode: String = "") {
-    var typed by remember { mutableStateOf(initialCode) }
+    var typed by remember { mutableStateOf(Lobby.typedCode(initialCode)) }
     var me by remember { mutableStateOf(if (onlineName(name)) name else "") }
     val code = Lobby.normalizeCode(typed)
     androidx.compose.foundation.layout.Box(modifier.fillMaxSize().tableTop().displayCutoutPadding().testTag("join"), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -216,9 +216,10 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
             Text("Your name", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
             ParchmentField(me, { me = it.take(16) }, "join-name")
             Text("Room code", style = Wood.sans(13.sp, color = Wood.INK_MUTED))
-            ParchmentField(typed, { typed = it.take(12) }, "join-code", androidx.compose.ui.text.input.KeyboardCapitalization.Characters)
+            ParchmentField(typed, { typed = Lobby.typedCode(it) }, "join-code", androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                RoomCodeDash)
             Text(when {
-                typed.isBlank() -> "The host reads it out or shares the link: like ROVER-42"
+                typed.isBlank() -> "The host reads it out or shares the link: like ROVER-427"
                 code == null -> "That doesn't look like a room code"
                 else -> "Room $code"
             }, style = Wood.sans(13.sp, color = if (typed.isNotBlank() && code == null) Wood.WAITING else Wood.INK_MUTED), modifier = Modifier.testTag("join-hint"))
@@ -228,5 +229,19 @@ fun JoinRoomScreen(name: String, busy: Boolean, onJoin: (code: String, name: Str
                     Modifier.weight(1f).height(44.dp)) { onJoin(code!!, me.trim()) }
             }
         }
+    }
+}
+
+/** Draws the room code's dash while you type (REEF604 shows REEF-604); the box itself keeps only letters and digits. */
+internal object RoomCodeDash : androidx.compose.ui.text.input.VisualTransformation {
+    override fun filter(text: androidx.compose.ui.text.AnnotatedString): androidx.compose.ui.text.input.TransformedText {
+        val raw = text.text
+        val at = Lobby.codeDashAt(raw)
+        if (at < 0) return androidx.compose.ui.text.input.TransformedText(text, androidx.compose.ui.text.input.OffsetMapping.Identity)
+        val shown = androidx.compose.ui.text.AnnotatedString(raw.substring(0, at) + "-" + raw.substring(at))
+        return androidx.compose.ui.text.input.TransformedText(shown, object : androidx.compose.ui.text.input.OffsetMapping {
+            override fun originalToTransformed(offset: Int) = if (offset >= at) offset + 1 else offset
+            override fun transformedToOriginal(offset: Int) = (if (offset > at) offset - 1 else offset).coerceIn(0, raw.length)
+        })
     }
 }

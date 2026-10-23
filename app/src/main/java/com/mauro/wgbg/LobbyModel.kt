@@ -114,6 +114,19 @@ data class Lobby(
             return "${m.groupValues[1]}-${m.groupValues[2]}".takeIf(::isValidCode)
         }
 
+        /** What the code box keeps as you type (Mauro's report 2026-10-22): capitals and digits only; the dash is drawn for you. */
+        fun typedCode(typed: String): String = typed.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }.take(10)
+
+        /**
+         * Where the code box draws its dash in [raw] (from [typedCode]): between the word and the number, or after a
+         * whole code word before any digit ("REEF" shows "REEF-"). -1 for none.
+         */
+        fun codeDashAt(raw: String): Int {
+            val word = raw.takeWhile { it in 'A'..'Z' }
+            if (word.isEmpty()) return -1
+            return if (word.length < raw.length || word in CODE_WORDS) word.length else -1
+        }
+
         fun isValidCode(code: String) = CODE_REGEX.matchEntire(code)?.let { it.groupValues[1] in CODE_WORDS } ?: false
 
         /** A fresh room from the game-start settings: you in seat 0, chosen bots reserved, friend seats open (Greedy fills). */

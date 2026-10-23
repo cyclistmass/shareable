@@ -459,10 +459,12 @@ internal fun Modifier.backPutsKeyboardAway(): Modifier {
 /** A one-line parchment text box with a brass edge (name, room code). */
 @Composable
 internal fun ParchmentField(value: String, onChange: (String) -> Unit, tag: String,
-                            caps: KeyboardCapitalization = KeyboardCapitalization.Words) {
+                            caps: KeyboardCapitalization = KeyboardCapitalization.Words,
+                            shown: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None) {
     BasicTextField(
         value = value,
         onValueChange = onChange,
+        visualTransformation = shown,
         singleLine = true,
         textStyle = Wood.sans(15.sp, FontWeight.SemiBold, Wood.PARCHMENT_INK),
         cursorBrush = SolidColor(Wood.PARCHMENT_INK),
