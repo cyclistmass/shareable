@@ -1217,7 +1217,8 @@ fun WatchGameScreen(
         if (offerKey == null) return@LaunchedEffect
         hostView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
         if (!Rules.cantPayOffer(state, me)) { sounds.tradeChime(sound.soundVolume); return@LaunchedEffect }
-        for (left in AUTO_NO_SECONDS downTo 1) { autoNo = left; delay(1000) }
+        if (env.autoNoSeconds == 0) return@LaunchedEffect       // Off: the panel says why; the No is theirs to tap
+        for (left in env.autoNoSeconds downTo 1) { autoNo = left; delay(1000) }
         autoNo = null
         // #26: the turn history says why; the No is checked against the rules like a tap, ignored if the offer moved on.
         humanMoves.trySend(Action.REJECT_TRADE)
