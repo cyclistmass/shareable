@@ -21,6 +21,13 @@ class BuildMenuTest {
     }
 
     @Test
+    fun `every board plate says what to tap while it's picked, and only those plates do`() {
+        for (k in BuildKind.entries) assertEquals(k.onBoard, k.boardHint != null, "${k.label}: ${k.boardHint}")
+        assertTrue(BuildKind.RAMPARTS.boardHint!!.contains("Town"))
+        assertTrue(BuildKind.entries.all { it.boardHint?.startsWith("Tap a glowing") ?: true })
+    }
+
+    @Test
     fun `a picked entry narrows the board to its moves only, and nothing picked offers everything`() {
         val s = Rules.newGame(GameConfig(numPlayers = 4), 9)
         val bots = List(4) { GreedyBot(it.toLong()) }

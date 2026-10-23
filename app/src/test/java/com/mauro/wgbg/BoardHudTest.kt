@@ -103,6 +103,24 @@ class BoardHudTest {
     }
 
     @Test
+    fun `a tap on a card you can't play says what it does as well as why not`() {
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 3)
+        val me = s.currentPlayer; val other = (me + 1) % s.config.numPlayers
+        val c = wgbg.engine.Progress.SABOTEUR
+        val off = progressTapText(s, other, c, now = false)
+        assertTrue(off.startsWith("${PROGRESS_NAMES[c]}: ${progressHint(c)}"), off)
+        assertTrue(off.endsWith("Can't play it now (only on your turn)."), off)
+        assertEquals("${PROGRESS_NAMES[c]}: ${progressHint(c)}", progressTapText(s, me, c, now = true))
+        for (i in PROGRESS_HINTS.indices) assertTrue(progressHint(i).isNotBlank(), "card $i has a hint")
+
+        val base = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 1)
+        val k = wgbg.engine.DevCard.KNIGHT
+        assertEquals("${FORTUNE[k]}: ${FORTUNE_HINTS[k]} Only on your turn.", fortuneTapText(base, (base.currentPlayer + 1) % 4, k))
+        val vp = wgbg.engine.DevCard.VICTORY_POINT
+        assertEquals("${FORTUNE[vp]}: ${FORTUNE_HINTS[vp]}", fortuneTapText(base, base.currentPlayer, vp))
+    }
+
+    @Test
     fun `a knight's corner glows round its base, an empty corner gets the usual dot (#118)`() {
         val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 2)
         s.chivalry!!.knightOwner[7] = 1
