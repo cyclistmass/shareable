@@ -61,7 +61,13 @@ object Splash {
         return url.startsWith("https://ko-fi.com/") && name.isNotEmpty() && name.all { it.isLetterOrDigit() || it == '_' || it == '-' }
     }
 
-    enum class Action { RESUME_GAME, RESUME_ROOM, NEW_GAME, FRIENDS, LOG_IN, SETTINGS }
+    /**
+     * The account line's words while there is no account to show: Firebase still starting, or it failed to start on this
+     * phone (Mauro, 0.3.4: no Log in anywhere and nobody could join, until he reinstalled; it used to just vanish).
+     */
+    fun onlineNote(started: Boolean): String = if (!started) "Getting online…" else "Online is off on this phone. Retry, or reinstall the app if it stays off."
+
+    enum class Action { RESUME_GAME, RESUME_ROOM, NEW_GAME, FRIENDS, SETTINGS }
 
     /** One main button: what it does, its label and whether it is the green go plate. */
     data class Button(val action: Action, val label: String, val go: Boolean, val tag: String)
@@ -69,15 +75,14 @@ object Splash {
     /**
      * The main buttons, top to bottom. Resume shows only for a saved local game ([localGame]) or an online room you
      * left for now ([room]); the first Resume is the green one, and New game is green when there is nothing to
-     * resume. Log in shows only when the build can sign in ([canSignIn]), and reads Account once you are signed in.
+     * resume. Signing in and out is the account line at the top of the menu (0.3.5), not a button here.
      * Quick game with friends shows once you have someone to play with ([friends], signed in only, #72).
      */
-    fun buttons(localGame: Boolean, room: String?, canSignIn: Boolean, signedIn: Boolean = false, friends: Boolean = false): List<Button> = buildList {
+    fun buttons(localGame: Boolean, room: String?, signedIn: Boolean = false, friends: Boolean = false): List<Button> = buildList {
         if (localGame) add(Button(Action.RESUME_GAME, "Resume game", go = true, tag = "resume-game"))
         if (room != null) add(Button(Action.RESUME_ROOM, "Resume online game $room", go = !localGame, tag = "resume-room"))
         add(Button(Action.NEW_GAME, "New game", go = isEmpty(), tag = "new-game-open"))
         if (friends && signedIn) add(Button(Action.FRIENDS, "Quick game with friends", go = false, tag = "quick-friends"))
-        if (canSignIn) add(Button(Action.LOG_IN, if (signedIn) "Account" else "Log in", go = false, tag = "log-in"))
         add(Button(Action.SETTINGS, "Settings", go = false, tag = "splash-settings"))
     }
 
@@ -133,20 +138,26 @@ fun SplashScreen(
     onJoinInvite: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
-    // Sign-in needs Firebase and a Google client id; builds without them have no Log in button (as AccountSection).
-    // Set up off the main thread (#111): the menu draws at once and Log in appears when Firebase is ready. A #72 sim's
-    // fake Google seat (debug, emulators only) has no client id but must still reach friends and invites.
-    val account by androidx.compose.runtime.produceState<FirestoreTransport?>(null) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            runCatching { LobbyRepository.create(context) as? FirestoreTransport }.getOrNull()?.takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }
+    // Sign-in needs Firebase and a Google client id. Set up off the main thread (#111): the menu draws at once and the
+    // account line fills in when Firebase is ready. A #72 sim's fake Google seat (debug, emulators only) has no client id
+    // but must still reach friends and invites. If it fails, the line says so and offers Retry ([onlineTry]) instead of
+    // the sign-in quietly vanishing (0.3.4); the reason goes to the log for a bug report.
+    var onlineTry by remember { mutableIntStateOf(0) }
+    val online by androidx.compose.runtime.produceState<Pair<Boolean, FirestoreTransport?>>(false to null, onlineTry) {
+        value = false to null
+        value = true to kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { LobbyRepository.create(context) as? FirestoreTransport }
+                .onFailure { android.util.Log.w("wgbg", "online didn't start", it) }
+                .getOrNull()?.takeIf { it.fakeGoogle || GoogleAccount.webClientId(context) != null }
         }
     }
+    val account = online.second
     // Rooms you hosted that are past their expiry go now (#72): in the background, never in the menu's way.
     androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { LobbyRepository.cleanExpiredOnce(context) } }
     var panel by remember { mutableStateOf<Splash.Action?>(null) }
     var about by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }
-    // Re-read who is signed in each time the Log in panel closes.
+    // Re-read who is signed in after each sign-in or sign-out on the account line.
     var accountSeen by remember { mutableIntStateOf(0) }
     val signedIn = remember(accountSeen, account) { account?.let { GoogleAccount.status(it.account).signedIn } ?: false }
     // Signed in with Google (#72): the people you played with, and the rooms that invite you while this screen is up.
@@ -174,14 +185,21 @@ fun SplashScreen(
                     Text(Splash.inviteLine(r), style = Wood.sans(14.sp, FontWeight.Bold), modifier = Modifier.weight(1f))
                     GoButton("Join", "join-invite", true, Modifier.height(40.dp)) { onJoinInvite(r.id) }
                 }
-                for (b in Splash.buttons(resumeGame, resumeRoom, account != null, signedIn, friends.isNotEmpty())) {
+                // Who you are online, with Sign in with Google or Sign out right there (Mauro, 0.3.5: "a login/out choice on
+                // the front page"); while Firebase starts, or if it can't, a line saying so (and Retry).
+                if (account != null) AccountSection(compact = true, onChanged = { accountSeen++ })
+                else Row(Modifier.fillMaxWidth().testTag("online-note"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(Splash.onlineNote(online.first), style = Wood.sans(12.sp, color = Wood.INK_SOFT), modifier = Modifier.weight(1f))
+                    if (online.first) WoodButton("Retry", "online-retry", Modifier.height(36.dp)) { onlineTry++ }
+                }
+                for (b in Splash.buttons(resumeGame, resumeRoom, signedIn, friends.isNotEmpty())) {
                     val tap = {
                         when (b.action) {
                             Splash.Action.RESUME_GAME -> onResumeGame()
                             Splash.Action.RESUME_ROOM -> onResumeRoom()
                             Splash.Action.NEW_GAME -> onNewGame()
                             Splash.Action.FRIENDS -> onFriends(friends)
-                            Splash.Action.LOG_IN, Splash.Action.SETTINGS -> panel = b.action
+                            Splash.Action.SETTINGS -> panel = b.action
                         }
                     }
                     if (b.go) GoButton(b.label, b.tag, true, Modifier.fillMaxWidth().height(48.dp)) { tap() }
@@ -211,7 +229,7 @@ fun SplashScreen(
                     Modifier.clickable(remember { MutableInteractionSource() }, null) { })
             }
         }
-        panel?.let { open ->
+        panel?.let { _ ->
             val close = { panel = null; accountSeen++ }
             BackHandler { close() }
             // A tap on the sea around the panel closes it, like the in-game gear.
@@ -220,15 +238,7 @@ fun SplashScreen(
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxHeight().padding(vertical = 10.dp).clickable(remember { MutableInteractionSource() }, null) { }) {
                     WoodButton("Close", "splash-panel-close") { close() }
-                    if (open == Splash.Action.SETTINGS) SettingsPanel(env, sound, Modifier.weight(1f, fill = false))
-                    // Scrolls like Settings when it can't fit (320 dp tall).
-                    else Column(Modifier.weight(1f, fill = false).width(360.dp).brassEdgedWood().verticalScroll(rememberScrollState()).padding(16.dp).testTag("log-in-panel"),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Log in", style = Wood.title(20.sp))
-                        Text("Sign in to keep your online name and rooms on any phone. Playing as a guest works too.",
-                            style = Wood.sans(13.sp, color = Wood.INK_SOFT))
-                        AccountSection()
-                    }
+                    SettingsPanel(env, sound, Modifier.weight(1f, fill = false))
                 }
             }
         }

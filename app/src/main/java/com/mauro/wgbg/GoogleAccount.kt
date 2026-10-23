@@ -118,10 +118,11 @@ object GoogleAccount {
 
 /**
  * Settings' Account rows: who you are online, and Sign in with Google / Sign out (#83). Hidden without Firebase.
- * [compact]: one line for the start screen (Mauro: "sign in should be on landing page").
+ * [compact]: one line for the start screen (Mauro: "sign in should be on landing page"). [onChanged] runs after each
+ * sign-in or sign-out, so the screen around it can re-read who you are.
  */
 @androidx.compose.runtime.Composable
-fun AccountSection(compact: Boolean = false) {
+fun AccountSection(compact: Boolean = false, onChanged: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     // Set up off the main thread: on the game-start screen this ran while the player typed a name, and a slow Firebase
     // start (cold phone, disk busy) held the screen up. The rows appear once it's ready.
@@ -141,7 +142,7 @@ fun AccountSection(compact: Boolean = false) {
             busy = true
             scope.launch {
                 note = runCatching { GoogleAccount.signOut(transport.account) }.fold({ "Signed out: playing as a new guest" }, { "Couldn't sign out (offline?)" })
-                transport.accountChanged(); status = GoogleAccount.status(transport.account); busy = false
+                transport.accountChanged(); status = GoogleAccount.status(transport.account); busy = false; onChanged()
             }
         }
     }
@@ -153,7 +154,7 @@ fun AccountSection(compact: Boolean = false) {
             val (token, early) = GoogleAccount.pick(activity, clientId)
             val outcome = early ?: GoogleAccount.signIn(transport.account, token!!)
             transport.accountChanged(); status = GoogleAccount.status(transport.account)
-            note = GoogleAccount.message(outcome); busy = false
+            note = GoogleAccount.message(outcome); busy = false; onChanged()
         }
     }
     val ink = androidx.compose.ui.graphics.Color(0xFFEDE6D8)
