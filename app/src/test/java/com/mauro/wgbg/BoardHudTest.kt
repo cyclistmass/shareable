@@ -54,7 +54,7 @@ class BoardHudTest {
         val roll = TurnReport(player = 0, turn = 5, die1 = 3, die2 = 4,
             rollIn = listOf(intArrayOf(2, 0, 0, 0, 0), IntArray(5), IntArray(5)),
             rollOut = listOf(IntArray(5), intArrayOf(0, 0, 1, 3, 0), IntArray(5)),
-            steal = Steal(thief = 0, victim = 2, card = 4))
+            steals = listOf(Steal(thief = 0, victim = 2, card = 4)))
         assertEquals(listOf(RollMini(0, 2), RollMini(4, 1)), rollMinis(roll, 0, me = 0))          // the thief sees the card
         assertEquals(listOf(RollMini(2, -1), RollMini(3, -3)), rollMinis(roll, 1, me = 0))       // discards are public
         assertEquals(listOf(RollMini(4, -1)), rollMinis(roll, 2, me = 2))                          // the victim sees it

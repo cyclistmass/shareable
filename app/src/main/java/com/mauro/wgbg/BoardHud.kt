@@ -564,7 +564,7 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
     val out = mutableListOf<RollMini>()
     roll.rollIn.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, n) }
     roll.rollOut.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, -n) }
-    roll.steal?.let { st ->
+    for (st in roll.steals) {
         val seen = me == st.thief || me == st.victim || me < 0
         if (p == st.thief) out += RollMini(if (seen) st.card else -1, 1)
         if (p == st.victim) out += RollMini(if (seen) st.card else -1, -1)
