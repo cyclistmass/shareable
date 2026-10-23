@@ -139,6 +139,15 @@ class EnvSettings(private val store: FloatStore) {
         get() = aiPaceState.floatValue.takeIf { it.isFinite() }?.coerceIn(AI_PACE_MIN, AI_PACE_MAX) ?: AI_PACE_DEFAULT
         set(v) { aiPaceState.floatValue = v.coerceIn(AI_PACE_MIN, AI_PACE_MAX); store.put(AI_PACE, aiPaceState.floatValue) }
 
+    private val autoNoState = mutableFloatStateOf(store.get(AUTO_NO, AUTO_NO_DEFAULT.toFloat()))
+    /**
+     * Seconds before an offer you can't pay is declined for you (#26, Mauro's report 2026-10-22), one of [AUTO_NO_CHOICES];
+     * 0 is Off: it waits for your tap.
+     */
+    var autoNoSeconds: Int
+        get() = autoNoState.floatValue.takeIf { it.isFinite() }?.roundToInt()?.takeIf { it in AUTO_NO_CHOICES } ?: AUTO_NO_DEFAULT
+        set(v) { val c = v.takeIf { it in AUTO_NO_CHOICES } ?: AUTO_NO_DEFAULT; autoNoState.floatValue = c.toFloat(); store.put(AUTO_NO, autoNoState.floatValue) }
+
     private val liveLodState = mutableFloatStateOf(store.get(LIVE_LOD, 0f))
     var liveLod: Int
         get() = liveLodState.floatValue.toInt().coerceIn(0, 1)
@@ -193,7 +202,7 @@ class EnvSettings(private val store: FloatStore) {
     /** Every setting back to its default (saved): scenery, board, look and play. */
     fun reset() {
         for (i in Item.entries) this[i] = DEFAULT; density = DEFAULT; pirateTheme = false; tileEdge = TileEdge.THIN; terrainPalette = TerrainPalette.TODAY; eventDieStyle = 0
-        liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; viewBars = false
+        liveBoard = false; liveLod = 0; facePieces = true; aiPace = AI_PACE_DEFAULT; autoNoSeconds = AUTO_NO_DEFAULT; viewBars = false
         art = ArtChoice(ArtSet.DEFAULT); tiles3d = false; seeThrough = false; bugButton = false
     }
 
@@ -216,6 +225,10 @@ class EnvSettings(private val store: FloatStore) {
         const val LIVE_LOD = "live-board-lod"
         const val FACE_PIECES = "live-face-pieces"
         const val AI_PACE = "ai-pace"
+        const val AUTO_NO = "auto-no"
+        /** Mauro kept 5 s as the default (2026-10-22). */
+        const val AUTO_NO_DEFAULT = 5
+        val AUTO_NO_CHOICES = listOf(0, 5, 10, 20)
         const val AI_PACE_DEFAULT = 1f
         const val AI_PACE_MIN = 1f
         const val AI_PACE_MAX = 5f
@@ -348,6 +361,13 @@ fun SettingsPanel(env: EnvSettings, sound: SoundSettings, modifier: Modifier = M
                     Text("%.1f s".format(env.aiPace), style = Wood.sans(12.sp), modifier = Modifier.width(100.dp))
                     BrassSlider(env.aiPace, { env.aiPace = Math.round(it * 2) / 2f }, "ai-pace", 220.dp,
                         EnvSettings.AI_PACE_MIN..EnvSettings.AI_PACE_MAX, steps = 7)
+                }
+            }
+            Setting("Offers you can't pay", "Declined for you after this long, saying which cards you lack. Off waits for your tap.") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (n in EnvSettings.AUTO_NO_CHOICES)
+                        Choice(if (n == 0) "Off" else "$n s", selected = env.autoNoSeconds == n, tag = "auto-no-$n",
+                            modifier = Modifier.height(36.dp).width(70.dp), size = 13.sp) { env.autoNoSeconds = n }
                 }
             }
             Setting("Report button", "On the game screen: a bug report with a screenshot, in one tap.") {
