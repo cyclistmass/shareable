@@ -40,13 +40,13 @@ scroll() {
 tap_text() {
   local xy i
   for i in $(seq 0 "${2:-4}"); do
-    xy=$(dump | grep -F "text=\"$1\"" | centre)
+    xy=$(dump | grep "\(text\|content-desc\)=\"$1\"" | centre)   # Roll is an icon since 0.3.5, named by its description
     [ -n "$xy" ] && { echo "  tap '$1'"; "$ADB" shell input tap $xy; sleep 1.5; return 0; }
     scroll
   done
   return 1
 }
-on_screen() { grep -qF "text=\"$1\"" <<< "$(dump)"; }
+on_screen() { grep -q "\(text\|content-desc\)=\"$1\"" <<< "$(dump)"; }
 # The players' names, in order: the text in the player list's area (the left 40% of the screen, under the heading),
 # without the counts and the prompts. Both 0.3.3 (no test tags) and later builds lay the list out there.
 names() {
@@ -88,7 +88,7 @@ wait_roll() {
   local end=$((SECONDS + $1)) x
   while [ $SECONDS -lt $end ]; do
     x=$(dump)
-    grep -qF 'text="Roll"' <<< "$x" && return 0
+    grep -q '\(text\|content-desc\)="Roll"' <<< "$x" && return 0
     if grep -qF 'offers you a trade' <<< "$x"; then echo "  a bot offers a trade: No"; tap_text "No" 0; continue; fi
     sleep 1
   done

@@ -92,26 +92,34 @@ xy=$(reach "$(re "$THEME")") || fail "no \"$THEME\" theme"; tap $xy
 shot theme
 for k in "${!PICKS[@]}"; do
   seat=$((k + 2)); name="${PICKS[$k]}"
-  # A seat's name button ("<name> ▾") is the nearest one below its "Seat N" title.
-  below() { local d ty; d=$(dump); ty=$(find_re "Seat $seat" "$d" | cut -d' ' -f2); [ -n "$ty" ] || return 1
-    echo "$d" | grep -o 'text="[^"]* ▾"[^/]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | grep -o 'bounds=.*' | tr -c '0-9\n' ' ' |
-      awk -v ty="$ty" '{y=int(($2+$4)/2); if (y > ty) print int(($1+$3)/2), y}' | sort -n -k2,2 | head -1; }
+  # A seat's name is a clasp box (0.3.5), tagged seat-<index>-name; tapped, it opens to a panel of the theme's names.
+  below() { dump | grep "resource-id=\"seat-$((seat - 1))-name\"" | ui_centre; }
   reach "Seat $seat" >/dev/null || fail "no Seat $seat"
   xy=$(below); [ -n "$xy" ] || { "$ADB" shell input swipe $((W / 4)) $((H * 2 / 3)) $((W / 4)) $((H / 3)) 400; sleep 0.6; xy=$(below); }
   [ -n "$xy" ] || fail "seat $seat's name button isn't on screen"
-  tap $xy; sleep 0.6
-  grep -q "text=\"Seat $seat: $THEME\"" <<< "$(dump)" || fail "seat $seat's picker didn't open"
+  tap $xy
+  # The box takes 0.6-0.72 s to open; its names can be tapped once the panel has settled.
+  for _ in $(seq 1 8); do sleep 0.4; grep -q 'resource-id="seat-name-picker"' <<< "$(dump)" && break; done
+  grep -q 'resource-id="seat-name-picker"' <<< "$(dump)" || fail "seat $seat's picker didn't open"
   [ "$k" = 0 ] && shot picker
-  xy=$(reach "$(re "$name")\\( *(Seat [0-9]: swaps)\\)\\?" $((W / 2))) || fail "no $name in the picker"
-  tap $xy; sleep 0.6
-  grep -q "text=\"$name ▾\"" <<< "$(dump)" || reach "$(re "$name") ▾" >/dev/null || fail "seat $seat didn't take $name"
+  # Only the panel is listed while it's open (it has the focus). Scroll it, inside it: a swipe outside would shut it.
+  xy=; for _ in $(seq 1 8); do
+    d=$(dump); xy=$(find_re "$(re "$name")" "$d"); [ -n "$xy" ] && break
+    read -r px py0 py1 < <(grep 'resource-id="seat-name-picker"' <<< "$d" | grep -o 'bounds=.*' | tr -c '0-9\n' ' ' |
+      awk '{print int(($1+$3)/2), int(($2 + 3 * $4) / 4), int((3 * $2 + $4) / 4)}')
+    [ -n "$px" ] || break
+    "$ADB" shell input swipe "$px" "$py0" "$px" "$py1" 400; sleep 0.6
+  done
+  [ -n "$xy" ] || fail "no $name in the picker"
+  tap $xy; sleep 1.2
+  reach "$(re "$name")" >/dev/null || fail "seat $seat didn't take $name"
 done
 shot picked
 echo "NAMES $TAG: picked ${PICKS[*]}"
 
 # Closed before Play: every change was saved as it was made.
 sleep 1; "$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
-for name in "${PICKS[@]}"; do reach "$(re "$name") ▾" >/dev/null || fail "$name was lost when the app closed before Play"; done
+for name in "${PICKS[@]}"; do reach "$(re "$name")" >/dev/null || fail "$name was lost when the app closed before Play"; done
 xy=$(reach "$(re "$THEME")") || fail "no \"$THEME\" theme after reopening"
 echo "NAMES $TAG: kept after closing the app before Play"
 
@@ -130,7 +138,7 @@ echo "NAMES $TAG: kept in the resumed game"
 
 # 3. Closed again, New game: the last game's names are still picked.
 "$ADB" shell am force-stop $PKG; sleep 1; launch; new_game
-for name in "${PICKS[@]}"; do reach "$(re "$name") ▾" >/dev/null || fail "$name was lost when the app closed"; done
+for name in "${PICKS[@]}"; do reach "$(re "$name")" >/dev/null || fail "$name was lost when the app closed"; done
 echo "NAMES $TAG: New game remembers them after closing the app"
 
 # 4. Monkey on the game-start screen (taps, swipes and the picker), no system keys.

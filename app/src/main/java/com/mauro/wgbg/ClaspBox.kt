@@ -45,6 +45,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,13 +110,14 @@ private const val LABEL_W = 260f
 
 /**
  * A name picker as a clasp box: shows [label]; opens to [rows] (the one at [selected] highlighted), [note] beside each,
- * and [onPick] when one is tapped, then shuts. [tag] is the box's, [panelTag] the open panel's, [rowTag] each row's.
+ * and [onPick] when one is tapped, then shuts. [tag] is the box's, [panelTag] the open panel's (read aloud as
+ * [panelLabel], which also lists it in the scripts' screen dump), [rowTag] each row's.
  */
 @Composable
 fun ClaspBox(
     label: String, rows: List<String>, selected: Int?, onPick: (Int) -> Unit, tag: String, panelTag: String,
-    rowTag: (Int) -> String, modifier: Modifier = Modifier, note: (Int) -> String? = { null }, ink: Color = Wood.INK,
-    maxWidth: Dp = 200.dp,
+    rowTag: (Int) -> String, panelLabel: String, modifier: Modifier = Modifier, note: (Int) -> String? = { null },
+    ink: Color = Wood.INK, maxWidth: Dp = 200.dp,
 ) {
     val hasp = CLASPBOX_HASP_MS.indices.map { ImageBitmap.imageResource(HASP_ART[it]) }
     val front = CLASPBOX_FRONT_MS.indices.map { ImageBitmap.imageResource(FRONT_ART[it]) }
@@ -197,7 +200,8 @@ fun ClaspBox(
                 onDismissRequest = { if (open) swing(false) },
                 properties = PopupProperties(focusable = open),
             ) {
-                Box(Modifier.size(widthDp, with(density) { popupH.toDp() }).testTag(if (open && t >= end) panelTag else "$panelTag-moving")) {
+                Box(Modifier.size(widthDp, with(density) { popupH.toDp() }).semantics { contentDescription = panelLabel }
+                    .testTag(if (open && t >= end) panelTag else "$panelTag-moving")) {
                     Canvas(Modifier.fillMaxSize()) {
                         // The front's frames carry their hinge; the settled panel takes the hinge strip over its top edge.
                         if (settled) {

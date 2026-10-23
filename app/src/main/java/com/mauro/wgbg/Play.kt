@@ -262,8 +262,12 @@ fun HumanControls(
             // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
-                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a -> BrassButton("Roll", "move-Roll", Modifier.width(96.dp).height(54.dp), size = 18.sp, onClick = moveTap { onMove(a) }) }
-                legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a -> IconPlateButton(MoveIcon.END_TURN, "End turn", "move-End turn", caption = "End turn", onClick = moveTap { onMove(a) }) }
+                // Roll and End turn share one plate (0.3.5 reports): the dice until you roll, then the hourglass. The rules
+                // never offer both at once.
+                legal.firstOrNull { it.type == ActionType.ROLL }?.let { a ->
+                    ArtPlateButton(R.drawable.icon_roll_on, R.drawable.icon_roll_off, "Roll", "move-Roll", onClick = moveTap { onMove(a) }) }
+                    ?: legal.firstOrNull { it.type == ActionType.END_TURN }?.let { a ->
+                        ArtPlateButton(R.drawable.icon_end_turn_on, R.drawable.icon_end_turn_off, "End turn", "move-End turn", onClick = moveTap { onMove(a) }) }
             }
         }
     }

@@ -17,7 +17,8 @@ fail=0
 . "$(dirname "$0")/lib/uiread.sh"   # dump, at, tap_text, tap_id: the app's own screen read (0.2 s), uiautomator as the fallback
 bounds() { grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1 | tr -c '0-9\n' ' '; }
 centre() { bounds | awk '{print int(($1+$3)/2), int(($2+$4)/2)}'; }
-on() { grep -q "text=\"$1\"" <<< "$(dump)"; }
+# By text or content description: Roll, End turn and Menu are icons since 0.3.5, named only by their description.
+on() { grep -q "\(text\|content-desc\)=\"$1\"" <<< "$(dump)"; }
 # The failure's screen, screen read and log land in the working dir (or $OUT), like the other CI scripts: CI uploads
 # *.png, *.xml and *.logcat.txt from there. Numbered, so a second failure doesn't overwrite the first.
 nbad=0
@@ -41,7 +42,7 @@ MIN=$(( 10 * DENSITY / 160 ))
 
 # Shown in full on screen: the label's text inside the screen and not cut to a sliver. $2 is a dump to read instead of a new one.
 fits() { [ -n "$1" ] && echo "$1" | awk -v w=$W -v h=$H -v m=$MIN '{ exit !($1 >= 0 && $2 >= 0 && $3 <= w && $4 <= h && $4 - $2 >= m) }'; }
-shown() { fits "$(echo "${2:-$(dump)}" | grep "text=\"$1\"" | bounds)"; }
+shown() { fits "$(echo "${2:-$(dump)}" | grep "\(text\|content-desc\)=\"$1\"" | bounds)"; }
 # Scrolls each scrollable panel on the screen (as the app reports them) to its top, then down to its end, until the
 # label is shown in full.
 reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$now" && return 0
@@ -61,7 +62,7 @@ reach() { local now was p l t r b x y d dir panels; now=$(dump); shown "$1" "$no
 all() { local where=$1 l n=0 x; shift; x=${DUMP:-$(dump)}
   for l in "$@"; do { shown "$l" "$x" || reach "$l"; } && n=$((n + 1)) || bad "$where: \"$l\" can't be reached by scrolling"; done
   echo "reach: $where: $n of $# reached (${SECONDS} s)"; }
-tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "text=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
+tap() { reach "$1" || { bad "\"$1\" can't be reached to tap"; return 1; }; local xy; xy=$(ui_still | grep "\(text\|content-desc\)=\"$1\"" | centre); [ -n "$xy" ] && "$ADB" shell input tap $xy; sleep 1; }
 # The Leave dialog: "Leave for now" keeps a saved game, "Leave" when there's nothing to keep.
 leave() { on "Leave for now" && { tap "Leave for now"; return; }; on "Leave" && tap "Leave"; }
 # Taps a button and checks the screen it opens (marked by $2); stops the run if it didn't, since what follows is moot.

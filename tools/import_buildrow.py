@@ -27,6 +27,10 @@ SIZES.update({b: BUTTON for b in ("btn_check", "btn_check_pressed", "btn_x", "bt
 SIZES.update({"icon_supply": ICON, "icon_promote": ICON})
 CLASPS = ["clasp_closed", "clasp_open_33", "clasp_open_66", "clasp_open"]
 SIZES.update({c: CLASP for c in CLASPS})
+# The turn plates from the 0.3.5 reports (Codex, 2026-10-22): Roll's dice, End turn's hourglass and the Menu's three bars,
+# each lit (on) and engraved (off), the plate drawn in. Cropped to the plate, at the long side they keep.
+REPORT_SRC = Path(r"C:/Users/mauro/wgbg-art/reports-0.3.5/out")
+REPORT = {f"icon_{n}_{s}": 160 for n in ("roll", "end_turn", "menu") for s in ("on", "off")}
 # The clasp box's sprites, by their file in final/claspbox/ and the long side they keep (native, not resized).
 CLASPBOX = {f"hasp_{k:02}": 128 for k in range(8)}
 CLASPBOX.update({f"front_{k:02}": 384 for k in range(6)})
@@ -63,6 +67,9 @@ def main():
     for name, px in SIZES.items():
         if name not in CLASPS and not name.startswith("claspbox_"):
             save(Image.open(SRC / f"{name}.png"), name, px)
+    for name, px in REPORT.items():
+        im = Image.open(REPORT_SRC / f"{name}.png").convert("RGBA")
+        save(im.crop(im.getbbox()), name, px)
     for n, px in CLASPBOX.items():
         im = Image.open(SRC / "claspbox" / f"{n}.png")
         assert max(im.size) == px, f"{n}.png is {im.size}, want {px} on its long side"

@@ -84,12 +84,12 @@ new_game() {
   fail "no game-start screen"
 }
 
-# A seat's colour button reads "You: Red ▾" or "Seat 3: Purple ▾".
+# A seat's colour button reads "You: Red" or "Seat 3: Purple", with the box clasp beside it (0.3.5).
 who() { [ "$1" = 0 ] && echo "You" || echo "Seat $(( $1 + 1 ))"; }
-expect_colour() { reach "$(who "$1"): $2 ▾" >/dev/null || fail "$(who "$1") isn't $2"; }
+expect_colour() { reach "$(who "$1"): $2" >/dev/null || fail "$(who "$1") isn't $2"; }
 # Opens seat $1's picker and taps colour $2 (its row may say who it swaps with, or what it looks like).
 pick() {
-  local xy; xy=$(reach "$(who "$1"): [A-Za-z?]* ▾") || fail "no colour button for $(who "$1")"
+  local xy; xy=$(reach "$(who "$1"): [A-Za-z?]*") || fail "no colour button for $(who "$1")"
   tap $xy; sleep 0.6
   grep -q "text=\"\(Your colour\|Seat $(( $1 + 1 ))'s colour\)\"" <<< "$(dump)" || fail "$(who "$1")'s colour picker didn't open"
   [ -n "${3:-}" ] && shot "$3"

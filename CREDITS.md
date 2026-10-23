@@ -59,6 +59,8 @@ unless another path is given.
   (it was turned 180 degrees).
 - Build row and tap-menu art (`plate_*_on/off`, `btn_check*`, `btn_x*`, `icon_supply`, `icon_promote`, `clasp_*`, 0.3.5): our own brass plates (raised when you can build, engraved when you can't), enamelled check and X, the knight menu's Supply and Promote icons and the setup screen's box clasp, made with OpenAI Codex built-in image generation (round 3, 2026-10-22), imported by `tools/import_buildrow.py`.
 - Clasp box name picker (`claspbox_*`, 0.3.5): the hasp's swing, the box, its dropping front, the list panel and its rows, from the storyboard Mauro approved, made with OpenAI Codex built-in image generation (2026-10-22), imported at native size by `tools/import_buildrow.py`.
+- Turn plates (`icon_roll_on/off`, `icon_end_turn_on/off`, `icon_menu_on/off`, 0.3.5): the Roll dice, the End turn hourglass and the Menu's three bars on brass plates, lit when you can press them and engraved when you can't. Codex, our own, 2026-10-22 (OpenAI Codex built-in image generation, for the player reports), imported by `tools/import_buildrow.py`.
+- Landmark card (`card_fortune_landmark`, 0.3.5): the lighthouse on its headland, a new picture for the Landmark Fortune card. Codex, our own, 2026-10-22 (OpenAI Codex built-in image generation, for the player reports), imported by `tools/import_ledger_cards.py`.
 
 ## Art: made with Claude Code for Mauro DiBenedetto
 

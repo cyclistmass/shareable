@@ -378,7 +378,7 @@ private fun SeatCard(i: Int, seat: SeatSetup, name: String?, ink: androidx.compo
         // The seat's name is a clasp box (0.3.5, Mauro's approved storyboard): it opens to the theme's names.
         if (name != null && seat.kind != SeatKind.EMPTY)
             ClaspBox(name, themeNames, themeNames.indexOf(name).takeIf { it >= 0 }, { onName(themeNames[it]) }, "seat-$i-name",
-                "seat-name-picker", { "seat-name-$it" }, note = nameNote, ink = ink)
+                "seat-name-picker", { "seat-name-$it" }, "Seat ${i + 1}'s names", note = nameNote, ink = ink)
     }
 }
 

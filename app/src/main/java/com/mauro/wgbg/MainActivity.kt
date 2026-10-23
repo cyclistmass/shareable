@@ -1674,7 +1674,7 @@ fun WatchGameScreen(
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 3.dp).testTag("debug-badge"))
         // Look & art has no game Menu (#91), only its Settings to show and hide.
-        BrassButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp).height(40.dp)) {
+        MenuButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp)) {
             // The Menu comes up over a clear board: the roll chart closes (0.3.3 test: it stayed open behind the menu).
             if (settingsOpen || lookAndArt) settingsOpen = !settingsOpen else { panelOpen = !panelOpen; histogramOpen = false }
         }

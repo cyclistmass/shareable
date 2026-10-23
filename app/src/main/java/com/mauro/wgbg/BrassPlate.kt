@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.testTag
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -107,6 +109,28 @@ fun IconPlateButton(icon: MoveIcon, label: String, tag: String, modifier: Modifi
             androidx.compose.ui.graphics.Color(if (lit) 0xFF3A2410 else 0xFFFFF4D8)), maxLines = 1)
       }
     }
+}
+
+/**
+ * A plate drawn whole as art (the 0.3.5 reports, Codex): [on] lit while it can be pressed, [off] engraved while it can't.
+ * [label] is what a screen reader (and the test scripts) call it. It sinks a little while held.
+ */
+@Composable
+fun ArtPlateButton(on: Int, off: Int, label: String, tag: String, modifier: Modifier = Modifier, enabled: Boolean = true,
+                   size: androidx.compose.ui.unit.Dp = 60.dp, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(if (enabled) on else off), null,
+        modifier.size(size).testTag(tag).semantics(mergeDescendants = true) { contentDescription = label }
+            .graphicsLayer { val k = if (pressed) 0.94f else 1f; scaleX = k; scaleY = k }
+            .clickable(interactionSource = src, indication = null, enabled = enabled, role = Role.Button, onClick = onClick))
+}
+
+/** The game's Menu button: shut, the three bars' plate (0.3.5 reports); its other words (Hide, Settings) stay words. */
+@Composable
+fun MenuButton(label: String, tag: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    if (label == "Menu") ArtPlateButton(R.drawable.icon_menu_on, R.drawable.icon_menu_off, label, tag, modifier, size = 44.dp, onClick = onClick)
+    else BrassButton(label, tag, modifier.height(40.dp), onClick = onClick)
 }
 
 /** [icon] drawn in [ink]: the engraving on a plate, or the mark beside a tap-menu line. */
