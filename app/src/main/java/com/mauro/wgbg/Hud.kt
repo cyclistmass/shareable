@@ -77,7 +77,9 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String>, mod
             /** False inside the one left side panel, which draws the frame for both halves. */
             framed: Boolean = true,
             /** A double tap on the dice: open the roll histogram (Mauro). */
-            onDiceDoubleTap: (() -> Unit)? = null) {
+            onDiceDoubleTap: (() -> Unit)? = null,
+            /** The camera cutout's rects (window px): the dice row and the news step right of one level with them (0.3.6). */
+            holes: List<androidx.compose.ui.geometry.Rect> = emptyList()) {
     if (report == null) return
     // Fixed size, so the dice always sit in the same spot. The dice and whose turn it is stay pinned at the top; this
     // turn's news and the earlier turns below scroll, with a brass scroll bar on the right (#65).
@@ -90,7 +92,7 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String>, mod
         val doubleTapNow = androidx.compose.runtime.rememberUpdatedState(onDiceDoubleTap)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             // Named for screen readers (and for tools/ci_reach.sh, which double-taps it for the histogram).
-            modifier = Modifier.testTag("dice-row").semantics { contentDescription = "Dice" }.then(if (onDiceDoubleTap != null) Modifier.pointerInput(Unit) {
+            modifier = Modifier.dodgeHoles(holes).testTag("dice-row").semantics { contentDescription = "Dice" }.then(if (onDiceDoubleTap != null) Modifier.pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = { doubleTapNow.value?.invoke() })   // today's handler, not the first one (#122)
             } else Modifier)) {
             val color = PLAYER_COLORS[report.player]
@@ -106,7 +108,7 @@ fun TurnHud(report: TurnReport?, previous: TurnReport?, names: List<String>, mod
             // No "X's turn" here: that player's row is already highlighted above (Mauro).
         }
         val scroll = androidx.compose.foundation.rememberScrollState()
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxWidth().dodgeHoles(holes)) {
         Column(Modifier.fillMaxSize().padding(end = 22.dp).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         for (line in report.production) Text(line, color = HUD_TEXT, fontSize = 12.sp, maxLines = 2)
         for (line in report.events) Text(line, color = HUD_TEXT.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 2)
