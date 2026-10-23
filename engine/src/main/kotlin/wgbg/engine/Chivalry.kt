@@ -456,13 +456,14 @@ object Chivalry {
         return false
     }
 
-    /** A road with nothing of its owner (road or building) attached at one of its ends. */
+    /** A road with nothing of its owner (road, building or knight) attached at one of its ends. */
     fun isOpenRoad(s: GameState, e: Int): Boolean {
         val q = s.edgeOwner[e]
         if (q < 0) return false
         val b = s.board
+        val knights = s.chivalry!!.knightOwner
         fun openEnd(v: Int): Boolean {
-            if (s.vertexOwner[v] == q) return false
+            if (s.vertexOwner[v] == q || knights[v] == q) return false
             for (i in 0 until 3) {
                 val f = b.vertexEdge[v * 3 + i]
                 if (f >= 0 && f != e && s.edgeOwner[f] == q) return false

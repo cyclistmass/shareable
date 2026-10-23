@@ -179,7 +179,6 @@ You can take commodities from the bank, and trades between players can include t
 
 - A Town lost to the Raiders when you have no Homestead left in your supply is taken off the board.
 - Turncoat can give you a mighty knight without Crown level 3.
-- Envoy decides whether a road is open from roads and buildings only. Knights don't count.
 - Knights supplied by the Marshal can't act that turn, the same as knights you pay to supply.
 - The Hoist is used straight away as an improvement that costs one commodity less.
 - Waterworks, Deep Shafts, Wrecker, Feast and Marshal are only offered when they would do something.
