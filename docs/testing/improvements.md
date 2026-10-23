@@ -85,6 +85,13 @@ move it to **Done** with the commit when it lands.
 - 2026-10-21, Bosun: slow local device runs move to CI shards (the repo is public, so Actions minutes are free):
   friends_sim on two copies of one AVD (tools/ci_friends.sh), ci_layout split three ways, names_check, colours_check;
   :cli:test and the tools' Python tests (25, never run before) join the unit-tests job.
+- 2026-10-21, mauro-1d (Fable's study, Phase A): `ScriptedDice` (engine Dice.kt, tests and debug only); test rolls
+  carry their dice in the move (`T.roll`, `CK.roll`) instead of brute-forcing a seed, and the seed riggers are gone.
+  #55's regression stack (RegressionStackTest, 0.1 s): six fixed games whose scripted dice reach the rare states,
+  pinned by state hash in regression-stack.tsv. Both fuzzers now assert rare states, not just action kinds
+  (Coverage.kt: empty bank, odd hands halved, turn-limit draws, every Raiders outcome). Found: random play never
+  empties a progress deck (0 in 1000 games); only ChivalryRulesTest's stacked deck does. Next (Phase B): `--el seed`
+  and `--es dice` debug extras so ci_trade, ci_withdraw and reach-end run on fixed dice.
 - layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d
 - Local device checks should run the APK CI built (gh run download), not a local build without the Firebase config: names and colours passed on the config-less build and failed on the config'd one (run 39682685361). Catches flavour-only layout changes; 2026-10-21, catan-android-36
 - A lane's Pixel Launcher ANR-ing after hours covers the screen and fails any script; restart the emulator before a local run of names/colours/reach (CI's aosp_atd has no launcher to hang). Saves a misread failure per run; 2026-10-21, catan-android-36

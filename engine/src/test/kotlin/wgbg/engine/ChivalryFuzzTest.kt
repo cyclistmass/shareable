@@ -18,6 +18,7 @@ class ChivalryFuzzTest {
         val cards = IntArray(Progress.COUNT)
         var attacks = 0
         var metropolises = 0
+        val coverage = Coverage("chivalry fuzz")
         val buf = ActionBuffer()
         for (game in 0 until 1000 * testScale) {
             val config = GameConfig(
@@ -40,12 +41,16 @@ class ChivalryFuzzTest {
                     assertEquals(s.stateHash(), s.copy().stateHash())
                 }
                 val before = s.phase
+                val attacks0 = s.chivalry!!.barbarianAttacks
+                val defenders0 = s.chivalry!!.defenderVp.sum()
                 try {
                     Rules.apply(s, a)
                     CK.checkInvariants(s)
                 } catch (e: Throwable) {
                     throw AssertionError("game $game step $steps: $a in $before -> ${s.phase}: ${e.message}", e)
                 }
+                Coverage.base(coverage, game, s, a)
+                raiders(coverage, game, s, s.chivalry!!.barbarianAttacks > attacks0, s.chivalry!!.defenderVp.sum() > defenders0)
                 counts.merge(a.type, 1, Int::plus)
                 phases.merge(s.phase, 1, Int::plus)
                 if (a.type == ChivalryActionType.PLAY_PROGRESS) cards[a.a]++
@@ -61,6 +66,7 @@ class ChivalryFuzzTest {
         println("chivalry action mix: " + allKinds.joinToString { "$it=${counts[it] ?: 0}" })
         println("chivalry phases: " + Phase.entries.joinToString { "$it=${phases[it] ?: 0}" })
         println("chivalry progress plays: " + Progress.NAMES.indices.joinToString { "${Progress.NAMES[it]}=${cards[it]}" })
+        coverage.print()
         assertEquals(1000, wins + draws)
         assertTrue(wins > 400, "random games should often finish")
         val unused = setOf<ActionKind>(
@@ -75,6 +81,23 @@ class ChivalryFuzzTest {
         for (c in 0 until Progress.COUNT) {
             if (!Progress.isVictoryPoint(c)) assertTrue(cards[c] > 0, "${Progress.NAMES[c]} never played")
         }
+        coverage.assertAll()
+    }
+
+    /** The Raiders' outcomes and the other Age of Chivalry corners, after a move ([attacked]: the Raiders just landed). */
+    internal fun raiders(c: Coverage, game: Int, s: GameState, attacked: Boolean, defender: Boolean) {
+        val ch = s.chivalry!!
+        val lost = Integer.bitCount(ch.barbLossMask)
+        val drawing = Integer.bitCount(ch.defenderDrawMask)
+        c.note("the Raiders beaten, one best defender", game, attacked && defender)
+        c.note("the Raiders beaten, tied best defenders", game, attacked && drawing >= 2)
+        c.note("the Raiders win, one player loses a city", game, attacked && lost == 1)
+        c.note("the Raiders win, tied players each lose a city", game, attacked && lost >= 2)
+        val cities = Chivalry.barbarianStrength(s)
+        c.note("the Raiders land before anyone has a city", game, attacked && cities == 0)
+        c.note("the Raiders win, every city a Capital (none to take)", game, attacked && cities > 0 && !defender && drawing == 0 && lost == 0)
+        // A progress deck drawn empty is never reached by random play (0 in 1000 games): the #55 stack plays it.
+        c.note("a commodity ran out in the bank", game, ch.commodityBank.any { it == 0 })
     }
 
     private val building = setOf<ActionKind>(
@@ -87,7 +110,7 @@ class ChivalryFuzzTest {
      * finish: half the time a building action is preferred when one exists, and END_TURN,
      * trades and offers are down-weighted.
      */
-    private fun pick(s: GameState, buf: ActionBuffer, bot: Rng): Action {
+    internal fun pick(s: GameState, buf: ActionBuffer, bot: Rng): Action {
         if (s.phase == Phase.PLAY_TURN && bot.nextInt(2) == 0) {
             var k = 0
             for (i in 0 until buf.size) if (buf[i].type in building) k++

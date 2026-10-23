@@ -248,8 +248,7 @@ class ChivalryRulesTest {
         val before = IntArray(4) { chivalry.progressCount(it) }
         chivalry.progressHand.fill(0, 2 * Progress.COUNT, 4 * Progress.COUNT)
         // Restore conservation: put the removed cards back is unnecessary for this check, so only compare deltas.
-        CK.rig(s, 1, 2, EventDie.SHIP_FACES + Track.POLITICS)
-        Rules.apply(s, Action.ROLL)
+        Rules.apply(s, Action.roll(1, 2, EventDie.SHIP_FACES + Track.POLITICS))
         assertEquals(1, chivalry.progressCount(0) + chivalry.progressVp[0] - before[0])
         assertEquals(1, chivalry.progressCount(1) + chivalry.progressVp[1] - before[1])
         assertEquals(0, chivalry.deckSize[Track.POLITICS])
