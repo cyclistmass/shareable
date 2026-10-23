@@ -6,11 +6,12 @@
 # 0.3.2 cut off the game-start screen's Points, Report and Intro and the start menu's Settings (with a saved game) at
 # 320 dp tall, and squashed the in-game Report's Send and Close; none of them scrolled.
 # A taller device is switched to CI's screen (320x640 at 160 dpi) for the run and put back after.
-# Usage: tools/ci_reach.sh [end]   (the app installed on $ANDROID_SERIAL or the only device)
+# Usage: tools/ci_reach.sh [end [base|chivalry]]   (the app installed on $ANDROID_SERIAL or the only device)
 set -uo pipefail
 ADB="${ADB:-adb}"
 PKG=com.mauro.wgbg
 MODE="${1:-screens}"
+RULES="${2:-chivalry}"   # end: the finished game's ruleset; only Age of Chivalry's histogram has the event die
 export MSYS_NO_PATHCONV=1
 fail=0
 
@@ -110,7 +111,7 @@ if [ "$MODE" = screens ]; then
   for _ in 1 2 3 4 5; do on "Resume game" && break; "$ADB" shell input keyevent KEYCODE_BACK; sleep 2; leave; done
   all "start menu with a saved game" "Resume game" "End saved game" "New game" "Settings" "ⓘ  About and credits"
 else
-  # Game over and the dice histogram (with the event die, its tallest form) on a game played to its end. The dice row only
+  # Game over and the dice histogram (in Age of Chivalry with the event die, its tallest form) on a game played to its end. The dice row only
   # shows once someone has rolled.
   for _ in $(seq 1 20); do on "See the board" && break; sleep 3; done
   all "game over" "Play again" "See the board" "Exit"
@@ -127,10 +128,12 @@ else
   x=""
   for gap in 0.12 0.06 0.2; do
     [ -n "$xy" ] && "$ADB" shell "input tap $xy & sleep $gap; input tap $xy; wait"; sleep 1.5
-    x=$(dump); grep -q 'text="Event die"' <<< "$x" && break
+    x=$(dump); grep -q 'resource-id="dice-histogram"' <<< "$x" && break
   done
-  grep -q 'text="Event die"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
-  DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
+  # Opened is its tag, not "Event die": a base game's histogram has no event die (0.3.5-pre2 nightly, end-base).
+  grep -q 'resource-id="dice-histogram"' <<< "$x" || bad "double-tapping the dice didn't open the histogram"
+  if [ "$RULES" = chivalry ]; then DUMP=$x all "dice histogram" "Event die" "The line on each bar is what fair dice would give."
+  else DUMP=$x all "dice histogram" "The line on each bar is what fair dice would give."; fi
 fi
 
 [ "$("$ADB" logcat -d -b crash | grep -A8 'FATAL EXCEPTION' | grep -c "$PKG")" = 0 ] || bad "the app crashed"

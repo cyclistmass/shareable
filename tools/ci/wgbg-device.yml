@@ -183,3 +183,4 @@ jobs:
             working-german-board-game/*.png
             working-german-board-game/*.xml
             working-german-board-game/*.logcat.txt
+            working-german-board-game/*.trace.txt

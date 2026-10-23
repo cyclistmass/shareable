@@ -64,7 +64,7 @@ case "$SHARD" in
   touch-full-chivalry-3) FULL=1 bash tools/ci_touchplay.sh 5400 10 "chivalry:3" ;;
   touch-full-chivalry-4) FULL=1 bash tools/ci_touchplay.sh 5400 10 "chivalry:4" ;;
   # Bots in every seat to the end screen, then the game-over panel and the dice histogram by touch.
-  end-base) STALL=120 bash tools/play_to_end.sh base 3 2400; bash tools/ci_reach.sh end ;;
+  end-base) STALL=120 bash tools/play_to_end.sh base 3 2400; bash tools/ci_reach.sh end base ;;
   end-chivalry) STALL=120 bash tools/play_to_end.sh chivalry 4 3600; bash tools/ci_reach.sh end ;;
   # 50 bot games back to back at Max speed.
   selfplay-base) RULESETS=base bash tools/ci_selfplay.sh 12600 50 ;;
