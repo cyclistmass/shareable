@@ -96,7 +96,7 @@ jobs:
          {"shard":"selfplay-base","minutes":240},{"shard":"selfplay-chivalry","minutes":270},
          {"shard":"monkey-base","minutes":90},{"shard":"monkey-chivalry","minutes":90},
          {"shard":"online","minutes":45},{"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},
-         {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},{"shard":"names","minutes":40},{"shard":"colours","minutes":40},
+         {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},{"shard":"layout-cutout","minutes":60,"target":"google_apis"},{"shard":"names","minutes":40},{"shard":"colours","minutes":40},
          {"shard":"trade","minutes":60},{"shard":"withdraw","minutes":45},{"shard":"reach","minutes":45},
          {"shard":"update","minutes":40}]
 

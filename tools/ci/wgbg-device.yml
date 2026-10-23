@@ -81,6 +81,9 @@ jobs:
     name: ${{ matrix.shard }}
     env:
       SHARD: ${{ matrix.shard }}
+      # The system image: aosp_atd (small, no launcher) unless a shard names one; layout-cutout needs google_apis, whose
+      # framework has the emulated camera cutouts aosp_atd leaves out (docs/testing/improvements.md, 2026-10-21).
+      IMAGE: ${{ matrix.target || 'aosp_atd' }}
       # reach hosts a room: with the Firebase config and debug.wgbg.firebase (shard.sh) that needs the emulators too.
       NEEDS_FIREBASE: ${{ startsWith(matrix.shard, 'online') || startsWith(matrix.shard, 'friends') || matrix.shard == 'reach' }}
     steps:
@@ -126,7 +129,7 @@ jobs:
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           for i in 1 2 3; do
-            "$SDKM" --install emulator "system-images;android-33;aosp_atd;x86_64" > /dev/null && { echo "installed (try $i)"; break; }
+            "$SDKM" --install emulator "system-images;android-33;$IMAGE;x86_64" > /dev/null && { echo "installed (try $i)"; break; }
             echo "try $i failed"; sleep 15
           done
       # The same snapshot cache as wgbg-ci.yml, so a nightly or check run reuses the per-push boot.
@@ -137,14 +140,14 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-33-aosp_atd-x86_64-v1
+          key: avd-33-${{ env.IMAGE }}-x86_64-v1
       - name: Boot once and save the snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           arch: x86_64
-          target: aosp_atd
+          target: ${{ env.IMAGE }}
           cores: 3
           ram-size: 4096M
           force-avd-creation: false
@@ -157,7 +160,7 @@ jobs:
         with:
           api-level: 33
           arch: x86_64
-          target: aosp_atd
+          target: ${{ env.IMAGE }}
           cores: 3
           ram-size: 4096M
           force-avd-creation: false
