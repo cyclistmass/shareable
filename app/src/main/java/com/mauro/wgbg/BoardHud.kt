@@ -240,9 +240,10 @@ fun progressArt(card: Int): Int = deckArt(wgbg.engine.Progress.track(card))
 fun deckArt(track: Int): Int = COMMODITY_PICTURE[wgbg.engine.Track.commodity(track) - CARD_TYPES]
 
 /** Age of Chivalry deck colours by track: Guilds gold (trade), Crown blue (politics), Academy green (science). */
-// Mauro: themed by commodity and its land. Guilds / Fabric (pasture) pale white-green, Crown / Silver (mountains)
-// blue-grey, Academy / Parchment (forest) forest green.
-internal val TRACK_COLORS = listOf(Color(0xFFD3E8C4), Color(0xFF8A9FB2), Color(0xFF3E8E48))
+// Mauro: themed by commodity and its land, so the colour reminds you of the commodity (theme-spec.md, Commodity
+// colours). 0.3.5: clear green, white and blue: Guilds / Fabric (sheep) white, Crown / Silver (mountains) blue, Academy /
+// Parchment (forest) green. Wood and sheep are both green lands, so sheep take white; no orange.
+internal val TRACK_COLORS = listOf(Color(0xFFF2EDE0), Color(0xFF3F7FC4), Color(0xFF3E8E48))
 
 /** Name type size on a [w] dp card face: 8 sp, smaller only when the longest word would not fit on one line. */
 fun cardNameSp(name: String, w: Int): Float {

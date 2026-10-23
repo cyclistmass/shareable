@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Touch play (Mauro, 2026-10-10: "test the game better, I crashed it on move 2"): a real human seat played by
 # tapping the screen, in each ruleset. Board moves are tapped at the pixel the app reports for them (the
-# WGBG-TURN line's spots=, debug builds), twice (select, then confirm), exactly like a finger; Roll and
+# WGBG-TURN line's spots=, debug builds), twice (select, then confirm), exactly like a finger (a knight or town opens
+# its menu instead: a line, then the check); Roll and
 # End turn are tapped by their labels; only moves with no single tap target (discards, card choices, steals)
 # go through the agent hook. Fails on any crash or ANR, or if the human seat gets stuck.
 # Covers base and Age of Chivalry with 3 players (how Mauro plays: you + 2 bots) and with 4.
@@ -31,7 +32,7 @@ for game in $GAMES; do
   "$ADB" logcat -c; "$ADB" logcat -b crash -c 2>/dev/null || true
   timeout 60 "$ADB" shell am start -W --activity-clear-task -n $PKG/.MainActivity --es start "$ruleset" --ei players "$players" --ez quickbots true >/dev/null
   sleep 4
-  moves=0; taps=0; hooks=0; last=""; prev=""; same=0; start=$(date +%s)
+  moves=0; taps=0; menus=0; hooks=0; last=""; prev=""; same=0; start=$(date +%s)
   while [ $(( $(date +%s) - start )) -lt "$SECS" ]; do
     if crashed; then echo "touchplay $ruleset/${players}p: CRASH after $moves moves"; fail=1; break; fi
     over=$("$ADB" logcat -d -s WGBG-GAME:I | grep -o 'over.*' | tail -1)
@@ -52,7 +53,17 @@ for game in $GAMES; do
     # Prefer what a person does most: build on the board, roll, end the turn.
     if [ -n "$spots" ] && [ $((RANDOM % 4)) != 0 ]; then
       pick=$(echo "$spots" | shuf -n 1); xy=${pick#*@}
-      tap "${xy%,*}" "${xy#*,}"; sleep 0.6; tap "${xy%,*}" "${xy#*,}"; taps=$((taps + 1))
+      tap "${xy%,*}" "${xy#*,}"; sleep 0.6
+      # A knight or a town opens its menu (0.3.5): pick a line it can do, then the check; Move picks the knight, and
+      # the next spot tapped is where it goes. Anything else takes the second tap that confirms it, as before.
+      scr=$(dump)
+      if grep -q 'resource-id="tap-menu-' <<< "$scr"; then
+        entry=$(grep 'clickable="true"' <<< "$scr" | grep -o 'resource-id="tap-[a-z]*"' | grep -v 'tap-menu-\|tap-confirm\|tap-cancel' | shuf -n 1 | cut -d'"' -f2)
+        if [ -n "$entry" ] && tap_id "$entry"; then menus=$((menus + 1)); tap_id tap-confirm || true; fi
+      else
+        tap "${xy%,*}" "${xy#*,}"
+      fi
+      taps=$((taps + 1))
     elif grep -q '^ROLL:' <<< "$legal" && tap_text "Roll"; then taps=$((taps + 1))
     elif grep -q '^END_TURN:' <<< "$legal" && [ $((RANDOM % 3)) != 0 ] && tap_text "End turn"; then taps=$((taps + 1))
     else
@@ -64,7 +75,7 @@ for game in $GAMES; do
   done
   anr=$("$ADB" logcat -d | grep -c "ANR in $PKG" || true)
   alive=$("$ADB" shell pidof $PKG | tr -d '\r')
-  echo "touchplay $ruleset/${players}p: $moves human moves ($taps by touch, $hooks by hook) in ${SECS}s, anr=$anr pid=${alive:-none}"
+  echo "touchplay $ruleset/${players}p: $moves human moves ($taps by touch, $menus through a tap menu, $hooks by hook) in ${SECS}s, anr=$anr pid=${alive:-none}"
   ended=$("$ADB" logcat -d -s WGBG-GAME:I | grep -c 'over' || true)
   if crashed || [ "$anr" != 0 ] || [ -z "$alive" ] || [ "$moves" -lt "$MIN_MOVES" ] || { [ "$FULL" = 1 ] && [ "$ended" = 0 ]; }; then
     echo "TOUCHPLAY FAILED in $ruleset with $players players"

@@ -78,10 +78,11 @@ class KnightPickTest {
                 val at = vertexLattice(s.board, k)
                 val busy = legal.any { it.type !in KNIGHT_MOVES && it.type in CHIVALRY_VERTEX_KINDS && chivalryVertex(it) == k }
                 if (busy) {
-                    // Supply or Promote at that knight comes first; Move knight in the build menu is the way to move it.
+                    // Supply or Promote at that knight: the tap opens its menu (0.3.5), whose Move line picks it.
                     assertEquals(null, knightPickAt(s, legal, at, null))
-                    val menu = boardMoves(legal, BuildKind.MOVE)
-                    assertEquals(k, knightPickAt(s, menu, at, null))
+                    val hit = tapTargetAt(s, legal, at, s.actingPlayer)
+                    assertEquals(TapKind.KNIGHT, hit?.target?.kind); assertEquals(k, hit?.vertex)
+                    assertTrue(lineMoves(hit!!.target.lines.single { it.tag == "move" }, legal, k).isNotEmpty())
                     continue
                 }
                 assertEquals(k, knightPickAt(s, legal, at, null)); picked++
@@ -97,11 +98,14 @@ class KnightPickTest {
     }
 
     @Test
-    fun `Move knight in the build menu offers moves and charges, nothing else`() {
-        val found = knightPositions(37L..44L, 4, random = true) { _, legal ->
-            val menu = boardMoves(legal, BuildKind.MOVE)
-            assertEquals(legal.filter { it.type == ChivalryActionType.MOVE_KNIGHT || it.type == ChivalryActionType.DISPLACE_KNIGHT }, menu)
-            assertTrue(BuildKind.MOVE in shownKinds(true, legal, null))
+    fun `0_3_5 a knight's menu Move line offers exactly that knight's moves and charges`() {
+        val found = knightPositions(37L..44L, 4, random = true) { s, legal ->
+            for (k in movableKnights(legal)) {
+                val hit = tapTargetAt(s, legal, vertexLattice(s.board, k), s.actingPlayer)
+                assertEquals(k, hit?.vertex, "tapping knight $k opens its menu")
+                val move = hit!!.target.lines.single { it.pick }
+                assertEquals(legal.filter { it.type in KNIGHT_MOVES && it.a == k }, lineMoves(move, legal, k))
+            }
         }
         assertTrue(found > 0)
     }
