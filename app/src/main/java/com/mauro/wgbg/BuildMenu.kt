@@ -52,7 +52,8 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
  * 15%"); one column still clears the Roll plate on a 443 dp phone (Pixel 10 Pro XL). */
 val BUILD_PLATE = 34.5.dp
 /** A plate steps this far clear of a camera hole: its 48 dp touch area reaches past the plate, and that clears it too. */
-internal val PLATE_HOLE_MARGIN = 4.dp + (48.dp - BUILD_PLATE) / 2
+internal fun plateHoleMargin(plate: Dp = BUILD_PLATE) = 4.dp + (48.dp - plate) / 2
+internal val PLATE_HOLE_MARGIN = plateHoleMargin()
 
 /**
  * The plates the row shows: every one for the ruleset, raised when it can be done now and engraved when it can't
@@ -72,6 +73,15 @@ fun buildMenuHeight(chivalry: Boolean): Dp = shownKinds(chivalry).let { ks ->
  * [screenH] tall. On a 320 dp phone (CI's 640x320) the Age of Chivalry menu runs over the Roll plate (0.3.5-pre2).
  */
 fun buildMenuReaches(chivalry: Boolean, screenH: Dp, buttonH: Dp): Boolean = BUILD_MENU_TOP + buildMenuHeight(chivalry) > screenH - buttonH
+
+/**
+ * The plate size that keeps the whole menu on a screen [screenH] tall: [BUILD_PLATE] where it fits, smaller (not under
+ * 20 dp) where it doesn't. On a 320 dp phone the Age of Chivalry column ran off the bottom and its last plate, Crown,
+ * was a sliver in the corner (CI layout-cutout, 0.3.6).
+ */
+fun buildPlateFor(chivalry: Boolean, screenH: Dp): Dp = shownKinds(chivalry).let { ks ->
+    val room = screenH - BUILD_MENU_TOP - 8.dp - 3.dp * (ks.size - 1) - 8.dp * ks.count { it.track >= 0 }
+    (room / ks.size).coerceIn(20.dp, BUILD_PLATE) }
 
 /** The legal moves the board should offer while [mode] is picked (all of them when nothing is). */
 fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { mode.offers(it) }
@@ -127,35 +137,36 @@ fun BuildMenu(chivalry: Boolean, legal: List<Action>, mode: BuildKind?, onPick: 
               holes: List<androidx.compose.ui.geometry.Rect> = emptyList()) {
     val res = androidx.compose.ui.platform.LocalContext.current.resources
     val pkg = androidx.compose.ui.platform.LocalContext.current.packageName
+    val size = buildPlateFor(chivalry, androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp)
     Column(modifier.testTag("build-menu"), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = androidx.compose.ui.Alignment.End) {
         for (k in shownKinds(chivalry)) {
             val moves = legal.filter { k.offers(it) }
             val tap = { plateTap(k, moves, mode)?.let(onPick); Unit }
             // Painted plates when they're in the build; the drawn icon on a brass plate until then.
             val art = res.getIdentifier("plate_${k.art}_${if (moves.isNotEmpty()) "on" else "off"}", "drawable", pkg)
-            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes, PLATE_HOLE_MARGIN), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Plate(k, art, mode, moves, tap)
-                LevelDots(level(k.track), TRACK_COLORS[k.track], Modifier.testTag("build-${k.name.lowercase()}-level"))
-            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes, PLATE_HOLE_MARGIN)) { Plate(k, art, mode, moves, tap) }
+            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes, plateHoleMargin(size)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Plate(k, art, mode, moves, tap, size)
+                LevelDots(level(k.track), TRACK_COLORS[k.track], size, Modifier.testTag("build-${k.name.lowercase()}-level"))
+            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes, plateHoleMargin(size))) { Plate(k, art, mode, moves, tap, size) }
         }
     }
 }
 
 @Composable
-private fun Plate(k: BuildKind, art: Int, mode: BuildKind?, moves: List<Action>, tap: () -> Unit) {
+private fun Plate(k: BuildKind, art: Int, mode: BuildKind?, moves: List<Action>, tap: () -> Unit, size: Dp = BUILD_PLATE) {
     if (art != 0) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(art), k.label,
-        Modifier.size(BUILD_PLATE).testTag("build-${k.name.lowercase()}")
+        Modifier.size(size).testTag("build-${k.name.lowercase()}")
             .then(if (mode == k) Modifier.border(2.dp, Wood.BRASS_LIGHT, androidx.compose.foundation.shape.RoundedCornerShape(6.dp)) else Modifier)
             .clickable(enabled = moves.isNotEmpty(), role = androidx.compose.ui.semantics.Role.Button, onClick = tap))
     else IconPlateButton(k.icon, k.label, "build-${k.name.lowercase()}", lit = mode == k, enabled = moves.isNotEmpty(),
-        width = BUILD_PLATE, height = BUILD_PLATE, iconSize = BUILD_PLATE * 0.6f, pad = 2.dp, onClick = tap)
+        width = size, height = size, iconSize = size * 0.6f, pad = 2.dp, onClick = tap)
 }
 
 /** A track level ([level] of [wgbg.engine.Track.MAX_LEVEL]) as dots, filled up to it, over a full bar in [colour]. */
 @Composable
-fun LevelDots(level: Int, colour: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+fun LevelDots(level: Int, colour: androidx.compose.ui.graphics.Color, width: Dp = BUILD_PLATE, modifier: Modifier = Modifier) {
     val max = wgbg.engine.Track.MAX_LEVEL
-    androidx.compose.foundation.Canvas(modifier.size(width = BUILD_PLATE, height = 7.dp)
+    androidx.compose.foundation.Canvas(modifier.size(width = width, height = 7.dp)
         .semantics { contentDescription = "level ${level.coerceIn(0, max)} of $max" }) {
         val r = 1.5.dp.toPx(); val gap = size.width / max
         for (i in 0 until max) {
