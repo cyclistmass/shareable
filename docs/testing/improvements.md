@@ -92,7 +92,7 @@ move it to **Done** with the commit when it lands.
   (Coverage.kt: empty bank, odd hands halved, turn-limit draws, every Raiders outcome). Found: random play never
   empties a progress deck (0 in 1000 games); only ChivalryRulesTest's stacked deck does. Next (Phase B): `--el seed`
   and `--es dice` debug extras so ci_trade, ci_withdraw and reach-end run on fixed dice.
-- layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d
+- layout-cutout needs a google_apis image shard (aosp_atd has no cutout overlays; it was a false green), 2026-10-21, mauro-1d. Drafted 2026-10-23 (Helm): the shard names `"target":"google_apis"` and wgbg-device.yml boots that image; first green run still to come
 - Local device checks should run the APK CI built (gh run download), not a local build without the Firebase config: names and colours passed on the config-less build and failed on the config'd one (run 39682685361). Catches flavour-only layout changes; 2026-10-21, catan-android-36
 - A lane's Pixel Launcher ANR-ing after hours covers the screen and fails any script; restart the emulator before a local run of names/colours/reach (CI's aosp_atd has no launcher to hang). Saves a misread failure per run; 2026-10-21, catan-android-36
 - A whole game by taps (release hand test): a 3-seat base game takes about 20 min median (about 8.5 s a turn by tap driver; headless Greedy games: median 83-89 turns, p99 160), so budget 30 min and stop at 45. The driver should build when it can: a seat that only rolls and ends turn stretches the tail (one game in 300 ran 724 turns). Chivalry and 4 seats not yet timed; 2026-10-21, mauro-1d

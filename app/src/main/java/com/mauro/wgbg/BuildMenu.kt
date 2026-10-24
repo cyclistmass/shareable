@@ -119,19 +119,21 @@ fun plateTap(k: BuildKind, moves: List<Action>, mode: BuildKind?): Pick? = when 
  */
 @Composable
 fun BuildMenu(chivalry: Boolean, legal: List<Action>, mode: BuildKind?, onPick: (Pick) -> Unit, modifier: Modifier = Modifier,
-              level: (Int) -> Int = { 0 }) {
+              level: (Int) -> Int = { 0 },
+              /** The camera cutout's rects (window px): a plate level with one steps left of it, the rest stay flush (0.3.6). */
+              holes: List<androidx.compose.ui.geometry.Rect> = emptyList()) {
     val res = androidx.compose.ui.platform.LocalContext.current.resources
     val pkg = androidx.compose.ui.platform.LocalContext.current.packageName
-    Column(modifier.testTag("build-menu"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(modifier.testTag("build-menu"), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = androidx.compose.ui.Alignment.End) {
         for (k in shownKinds(chivalry)) {
             val moves = legal.filter { k.offers(it) }
             val tap = { plateTap(k, moves, mode)?.let(onPick); Unit }
             // Painted plates when they're in the build; the drawn icon on a brass plate until then.
             val art = res.getIdentifier("plate_${k.art}_${if (moves.isNotEmpty()) "on" else "off"}", "drawable", pkg)
-            if (k.track >= 0) Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Plate(k, art, mode, moves, tap)
                 LevelDots(level(k.track), TRACK_COLORS[k.track], Modifier.testTag("build-${k.name.lowercase()}-level"))
-            } else Plate(k, art, mode, moves, tap)
+            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes)) { Plate(k, art, mode, moves, tap) }
         }
     }
 }

@@ -32,6 +32,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -195,7 +198,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Full screen: draw under the camera cutout and hide the system bars (swipe to peek).
         window.attributes = window.attributes.apply {
-            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            // ALWAYS (API 30+): the window reaches the screen edge beside the camera on every side, as edge-to-edge on API 35+
+            // does anyway; the HUD steps round only the hole itself (0.3.6).
+            layoutInDisplayCutoutMode = if (android.os.Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -1229,12 +1235,14 @@ fun WatchGameScreen(
     }
     CompositionLocalProvider(LocalArtChoice provides env.art) {
     Box(modifier) {
+      // The camera cutout's own rects: what sits level with the hole steps round it; nothing pads a whole edge (0.3.6).
+      val holes = if (inventory) emptyList() else cutoutHoles()
       Box(Modifier.fillMaxSize()) { // the menu floats over the board, so the ocean always fills the screen
       Box(Modifier.fillMaxSize()) {
         // The board sits beside the player strip and turn panel (TurnHud is 360 dp wide, plus its 8 dp margins).
-        // A camera cutout on the left pushes the panel in by its width (0.3.4).
-        val cutoutLeft = WindowInsets.displayCutout.getLeft(LocalDensity.current, androidx.compose.ui.platform.LocalLayoutDirection.current)
-        Layout.leftInset = if (inventory) 0f else with(LocalDensity.current) { 376.dp.toPx() } + cutoutLeft
+        // The panel runs flush past a camera cutout on the left, stepping round the hole itself (0.3.6), so the board
+        // gets the cutout's strip back too.
+        Layout.leftInset = if (inventory) 0f else with(LocalDensity.current) { 376.dp.toPx() }
         val measurer = rememberTextMeasurer()
         val resources = LocalContext.current.resources
         val colors = PLAYER_COLORS
@@ -1468,8 +1476,12 @@ fun WatchGameScreen(
             }
         }
         // The HUD keeps clear of the camera cutout (0.3.4: the lens sat on the dice); the board runs under it.
-        // Every HUD size is measured in here, on the screen left beside the cutout.
-        Box(Modifier.fillMaxSize().displayCutoutPadding().onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
+        // The side panel and the right-hand controls run flush to the edges and only what is level with the hole steps
+        // round it (0.3.6: players asked for the blank strip back); Look & art keeps the whole strip clear.
+        // Every HUD size is measured in here.
+        Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
+            WindowInsets.displayCutout.only(WindowInsetsSides.Vertical)))
+            .onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
           if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
               for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
           }
@@ -1521,7 +1533,8 @@ fun WatchGameScreen(
               if (!chestOpen) Box(Modifier.align(Alignment.BottomStart).padding(8.dp).onGloballyPositioned { hudTopRight = it.boundsInParent().topRight }) {
                   TurnHud(report, previous, names, me = me, history = tick.let { tracker.history }, onDiceSlots = { a, b -> diceSlots = a to b }, showDice = !diceFlying, dicePads = !inSetup(state), pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle,
                       eventDie = state.chivalry != null, onEventSlot = { eventSlot = it }, height = turnHudHeight,
-                      width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false })
+                      width = if (stripWidth > 0f) sideWidth else 360.dp, framed = stripWidth <= 0f, onDiceDoubleTap = { histogramOpen = true; settingsOpen = false; panelOpen = false },
+                      holes = holes)
               }
               if (rolled != null && env.animating) RollingDice(rolled.die1, rolled.die2, rollKey = rolled.turn * 8 + rolled.player, rest = hudTopRight, slots = diceSlots, pirate = env.art.pirate(ArtObject.DICE), eventStyle = env.eventDieStyle, event = rolled.event, eventSlot = eventSlot, fallMs = Pace.fallMs(1f), onFlying = { diceFlying = it },
                   modifier = Modifier.fillMaxSize())
@@ -1533,7 +1546,7 @@ fun WatchGameScreen(
           if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
               .heightIn(max = stripMaxHeight(with(LocalDensity.current) { screenHeight.toDp() }))
               .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
-              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false, cameos = cameos)
+              roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false, cameos = cameos, holes = holes)
           if (net != null && !inventory) onlineView?.let { v ->
               Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                   OnlineConnectionStatus(v)
@@ -1569,14 +1582,17 @@ fun WatchGameScreen(
               val panelEdge = with(LocalDensity.current) { stripWidth.toDp() } + 16.dp
               // On a narrow screen (640 dp across, CI's emulator and small phones) the Age of Chivalry chest's 8 cards and its
               // buttons don't fit right of the panel: Trade ran off the edge. Then it spreads over the full width instead.
-              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, top = MENU_CLEAR, bottom = 8.dp, end = 8.dp)) {
-                  val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else 0.dp
+              if (chestOpen) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(start = 8.dp, top = MENU_CLEAR, bottom = 8.dp,
+                  end = 8.dp + with(LocalDensity.current) { WindowInsets.displayCutout.getRight(this, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() })) {
+                  // Spread over the full width, it keeps clear of a cutout on either side, as the HUD box no longer does.
+                  val cutLeft = with(LocalDensity.current) { WindowInsets.displayCutout.getLeft(this, androidx.compose.ui.unit.LayoutDirection.Ltr).toDp() }
+                  val start = if (chestFits(maxWidth - panelEdge + 8.dp, tradeCards(state))) panelEdge - 8.dp else cutLeft
                   TradePanel(state, me, legal, names, send, onClose = { tradeOpen = false; harbourTab.value = false }, harbour = harbourTab, responses = responses, version = tick, autoNoSeconds = autoNo,
                       room = maxWidth - start, modifier = Modifier.align(Alignment.BottomCenter).padding(start = start))
               }
               else if (cardPick.isNotEmpty() && chosen.isEmpty()) Column(
                   // Aiming a board card: say what to tap, with a way out.
-                  Modifier.align(Alignment.BottomEnd).padding(8.dp).width(260.dp).brassEdgedWood().padding(12.dp).testTag("card-pick"),
+                  Modifier.align(Alignment.BottomEnd).dodgeHolesEnd(holes).padding(8.dp).width(260.dp).brassEdgedWood().padding(12.dp).testTag("card-pick"),
                   verticalArrangement = Arrangement.spacedBy(6.dp),
               ) {
                   val card = cardPick[0].a
@@ -1588,7 +1604,7 @@ fun WatchGameScreen(
               }
               else if (legal.isNotEmpty()) HumanControls(state, me, legal, names, send, Modifier.fillMaxSize().padding(start = panelEdge, top = MENU_CLEAR, end = 8.dp, bottom = 8.dp),
                   onBoardPick = { cardPick = pickChoices(it); cardSecond = false; pending = emptyList() },
-                  fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null },
+                  fortuneAsk = fortuneAsk, onFortuneDone = { fortuneAsk = null }, holes = holes,
                   discardCause = tick.let {
                       if (tracker.turnCard == wgbg.engine.Progress.SABOTEUR && state.currentPlayer != me) "${names[state.currentPlayer]} played Wrecker against you" else null
                   },
@@ -1634,11 +1650,14 @@ fun WatchGameScreen(
           }
         }
       }
-        // The Menu panel and every button and dialog below keep clear of the camera cutout; the board runs under it (0.3.4).
-        Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+        // The Menu panel keeps clear of the camera hole: on the right it steps round it, flush otherwise (0.3.6); Look & art
+        // keeps the whole strip clear.
+        Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
+            WindowInsets.displayCutout.only(WindowInsetsSides.Left + WindowInsetsSides.Vertical)))) {
           if (panelOpen) CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) {
               Column(
                   Modifier.align(Alignment.TopEnd)
+                      .dodgeHolesEnd(holes)
                       .padding(top = 60.dp, end = 8.dp, bottom = 8.dp)
                       .width(340.dp)
                       .brassEdgedWood()
@@ -1666,21 +1685,24 @@ fun WatchGameScreen(
           }
         }
       }
-      // Every button, banner and dialog over the board keeps clear of the camera cutout (0.3.4).
-      Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+      // Every button, banner and dialog over the board keeps clear of the camera cutout (0.3.4). The right-edge buttons
+      // (Menu, the build row, the view bars, Settings) run flush and step round only the hole (0.3.6); a full-screen
+      // sheet (the card guide) pads itself.
+      Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
+            WindowInsets.displayCutout.only(WindowInsetsSides.Left + WindowInsetsSides.Vertical)))) {
         // Debug autoplay must never be invisible: a bot playing your seat looked like a desync in a playtest.
         if (autoplay || autoSetup) Text(if (autoplay) "AUTOPLAY (debug): a bot plays your seat" else "AUTOSETUP (debug)",
             color = Color(0xFFFFB4A0), fontSize = 12.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 3.dp).testTag("debug-badge"))
         // Look & art has no game Menu (#91), only its Settings to show and hide.
-        MenuButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+        MenuButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).dodgeHolesEnd(holes).padding(8.dp)) {
             // The Menu comes up over a clear board: the roll chart closes (0.3.3 test: it stayed open behind the menu).
             if (settingsOpen || lookAndArt) settingsOpen = !settingsOpen else { panelOpen = !panelOpen; histogramOpen = false }
         }
         // The Report button under Menu, switched on in the gear menu (#128): a bug report with a screenshot, in one tap.
         if (env.bugButton && !feedbackOpen && !reportCapture && !panelOpen && !settingsOpen)
-            BrassButton("Report a bug or idea", "bug-report", Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = 8.dp).height(36.dp)) { reportCapture = true }
+            BrassButton("Report a bug or idea", "bug-report", Modifier.align(Alignment.TopEnd).dodgeHolesEnd(holes).padding(top = 56.dp, end = 8.dp).height(36.dp)) { reportCapture = true }
         // Settings open from the gear inside the Menu, so the board stays clean.
         if (histogramOpen) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // Copies, so each move's new counts reach the screen (the arrays themselves never change identity).
@@ -1695,12 +1717,12 @@ fun WatchGameScreen(
             FeedbackPanel(game, remember { Feedback.historyLines(tracker.history, names) }, remember { Feedback.position(state, names) },
                 shot = reportShot, onClose = { feedbackOpen = false; reportShot = null })
         }
-        if (guideOpen) Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+        if (guideOpen) Box(Modifier.fillMaxSize().displayCutoutPadding().padding(12.dp), contentAlignment = Alignment.Center) {
             CardGuide(state.chivalry != null, env.art.pirate(ArtObject.KNIGHTS), onClose = { guideOpen = false })
         }
         // Pause, speed and Watch bots live under the gear (Mauro, 2026-10-12); local games only, not on Look & art.
         if (settingsOpen) SettingsPanel(env, sound,
-            Modifier.align(Alignment.TopEnd).padding(top = 60.dp, end = 8.dp),
+            Modifier.align(Alignment.TopEnd).dodgeHolesEnd(holes).padding(top = 60.dp, end = 8.dp),
             gameControls = if (!lookAndArt) {
                 { CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (online == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1801,7 +1823,7 @@ fun WatchGameScreen(
                     is Pick.Ask -> { pending = pick.moves; pendingAt = null }
                     is Pick.Hint -> tapHint = pick.text
                 }
-            }, modifier = Modifier.align(Alignment.TopEnd).padding(top = BUILD_MENU_TOP, end = if (env.viewBars) 156.dp else 8.dp))
+            }, modifier = Modifier.align(Alignment.TopEnd).padding(top = BUILD_MENU_TOP, end = if (env.viewBars) 156.dp else 8.dp), holes = holes)
         // The tapped object's menu, centred right above it (Mauro: "the menu right above the knight").
         tapMenu?.let { hit ->
             val density = LocalDensity.current
@@ -1841,7 +1863,7 @@ fun WatchGameScreen(
             // The 3D board also turns (Mauro: "a rotate slider - start it in the middle"); the flat board doesn't.
             rotation = boardRotation.takeIf { liveBoard }, onTurn = { r -> boardRotation = r },
             // Upper right under Trade, short, clear of the move buttons that stack up from the bottom right.
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 104.dp, end = 8.dp))
+            modifier = Modifier.align(Alignment.TopEnd).dodgeHolesEnd(holes).padding(top = 104.dp, end = 8.dp))
         overlay?.invoke(this, state, tick)
       }
     }

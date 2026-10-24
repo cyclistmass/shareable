@@ -190,6 +190,8 @@ fun HumanControls(
     /** A Fortune card tapped in the hand row ([HandRow]), to play now; [onFortuneDone] clears it. */
     fortuneAsk: Int? = null,
     onFortuneDone: () -> Unit = {},
+    /** The camera cutout's rects (window px): a button level with one steps left of it, the rest stay flush (0.3.6). */
+    holes: List<androidx.compose.ui.geometry.Rect> = emptyList(),
 ) {
     var sheet by remember { mutableStateOf<String?>(null) } // which picker is open
     // A Fortune card tapped in the hand: Sentinel and Trailblazers play at once, Windfall and Corner the Market open
@@ -258,14 +260,16 @@ fun HumanControls(
             // Fortune cards are played from the hand row (tap the card).
             // Age of Chivalry moves that aren't board taps: one button per kind (or card), a picker if it has choices.
             for ((label, acts) in chivalryButtonGroups(s, legal, names)) {
-                if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
-                else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
-                else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
+                Box(Modifier.dodgeHolesEnd(holes)) {
+                    if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
+                    else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
+                    else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
+                }
             }
             // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro). Where
             // the build menu down the right edge reaches the corner (a short phone), they sit left of it.
             val clear = buildMenuReaches(s.chivalry != null, androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp, TURN_PLATE)
-            Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.dodgeHolesEnd(holes).padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
                 // Roll and End turn share one plate (0.3.5 reports): the dice until you roll, then the hourglass. The rules
                 // never offer both at once.

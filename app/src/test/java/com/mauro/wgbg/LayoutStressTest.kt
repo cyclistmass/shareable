@@ -73,7 +73,15 @@ class LayoutStressTest {
         val pages = src.flatMap { f -> f.readLines().filter { "fillMaxSize().tableTop()" in it && "WatchGameScreen(" !in it }.map { f.name to it.trim() } }
         assertTrue(pages.size >= 5, "found the pages: $pages")
         for ((file, line) in pages) assertTrue("displayCutoutPadding()" in line, "$file: $line")
+        // The game screen pads no whole edge it puts controls on (0.3.6: "no gap"): the HUD pads only the ends, the Menu
+        // panel and the buttons over the board only the left (their controls are on the right and step round the hole);
+        // Look & art and the card guide keep the whole strip clear.
         val game = File("src/main/java/com/mauro/wgbg/MainActivity.kt").readText()
-        assertTrue(Regex("""displayCutoutPadding\(\)""").findAll(game).count() >= 3, "the HUD, the Menu panel and the buttons over the board")
+        val sides = Regex("""displayCutout\.only\(([^)]*)\)""").findAll(game).map { it.groupValues[1] }.toList()
+        assertEquals(listOf("WindowInsetsSides.Vertical", "WindowInsetsSides.Left + WindowInsetsSides.Vertical",
+            "WindowInsetsSides.Left + WindowInsetsSides.Vertical"), sides)
+        val whole = game.lines().filter { "displayCutoutPadding()" in it && "import" !in it }.map { it.trim() }
+        assertEquals(4, whole.size, "$whole")
+        assertTrue(whole.all { "if (inventory) Modifier.displayCutoutPadding()" in it || "guideOpen" in it }, "$whole")
     }
 }
