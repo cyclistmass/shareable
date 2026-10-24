@@ -85,6 +85,7 @@ unless another path is given.
 - Raiders horn (`app/src/main/res/raw/raiders_horn.ogg`): "Hunting horn tone" by Alon-De-Lon, CC0,
   https://commons.wikimedia.org/wiki/File:Hunting_horn_tone.ogg. The first blast, cut and faded by
   `tools/import_sounds.sh`, 2026-10-20.
+- Drunken Sailor (`app/src/main/res/raw/tune_drunken_sailor.ogg`): traditional public-domain melody (What Shall We Do with the Drunken Sailor, a 19th-century capstan shanty), transcribed in `tools/make_sounds.py`; arrangement and recording ours. Credit line added 0.3.6, when a test found it missing.
 - Carnival of Venice (`app/src/main/res/raw/tune_carnival_of_venice.ogg`): public-domain melody (the
   traditional 3/4 theme); our own arrangement and synthesis via `tools/make_sounds.py`.
 
