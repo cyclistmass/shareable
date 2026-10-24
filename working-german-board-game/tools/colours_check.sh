@@ -54,8 +54,8 @@ system_anr() {
   if grep -q 'text="Live Caption"' <<< "$d"; then
     xy=$(find_re "Got it" "$d"); [ -n "$xy" ] && { echo "COLOURS: closed the system's Live Caption popup"; tap $xy; return 0; }
   fi
-  grep -q 'text="[^"]* isn.t responding"' <<< "$d" || return 1
-  grep -q 'text="Working German Board Game isn.t responding"' <<< "$d" && fail "the game isn't responding (ANR)"
+  grep -q 'text="[^"]* \(isn.t responding\|keeps stopping\)"' <<< "$d" || return 1
+  grep -q 'text="Working German Board Game \(isn.t responding\|keeps stopping\)"' <<< "$d" && fail "the game isn't responding or keeps stopping"
   echo "COLOURS: closed a system app that wasn't responding"
   xy=$(find_re "Close app" "$d"); [ -n "$xy" ] && tap $xy
   return 0

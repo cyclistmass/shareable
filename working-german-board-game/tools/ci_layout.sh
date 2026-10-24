@@ -66,7 +66,14 @@ wait_for() { local l; for _ in $(seq 1 $(( ${2:-60} * 2 ))); do l=$(turn)
 check() { local name=$1 f="$OUT/layout-$1.xml" w="$OUT/layout-$1.window.txt"; steps=$((steps + 1))
   # uiautomator sometimes finds no window (just after a resize or a font change) or its last run still registered: retry.
   for _ in 1 2 3 4 5 6; do "$ADB" shell rm -f /sdcard/ui.xml; timeout 30 "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    "$ADB" exec-out cat /sdcard/ui.xml > "$f" 2>/dev/null; grep -q '</hierarchy>' "$f" && break; sleep 2; done
+    "$ADB" exec-out cat /sdcard/ui.xml > "$f" 2>/dev/null; grep -q '</hierarchy>' "$f" || { sleep 2; continue; }
+    # A slow emulator's own app (Pixel Launcher, 0.3.6 CI) can stop and leave its dialog over the game: close it and dump
+    # again. Our game stopping is never closed here; the checker then fails on what it sees.
+    if grep -q 'text="[^"]*\(keeps stopping\|isn.t responding\)"' "$f" && ! grep -q 'text="Working German Board Game \(keeps stopping\|isn.t responding\)"' "$f"; then
+      local xy; xy=$(grep -o 'text="Close app"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$f" | sed -E 's/.*\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]"/\1 \2 \3 \4/' | awk '{print int(($1+$3)/2), int(($2+$4)/2)}' | head -1)
+      [ -n "$xy" ] && { echo "layout $name: closed a system app's crash dialog"; "$ADB" shell input tap $xy; sleep 1; continue; }
+    fi
+    break; done
   "$ADB" shell dumpsys window | grep -m1 'mDisplayCutout=' > "$w"
   # env -u: Windows Python needs MSYS to turn /c/... paths into Windows paths; only adb wants it off.
   local r rc; r=$(env -u MSYS_NO_PATHCONV "${PY[@]}" -I "$HERE/layout_check.py" "$f" "$name" --cutout "$w" --players 4); rc=$?
