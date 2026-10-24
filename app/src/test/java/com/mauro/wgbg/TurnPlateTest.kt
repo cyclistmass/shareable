@@ -46,7 +46,7 @@ class TurnPlateTest {
         assertFalse(buildMenuReaches(false, 320.dp, TURN_PLATE), "base's four plates stop well above it")
         // A Pixel 6 held sideways (411 dp): the plate stays in the corner, as Mauro saw it.
         assertFalse(buildMenuReaches(true, 411.dp, TURN_PLATE))
-        assertTrue("Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
+        assertTrue("Row(Modifier.dodgeHolesEnd(holes).padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
     }
 
     @Test

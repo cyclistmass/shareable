@@ -46,8 +46,16 @@ internal fun holeIndent(left: Float, top: Float, bottom: Float, holes: List<Rect
     holes.filter { it.top - margin < bottom && it.bottom + margin > top && it.left - margin < left && it.right + margin > left }
         .maxOfOrNull { it.right + margin - left } ?: 0f
 
+/**
+ * The same for something on the right edge ending at [right]: how far left it moves to clear every hole level with it
+ * that reaches its right edge (the camera on the right, the phone turned the other way).
+ */
+internal fun holeIndentEnd(right: Float, top: Float, bottom: Float, holes: List<Rect>, margin: Float): Float =
+    holes.filter { it.top - margin < bottom && it.bottom + margin > top && it.right + margin > right && it.left - margin < right }
+        .maxOfOrNull { right + margin - it.left } ?: 0f
+
 /** Steps a row right of any camera hole level with it; elsewhere it keeps its place. [indentPx] is how far, for the row's own use. */
-internal class HoleDodge(private val holes: List<Rect>, private val margin: Float) {
+internal class HoleDodge(private val holes: List<Rect>, private val margin: Float, private val end: Boolean = false) {
     /** In the row's own units (the player list may be scaled down to fit). */
     var indentPx by mutableFloatStateOf(0f)
         private set
@@ -56,18 +64,25 @@ internal class HoleDodge(private val holes: List<Rect>, private val margin: Floa
     val track: Modifier = if (holes.isEmpty()) Modifier else Modifier.onGloballyPositioned { c ->
         val b = c.boundsInWindow()
         val scale = if (c.size.width > 0 && b.width > 0f) b.width / c.size.width else 1f
-        indentPx = holeIndent(b.left, b.top, b.bottom, holes, margin) / scale.coerceAtLeast(0.1f)
+        indentPx = (if (end) holeIndentEnd(b.right, b.top, b.bottom, holes, margin) else holeIndent(b.left, b.top, b.bottom, holes, margin)) /
+            scale.coerceAtLeast(0.1f)
     }
 }
 
 @Composable
-internal fun rememberHoleDodge(holes: List<Rect>, margin: Dp = 4.dp): HoleDodge {
+internal fun rememberHoleDodge(holes: List<Rect>, margin: Dp = 4.dp, end: Boolean = false): HoleDodge {
     val m = with(LocalDensity.current) { margin.toPx() }
-    return remember(holes, m) { HoleDodge(holes, m) }
+    return remember(holes, m, end) { HoleDodge(holes, m, end) }
 }
 
 /** The row moved right of any camera hole level with it. */
 internal fun Modifier.dodgeHoles(holes: List<Rect>): Modifier = if (holes.isEmpty()) this else composed {
     val dodge = rememberHoleDodge(holes)
     dodge.track.padding(start = with(LocalDensity.current) { dodge.indentPx.toDp() })
+}
+
+/** Something on the right edge moved left of any camera hole level with it; it keeps its right edge, so it stays flush. */
+internal fun Modifier.dodgeHolesEnd(holes: List<Rect>): Modifier = if (holes.isEmpty()) this else composed {
+    val dodge = rememberHoleDodge(holes, end = true)
+    dodge.track.padding(end = with(LocalDensity.current) { dodge.indentPx.toDp() })
 }
