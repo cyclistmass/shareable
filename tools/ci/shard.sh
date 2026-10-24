@@ -23,6 +23,18 @@ echo "== $SHARD on $("$ADB" shell getprop ro.build.version.release | tr -d '\r')
 "$ADB" shell setprop debug.wgbg.firebase emu
 "$ADB" install -r "$APK"
 
+# A dead emulator leaves every adb call at "- waiting for device -" until the job's timeout (0.3.6 CI: a whole hour).
+# On a runner, watch it and end the shard 2 minutes after the device goes: stopping adb fails the hung call too.
+# Runners only: on a PC, killing adb would cut the other lanes off.
+if [ "${CI:-}" = true ] && command -v pkill >/dev/null; then
+  ( gone=0; while sleep 30; do
+      if [ "$(timeout 10 "$ADB" get-state 2>/dev/null)" = device ]; then gone=0; else gone=$((gone + 1)); fi
+      [ $gone -lt 4 ] && continue
+      echo "shard: FAILED: the emulator went offline (no adb device for 2 minutes)"; pkill -TERM -x adb; kill -TERM $$; exit
+    done ) &
+  WATCHDOG=$!; trap 'pkill -P $WATCHDOG 2>/dev/null || true; kill $WATCHDOG 2>/dev/null || true' EXIT
+fi
+
 monkey_long() {   # three seeds of 20,000 events, starting in a game of the ruleset
   local start="$1" i
   for i in 1 2 3; do SETTLE=1 START="$start" bash tools/ci_monkey.sh "$APK" 20000 $((RUN * 10 + i)); done
