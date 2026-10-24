@@ -359,11 +359,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                     long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c])),
                     plain = !LocalArtChoice.current.space(ArtObject.CARDS)) {
                     if (now) { hint = null; onFortune?.invoke(c) }
-                    else hint = "${FORTUNE[c]}: " + when {
-                        c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]
-                        s.currentPlayer != me -> "only on your turn."
-                        else -> "not now (one Fortune card a turn, never one you bought this turn)."
-                    }
+                    else hint = fortuneTapText(s, me, c)
                 }
             }
         }
@@ -385,7 +381,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
                     small = null,
                     art = progressArt(c), long = progressDetail(c)) {
-                    hint = "${PROGRESS_NAMES.getOrElse(c) { "Progress" }}: " + if (now) progressHint(c) else "can't play it now (${notPlayableWhy(s, me, c)})."
+                    hint = progressTapText(s, me, c, now)
                 }
             }
         }
@@ -443,6 +439,20 @@ fun playableProgress(s: GameState, me: Int): Set<Int> =
     else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
 
 /** Why progress card [c] can't be played by [me] now, in a few words. */
+/**
+ * What a tap on progress card [c] in [me]'s hand says: what the card does, and when it can't be played [now], why not
+ * (a player report: off-turn it said only that it couldn't be played, not what it was).
+ */
+internal fun progressTapText(s: GameState, me: Int, c: Int, now: Boolean): String =
+    "${PROGRESS_NAMES.getOrElse(c) { "Progress" }}: ${progressHint(c)}" + if (now) "" else " Can't play it now (${notPlayableWhy(s, me, c)})."
+
+/** The same for Fortune card [c] when it can't be played: what it does, then why not now. */
+internal fun fortuneTapText(s: GameState, me: Int, c: Int): String = "${FORTUNE[c]}: ${FORTUNE_HINTS[c]}" + when {
+    c == wgbg.engine.DevCard.VICTORY_POINT -> ""
+    s.currentPlayer != me -> " Only on your turn."
+    else -> " Not now (one Fortune card a turn, never one you bought this turn)."
+}
+
 fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
     s.currentPlayer != me -> "only on your turn"
     s.phase != wgbg.engine.Phase.PLAY_TURN -> "finish what you're doing first"
@@ -554,7 +564,7 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
     val out = mutableListOf<RollMini>()
     roll.rollIn.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, n) }
     roll.rollOut.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, -n) }
-    roll.steal?.let { st ->
+    for (st in roll.steals) {
         val seen = me == st.thief || me == st.victim || me < 0
         if (p == st.thief) out += RollMini(if (seen) st.card else -1, 1)
         if (p == st.victim) out += RollMini(if (seen) st.card else -1, -1)

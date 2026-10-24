@@ -85,7 +85,7 @@ class TurnHistoryTest {
                     assertEquals(out?.sum() ?: (had - s.cardCount(who)), listed, "every card that left the hand is listed: $line")
                     if (listOf("Parchment", "Fabric", "Silver").any { it in line }) commodityDiscards++
                 }
-                tracker.current?.steal?.let { st ->
+                tracker.current?.steals?.forEach { st ->
                     assertTrue(st.card in ALL_CARD_NAMES.indices, "a real card: $st")
                     if (st.card >= wgbg.engine.CARD_TYPES) commoditySteals++
                 }

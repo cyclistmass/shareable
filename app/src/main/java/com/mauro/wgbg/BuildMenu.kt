@@ -73,6 +73,23 @@ fun buildMenuReaches(chivalry: Boolean, screenH: Dp, buttonH: Dp): Boolean = BUI
 /** The legal moves the board should offer while [mode] is picked (all of them when nothing is). */
 fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { mode.offers(it) }
 
+/**
+ * What the turn prompt says while board plate [this] is picked (a player report: the Ramparts plate lit up and the
+ * prompt didn't change, so it seemed to do nothing). Null for the plates that act at once.
+ */
+val BuildKind.boardHint: String?
+    get() = when (this) {
+        BuildKind.ROAD -> "Tap a glowing edge to lay your road"
+        BuildKind.HOMESTEAD -> "Tap a glowing corner for your Homestead"
+        BuildKind.TOWN -> "Tap a glowing Homestead to make it a Town"
+        BuildKind.KNIGHT -> "Tap a glowing corner for your new knight"
+        BuildKind.RAMPARTS -> "Tap a glowing Town to put Ramparts on it"
+        else -> null
+    }
+
+/** The turn prompt while a knight picked to move waits for where it goes. */
+const val KNIGHT_PICK_HINT = "Tap a glowing corner to move your knight there"
+
 /** True when [a] is one of this plate's moves. */
 fun BuildKind.offers(a: Action) = a.type == kind && (track < 0 || a.a == track)
 

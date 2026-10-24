@@ -1551,7 +1551,7 @@ fun WatchGameScreen(
                       ColorButton("OK", Color(0xFF3E9B4F), "hit-ok") { seenHit = hit.seq }
                   }
               }
-              if (!state.isOver) TurnPrompt(tapHint ?: prompt(state, legal, names),
+              if (!state.isOver) TurnPrompt(tapHint ?: buildMode?.boardHint ?: knightPick?.let { KNIGHT_PICK_HINT } ?: prompt(state, legal, names),
                   Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 8.dp))
               // The hand row steps aside while a card sheet (a 7's discard, a card to pick) covers the bottom centre.
               val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
