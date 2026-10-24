@@ -85,6 +85,7 @@ unless another path is given.
 - Raiders horn (`app/src/main/res/raw/raiders_horn.ogg`): "Hunting horn tone" by Alon-De-Lon, CC0,
   https://commons.wikimedia.org/wiki/File:Hunting_horn_tone.ogg. The first blast, cut and faded by
   `tools/import_sounds.sh`, 2026-10-20.
+- Drunken Sailor (`app/src/main/res/raw/tune_drunken_sailor.ogg`): traditional public-domain melody (What Shall We Do with the Drunken Sailor, a 19th-century capstan shanty), transcribed in `tools/make_sounds.py`; arrangement and recording ours. Credit line added 0.3.6, when a test found it missing.
 - Carnival of Venice (`app/src/main/res/raw/tune_carnival_of_venice.ogg`): public-domain melody (the
   traditional 3/4 theme); our own arrangement and synthesis via `tools/make_sounds.py`.
 
@@ -97,6 +98,13 @@ unless another path is given.
 - Shenandoah (`app/src/main/res/raw/tune_shenandoah.ogg`): traditional public-domain melody; melody source https://abcnotation.com/tunePage?a=trillian.mit.edu/~jc/music/abc/song/Shenandoah_1/0000; arrangement and recording ours.
 - Wellerman (`app/src/main/res/raw/tune_wellerman.ogg`): melody commonly labelled traditional; public-domain attribution disputed (collected 1966, author unknown), included at the maintainer's decision; melody source https://abcnotation.com/tunePage?a=dmc.lizmilner.com/viewabc.vbhtml?file=Wellerman/0002; arrangement and recording ours. Provenance discussion: https://www.folksong.org.nz/soon_may_the_wellerman/index.html (confirm melody rights before release).
 - Leave Her Johnny, lament (`app/src/main/res/raw/tune_leave_her_johnny_lament.ogg`): same traditional melody as above, a slower second arrangement; ours.
+- Santiana (`app/src/main/res/raw/tune_santiana.ogg`): traditional public-domain melody; melody source https://abcnotation.com/tunePage?a=www.joe-offer.com/folkinfo/songs/abc/497/0000; arrangement and recording ours.
+- The Leaving of Liverpool (`app/src/main/res/raw/tune_the_leaving_of_liverpool.ogg`): traditional public-domain melody; melody source https://abcnotation.com/tunePage?a=back.numachi.com:8000/dtrad/abc_dtrad.tar.gz/abc_dtrad/LEAVLIV/0000; arrangement and recording ours.
+- Bully in the Alley (`app/src/main/res/raw/tune_bully_in_the_alley.ogg`): traditional public-domain melody; melody source https://trillian.mit.edu/~jc/music/abc/mirror/back.numachi.com/Bully_in_the_Alley.abc; arrangement and recording ours.
+- Sally Brown (`app/src/main/res/raw/tune_sally_brown.ogg`): traditional public-domain melody; melody source https://trillian.mit.edu/~jc/music/abc/mirror/back.numachi.com/Sally_Brown.abc; arrangement and recording ours.
+- Roll the Old Chariot (`app/src/main/res/raw/tune_roll_the_old_chariot.ogg`): traditional public-domain melody; melody source https://trillian.mit.edu/~jc/music/abc/mirror/back.numachi.com/Roll_the_Old_Chariot.abc; arrangement and recording ours.
+- A-Roving (`app/src/main/res/raw/tune_a_roving.ogg`): traditional public-domain melody; melody source https://abcnotation.com/tunePage?a=back.numachi.com:8000/dtrad/abc_dtrad.tar.gz/abc_dtrad/AROVIN.1/0000; arrangement and recording ours.
+- John Kanaka (`app/src/main/res/raw/tune_john_kanaka.ogg`): traditional public-domain melody; melody source https://trillian.mit.edu/~jc/music/abc/mirror/back.numachi.com/John_Kanaka.abc; arrangement and recording ours.
 - Music: our own arrangements of traditional public-domain tunes, played on samples from VSCO 2 Community Edition and the Versilian Community Sample Library (VCSL), both CC0 (Versilian Studios, github.com/sgossner/VSCO-2-CE, github.com/sgossner/VCSL). The 2026-10-13 golden-age recordings (by Crest) replace the earlier synthesised ones in every tune_*.ogg.
 
 ## Libraries

@@ -1,5 +1,6 @@
 package com.mauro.wgbg
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -44,9 +45,12 @@ class TurnPlateTest {
         // CI's 640x320 at density 160: the Age of Chivalry menu ran over the Roll plate and touchplay stuck at the roll.
         assertTrue(buildMenuReaches(true, 320.dp, TURN_PLATE))
         assertFalse(buildMenuReaches(false, 320.dp, TURN_PLATE), "base's four plates stop well above it")
-        // A Pixel 6 held sideways (411 dp): the plate stays in the corner, as Mauro saw it.
-        assertFalse(buildMenuReaches(true, 411.dp, TURN_PLATE))
-        assertTrue("Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
+        // Mauro's Pixel 10 Pro XL held sideways (443 dp): the plate stays in the corner. A Pixel 6 (411 dp) moves it
+        // left since the plates grew 15% (0.3.6).
+        assertFalse(buildMenuReaches(true, 443.dp, TURN_PLATE))
+        assertTrue(buildMenuReaches(true, 411.dp, TURN_PLATE))
+        assertEquals(34.5.dp, BUILD_PLATE)
+        assertTrue("Row(Modifier.dodgeHolesEnd(holes).padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
     }
 
     @Test

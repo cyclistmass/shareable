@@ -44,7 +44,7 @@ def inside(a, outer):
 
 
 ROW_PARTS = ("name", "score", "cards", "road", "army")
-SHEETS = ("trade-panel", "card-choice", "discard-sheet")  # modal sheets that may cover the list while open
+SHEETS = ("trade-panel", "card-choice", "discard-sheet", "feast-sheet")  # modal sheets that may cover the list while open
 
 
 def cutouts(window_dump):

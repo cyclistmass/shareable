@@ -54,7 +54,7 @@ class BoardHudTest {
         val roll = TurnReport(player = 0, turn = 5, die1 = 3, die2 = 4,
             rollIn = listOf(intArrayOf(2, 0, 0, 0, 0), IntArray(5), IntArray(5)),
             rollOut = listOf(IntArray(5), intArrayOf(0, 0, 1, 3, 0), IntArray(5)),
-            steal = Steal(thief = 0, victim = 2, card = 4))
+            steals = listOf(Steal(thief = 0, victim = 2, card = 4)))
         assertEquals(listOf(RollMini(0, 2), RollMini(4, 1)), rollMinis(roll, 0, me = 0))          // the thief sees the card
         assertEquals(listOf(RollMini(2, -1), RollMini(3, -3)), rollMinis(roll, 1, me = 0))       // discards are public
         assertEquals(listOf(RollMini(4, -1)), rollMinis(roll, 2, me = 2))                          // the victim sees it
@@ -100,6 +100,24 @@ class BoardHudTest {
         assertTrue(playableProgress(s, other).isEmpty())
         assertEquals("only on your turn", notPlayableWhy(s, other, wgbg.engine.Progress.SABOTEUR))
         assertTrue(playableProgress(wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 1), 0).isEmpty())   // base game: none
+    }
+
+    @Test
+    fun `a tap on a card you can't play says what it does as well as why not`() {
+        val s = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(expansion = wgbg.engine.Expansion.CHIVALRY), 3)
+        val me = s.currentPlayer; val other = (me + 1) % s.config.numPlayers
+        val c = wgbg.engine.Progress.SABOTEUR
+        val off = progressTapText(s, other, c, now = false)
+        assertTrue(off.startsWith("${PROGRESS_NAMES[c]}: ${progressHint(c)}"), off)
+        assertTrue(off.endsWith("Can't play it now (only on your turn)."), off)
+        assertEquals("${PROGRESS_NAMES[c]}: ${progressHint(c)}", progressTapText(s, me, c, now = true))
+        for (i in PROGRESS_HINTS.indices) assertTrue(progressHint(i).isNotBlank(), "card $i has a hint")
+
+        val base = wgbg.engine.Rules.newGame(wgbg.engine.GameConfig(), 1)
+        val k = wgbg.engine.DevCard.KNIGHT
+        assertEquals("${FORTUNE[k]}: ${FORTUNE_HINTS[k]} Only on your turn.", fortuneTapText(base, (base.currentPlayer + 1) % 4, k))
+        val vp = wgbg.engine.DevCard.VICTORY_POINT
+        assertEquals("${FORTUNE[vp]}: ${FORTUNE_HINTS[vp]}", fortuneTapText(base, base.currentPlayer, vp))
     }
 
     @Test

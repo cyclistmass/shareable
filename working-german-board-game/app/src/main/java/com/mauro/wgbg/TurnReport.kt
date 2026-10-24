@@ -27,8 +27,8 @@ data class TurnReport(
     val rollIn: List<IntArray> = emptyList(),
     /** Cards each player discarded on a 7 (public: they go back to the bank face up). */
     val rollOut: List<IntArray> = emptyList(),
-    /** The bandit's robbery this turn, if any (which card is secret but to the two players). */
-    val steal: Steal? = null,
+    /** The robberies this turn, the bandit's and the Abbot's (which card is secret but to the two players in each). */
+    val steals: List<Steal> = emptyList(),
 ) {
     val rolled get() = die1 > 0
 }
@@ -137,8 +137,14 @@ class TurnTracker(private val names: List<String>) {
                 val victim = action.robberVictim
                 val card = if (victim >= 0) gained[victim].indexOfFirst { it < 0 } else -1
                 r.plus(if (victim >= 0) "$n moved the bandit and took a card from ${names[victim]}" else "$n moved the bandit")
-                    .let { if (victim >= 0 && card >= 0) it.copy(steal = Steal(who, victim, card)) else it }
+                    .let { if (victim >= 0 && card >= 0) it.copy(steals = it.steals + Steal(who, victim, card)) else it }
             }
+            // The Abbot moves the bandit and robs everyone at its new tile: each card shows like the bandit's (a player
+            // report: commodities lost after the roll never showed as lost cards). Its line comes from noteHits.
+            action.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && (action.payload and 0xff).toInt() == wgbg.engine.Progress.BISHOP ->
+                r.copy(steals = r.steals + (0 until s.numPlayers).mapNotNull { q ->
+                    gained[q].indexOfFirst { it < 0 }.takeIf { q != who && it >= 0 }?.let { Steal(who, q, it) }
+                }).plus("$n ${describe(action.type)}")
             action.type == ActionType.DISCARD -> {
                 // One line per player for a whole discard, however many moves it took ("Blue discarded 2 Fleece, 1 Grain"),
                 // not a line per card, some of them empty (Fable review T8).

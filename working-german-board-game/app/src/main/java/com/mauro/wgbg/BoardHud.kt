@@ -71,7 +71,9 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                 /** False inside the one left side panel (#73), which draws the frame for both halves. */
                 framed: Boolean = true,
                 /** Each player's cameo id (0.3.5), or null for the plain colour dot. */
-                cameos: List<String?> = emptyList()) {
+                cameos: List<String?> = emptyList(),
+                /** The camera cutout's rects (window px): a row level with one steps right of it (0.3.6). */
+                holes: List<androidx.compose.ui.geometry.Rect> = emptyList()) {
     version // the state object is mutated in place; this changing value makes the strip redraw after each move
     // Taller than the height it's given (the room above the dice: a short screen, a large font, the Raiders warning, six
     // seats), the whole list shrinks to fit, so every row stays in sight; it never scrolls White away (0.3.4, Mauro).
@@ -81,7 +83,7 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
         .semantics { contentDescription = "Players"; testTagsAsResourceId = true }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
         // Age of Chivalry: how near the Raiders are (a ship marker on a 7-step track).
         s.chivalry?.let { chivalry ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.testTag("raiders-track")) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.dodgeHoles(holes).testTag("raiders-track")) {
                 Text("Raiders", color = Color(0xFFE57373), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp),
                     maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 12.sp))
                 for (i in 0 until wgbg.engine.ChivalryPiece.BARBARIAN_TRACK) Box(
@@ -96,12 +98,16 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
             }
             // On your turn, 3 steps or fewer out: say so, and what's at stake (#92).
             raidersWarning(s, me)?.let { Text(it, color = Color(0xFFFFB4A8), fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.widthIn(max = 250.dp).padding(top = 1.dp, bottom = 2.dp).testTag("raiders-warning")) }
+                modifier = Modifier.dodgeHoles(holes).widthIn(max = 250.dp).padding(top = 1.dp, bottom = 2.dp).testTag("raiders-warning")) }
         }
         for (p in 0 until s.numPlayers) {
             val turn = !s.isOver && p == s.currentPlayer
+            // Level with the camera, the row steps right of it and its name column gives up that room, so the panel
+            // stays as narrow as it can.
+            val dodge = rememberHoleDodge(holes)
+            val step = with(LocalDensity.current) { dodge.indentPx.toDp() }
             Row(
-                Modifier.then(if (turn) Modifier.border(1.dp, Color(0xFFC9A04A), RoundedCornerShape(8.dp)) else Modifier).padding(horizontal = 6.dp, vertical = 1.dp),
+                Modifier.then(dodge.track).padding(start = step).then(if (turn) Modifier.border(1.dp, Color(0xFFC9A04A), RoundedCornerShape(8.dp)) else Modifier).padding(horizontal = 6.dp, vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The score sits in the player's colour dot, so the strip needs no score column (Mauro). The dot is a fixed
@@ -125,7 +131,7 @@ fun PlayerStrip(s: GameState, me: Int, names: List<String>, version: Int, modifi
                     contentAlignment = Alignment.Center) {
                     score(14f, 9f, if (PLAYER_COLORS[p].luminance() > 0.35f) Color(0xFF2B2118) else Color.White)
                 }
-                Column(Modifier.width(74.dp)) {
+                Column(Modifier.width(nameColumn(step))) {
                     // A long name (16 letters online) or a large font shrinks, then ends in "…", on one line (0.3.4).
                     Text(names[p], color = Color(0xFFEDE6D8), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 13.sp), modifier = Modifier.testTag("name-$p"))
@@ -359,11 +365,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                     long = CardDetail(fortuneArt(c), FORTUNE[c], "Fortune card", listOf(FORTUNE_HINTS[c])),
                     plain = !LocalArtChoice.current.space(ArtObject.CARDS)) {
                     if (now) { hint = null; onFortune?.invoke(c) }
-                    else hint = "${FORTUNE[c]}: " + when {
-                        c == wgbg.engine.DevCard.VICTORY_POINT -> FORTUNE_HINTS[c]
-                        s.currentPlayer != me -> "only on your turn."
-                        else -> "not now (one Fortune card a turn, never one you bought this turn)."
-                    }
+                    else hint = fortuneTapText(s, me, c)
                 }
             }
         }
@@ -385,7 +387,7 @@ fun HandRow(s: GameState, me: Int, version: Int, modifier: Modifier = Modifier, 
                 namedCard(PROGRESS_NAMES.getOrElse(c) { "Progress" }, TRACK_COLORS[wgbg.engine.Progress.track(c)], n, "hand-progress-$c", 50, 70, // as tall as the resource cards; hold one to read it large (Mauro, 2026-10-12)
                     small = null,
                     art = progressArt(c), long = progressDetail(c)) {
-                    hint = "${PROGRESS_NAMES.getOrElse(c) { "Progress" }}: " + if (now) progressHint(c) else "can't play it now (${notPlayableWhy(s, me, c)})."
+                    hint = progressTapText(s, me, c, now)
                 }
             }
         }
@@ -443,6 +445,20 @@ fun playableProgress(s: GameState, me: Int): Set<Int> =
     else wgbg.engine.Rules.legalActions(s).filter { it.type == wgbg.engine.ChivalryActionType.PLAY_PROGRESS && offered(s, it) }.map { it.a }.toSet()
 
 /** Why progress card [c] can't be played by [me] now, in a few words. */
+/**
+ * What a tap on progress card [c] in [me]'s hand says: what the card does, and when it can't be played [now], why not
+ * (a player report: off-turn it said only that it couldn't be played, not what it was).
+ */
+internal fun progressTapText(s: GameState, me: Int, c: Int, now: Boolean): String =
+    "${PROGRESS_NAMES.getOrElse(c) { "Progress" }}: ${progressHint(c)}" + if (now) "" else " Can't play it now (${notPlayableWhy(s, me, c)})."
+
+/** The same for Fortune card [c] when it can't be played: what it does, then why not now. */
+internal fun fortuneTapText(s: GameState, me: Int, c: Int): String = "${FORTUNE[c]}: ${FORTUNE_HINTS[c]}" + when {
+    c == wgbg.engine.DevCard.VICTORY_POINT -> ""
+    s.currentPlayer != me -> " Only on your turn."
+    else -> " Not now (one Fortune card a turn, never one you bought this turn)."
+}
+
 fun notPlayableWhy(s: GameState, me: Int, c: Int): String = when {
     s.currentPlayer != me -> "only on your turn"
     s.phase != wgbg.engine.Phase.PLAY_TURN -> "finish what you're doing first"
@@ -554,7 +570,7 @@ fun rollMinis(roll: TurnReport?, p: Int, me: Int): List<RollMini> {
     val out = mutableListOf<RollMini>()
     roll.rollIn.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, n) }
     roll.rollOut.getOrNull(p)?.forEachIndexed { r, n -> if (n > 0) out += RollMini(r, -n) }
-    roll.steal?.let { st ->
+    for (st in roll.steals) {
         val seen = me == st.thief || me == st.victim || me < 0
         if (p == st.thief) out += RollMini(if (seen) st.card else -1, 1)
         if (p == st.victim) out += RollMini(if (seen) st.card else -1, -1)
@@ -592,6 +608,9 @@ internal val TURN_HUD_MIN = (DIE_DP + 30).dp
  * The turn panel's height: the room under the player list ([stripBottom]), so the dice sit right under it. It used to
  * be at least 110 dp, which on a 320 dp tall screen pushed the dice up over the last player's row (0.3.4).
  */
+/** The player list's name column, 74 dp, less a row's [step] around the camera, down to 48 dp. */
+internal fun nameColumn(step: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = (74.dp - step).coerceAtLeast(48.dp)
+
 /** One road or knights badge: (64 dp column - 6 dp gap) / 2. */
 internal val STAT_BADGE_W = 29.dp
 

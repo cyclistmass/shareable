@@ -190,6 +190,8 @@ fun HumanControls(
     /** A Fortune card tapped in the hand row ([HandRow]), to play now; [onFortuneDone] clears it. */
     fortuneAsk: Int? = null,
     onFortuneDone: () -> Unit = {},
+    /** The camera cutout's rects (window px): a button level with one steps left of it, the rest stay flush (0.3.6). */
+    holes: List<androidx.compose.ui.geometry.Rect> = emptyList(),
 ) {
     var sheet by remember { mutableStateOf<String?>(null) } // which picker is open
     // A Fortune card tapped in the hand: Sentinel and Trailblazers play at once, Windfall and Corner the Market open
@@ -239,6 +241,9 @@ fun HumanControls(
         // on buttons that moved as card types ran out, lost the wrong card with no undo).
         if (ActionType.DISCARD in types) { Box(Modifier.align(Alignment.BottomCenter)) { DiscardSheet(s, me, legal, onMove, discardCause) }; return@Box }
         cardPick(s, legal, names)?.let { pick -> CardPickSheet(s, me, pick, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box }
+        if (s.phase == Phase.WEDDING && wgbg.engine.ChivalryActionType.CHOOSE_CARD in types) {
+            Box(Modifier.align(Alignment.BottomCenter)) { FeastSheet(s, me, names, onMove) }; return@Box
+        }
         if (wgbg.engine.ChivalryActionType.CHOOSE_CARD in types) {
             CardChoiceSheet(s, me, legal.filter { it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD }, names, onMove, Modifier.align(Alignment.BottomCenter)); return@Box
         }
@@ -255,14 +260,16 @@ fun HumanControls(
             // Fortune cards are played from the hand row (tap the card).
             // Age of Chivalry moves that aren't board taps: one button per kind (or card), a picker if it has choices.
             for ((label, acts) in chivalryButtonGroups(s, legal, names)) {
-                if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
-                else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
-                else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
+                Box(Modifier.dodgeHolesEnd(holes)) {
+                    if (acts.size == 1 && !isBoardCard(acts) && !asksFirst(acts[0])) MoveButton(label) { onMove(acts[0]) }
+                    else if (isBoardCard(acts)) MoveButton("$label…") { onBoardPick(acts) }
+                    else MoveButton("$label…") { chivalryChoices = label to acts; sheet = "chivalry" }
+                }
             }
             // The main move last, in the bottom-right corner, with Trade right beside it: icons, not words (Mauro). Where
             // the build menu down the right edge reaches the corner (a short phone), they sit left of it.
             val clear = buildMenuReaches(s.chivalry != null, androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp, TURN_PLATE)
-            Row(Modifier.padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.dodgeHolesEnd(holes).padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 tradeButton?.invoke()
                 // Roll and End turn share one plate (0.3.5 reports): the dice until you roll, then the hourglass. The rules
                 // never offer both at once.
@@ -288,18 +295,40 @@ fun discardPick(pile: IntArray, r: Int, add: Boolean, have: Int, owed: Int): Int
 /** The discard moves for a full [pile], one card per move, in card order. */
 fun discardMoves(pile: IntArray): List<Action> = pile.indices.flatMap { r -> List(pile[r]) { Action.discard(r) } }
 
+/** The moves that give Feast's [pile] to the player who played it, one card per move, in card order. */
+fun feastMoves(pile: IntArray): List<Action> = pile.indices.flatMap { r -> List(pile[r]) { Action.chooseCard(r) } }
+
 @Composable
-private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Action) -> Unit, cause: String? = null) {
+private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Action) -> Unit, cause: String? = null) =
     // The same chest as the trade and the science bonus: title, the cards with "have N" under them, the chest's
     // buttons on the right (Mauro: "the discard menu for 7 should be the same style as trade and science bonus").
-    val owed = s.discardOwed[me]
+    PileSheet(s, me, s.discardOwed[me], "discard", { owed, chosen -> "${cause ?: "A 7: you hold too many cards"}. Choose $owed to discard ($chosen chosen)" },
+        "Discard", ::discardMoves, legal.firstOrNull { it.type == ActionType.DISCARD && it.discardResource < 0 }, onMove)
+
+/**
+ * Feast played against you: choose both cards, then give them with one press, like a 7's discard (a player report:
+ * one tap per card gave the first away before you could pick the second). The engine still takes a card per move.
+ */
+@Composable
+internal fun FeastSheet(s: GameState, me: Int, names: List<String>, onMove: (Action) -> Unit) =
+    PileSheet(s, me, s.chivalry?.giveOwed?.getOrNull(me) ?: 0, "feast",
+        { owed, chosen -> "${names[s.currentPlayer]} played Feast against you: choose $owed to give them ($chosen chosen)" },
+        "Give", ::feastMoves, null, onMove)
+
+/**
+ * Pick [owed] cards from your hand into a pile, then send them all with one press ([go] and the count): a 7's discard
+ * or Feast. Test tags start with [tag]: `<tag>-sheet`, `<tag>-card-<r>`, `<tag>-go`, `<tag>-clear`, `<tag>-random`.
+ */
+@Composable
+private fun PileSheet(s: GameState, me: Int, owed: Int, tag: String, title: (Int, Int) -> String, go: String,
+                      moves: (IntArray) -> List<Action>, random: Action?, onMove: (Action) -> Unit) {
     var pile by remember(s.turn, owed) { mutableStateOf(IntArray(tradeCards(s))) }
     val full = pile.sum() == owed
-    Row(Modifier.chest().testTag("discard-sheet").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.chest().testTag("$tag-sheet").semantics { testTagsAsResourceId = true }, verticalAlignment = Alignment.CenterVertically) {
         // Weighted, so the buttons are measured first and always on screen; the cards shrink, then scroll, to fit what's
         // left (0.3.4: 8 cards at font 1.3 on a 640 dp phone covered Discard, and a player who had to discard was stuck).
         Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("${cause ?: "A 7: you hold too many cards"}. Choose $owed to discard (${pile.sum()} chosen)", color = CHEST_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(title(owed, pile.sum()), color = CHEST_INK, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Text("Tap a card to add it · hold to take it back", color = CHEST_INK.copy(alpha = 0.7f), fontSize = 11.sp)
             ChestCardRow(pile.indices.count { holding(s, me, it) > 0 }, 42.dp) { w ->
                 for (r in pile.indices) {
@@ -312,7 +341,7 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
                             Modifier.size(width = w, height = w * (60f / 42f))
                                 .pointerInput(r) {
                                     detectTapGestures(onTap = { pick(true) }, onLongPress = { pick(false) })
-                                }.testTag("discard-card-$r"),
+                                }.testTag("$tag-card-$r"),
                             contentAlignment = Alignment.Center,
                         ) {
                             Image(artPainter(ALL_CARD_ART[r]), ALL_CARD_NAMES[r], Modifier.fillMaxSize())
@@ -327,9 +356,9 @@ private fun DiscardSheet(s: GameState, me: Int, legal: List<Action>, onMove: (Ac
         Box(Modifier.width(10.dp))
         // Fixed buttons: the cards never move while you pick them.
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChestButton("Discard $owed", CHEST_YES, "discard-go", 104.dp, if (full) ({ val moves = discardMoves(pile); pile = IntArray(pile.size); moves.forEach(onMove) }) else null)
-            ChestButton("Clear", CHEST_NO, "discard-clear", 104.dp, if (pile.sum() > 0) ({ pile = IntArray(pile.size) }) else null)
-            legal.firstOrNull { it.type == ActionType.DISCARD && it.discardResource < 0 }?.let { a -> ChestButton("Random", CHEST_GOLD, "discard-random", 104.dp) { onMove(a) } }
+            ChestButton("$go $owed", CHEST_YES, "$tag-go", 104.dp, if (full) ({ val sent = moves(pile); pile = IntArray(pile.size); sent.forEach(onMove) }) else null)
+            ChestButton("Clear", CHEST_NO, "$tag-clear", 104.dp, if (pile.sum() > 0) ({ pile = IntArray(pile.size) }) else null)
+            random?.let { a -> ChestButton("Random", CHEST_GOLD, "$tag-random", 104.dp) { onMove(a) } }
         }
     }
 }

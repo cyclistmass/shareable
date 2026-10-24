@@ -48,8 +48,9 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
     }
 }
 
-/** A plate's size on screen: half the pass-2 mockups' (Mauro, 2026-10-22: "half size"), so one column fits. */
-val BUILD_PLATE = 30.dp
+/** A plate's size on screen: half the pass-2 mockups' (Mauro, 2026-10-22: "half size"), then 15% up (0.3.6: "scale them
+ * 15%"); one column still clears the Roll plate on a 443 dp phone (Pixel 10 Pro XL). */
+val BUILD_PLATE = 34.5.dp
 
 /**
  * The plates the row shows: every one for the ruleset, raised when it can be done now and engraved when it can't
@@ -72,6 +73,23 @@ fun buildMenuReaches(chivalry: Boolean, screenH: Dp, buttonH: Dp): Boolean = BUI
 
 /** The legal moves the board should offer while [mode] is picked (all of them when nothing is). */
 fun boardMoves(legal: List<Action>, mode: BuildKind?): List<Action> = if (mode == null) legal else legal.filter { mode.offers(it) }
+
+/**
+ * What the turn prompt says while board plate [this] is picked (a player report: the Ramparts plate lit up and the
+ * prompt didn't change, so it seemed to do nothing). Null for the plates that act at once.
+ */
+val BuildKind.boardHint: String?
+    get() = when (this) {
+        BuildKind.ROAD -> "Tap a glowing edge to lay your road"
+        BuildKind.HOMESTEAD -> "Tap a glowing corner for your Homestead"
+        BuildKind.TOWN -> "Tap a glowing Homestead to make it a Town"
+        BuildKind.KNIGHT -> "Tap a glowing corner for your new knight"
+        BuildKind.RAMPARTS -> "Tap a glowing Town to put Ramparts on it"
+        else -> null
+    }
+
+/** The turn prompt while a knight picked to move waits for where it goes. */
+const val KNIGHT_PICK_HINT = "Tap a glowing corner to move your knight there"
 
 /** True when [a] is one of this plate's moves. */
 fun BuildKind.offers(a: Action) = a.type == kind && (track < 0 || a.a == track)
@@ -102,19 +120,21 @@ fun plateTap(k: BuildKind, moves: List<Action>, mode: BuildKind?): Pick? = when 
  */
 @Composable
 fun BuildMenu(chivalry: Boolean, legal: List<Action>, mode: BuildKind?, onPick: (Pick) -> Unit, modifier: Modifier = Modifier,
-              level: (Int) -> Int = { 0 }) {
+              level: (Int) -> Int = { 0 },
+              /** The camera cutout's rects (window px): a plate level with one steps left of it, the rest stay flush (0.3.6). */
+              holes: List<androidx.compose.ui.geometry.Rect> = emptyList()) {
     val res = androidx.compose.ui.platform.LocalContext.current.resources
     val pkg = androidx.compose.ui.platform.LocalContext.current.packageName
-    Column(modifier.testTag("build-menu"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(modifier.testTag("build-menu"), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = androidx.compose.ui.Alignment.End) {
         for (k in shownKinds(chivalry)) {
             val moves = legal.filter { k.offers(it) }
             val tap = { plateTap(k, moves, mode)?.let(onPick); Unit }
             // Painted plates when they're in the build; the drawn icon on a brass plate until then.
             val art = res.getIdentifier("plate_${k.art}_${if (moves.isNotEmpty()) "on" else "off"}", "drawable", pkg)
-            if (k.track >= 0) Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Plate(k, art, mode, moves, tap)
                 LevelDots(level(k.track), TRACK_COLORS[k.track], Modifier.testTag("build-${k.name.lowercase()}-level"))
-            } else Plate(k, art, mode, moves, tap)
+            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes)) { Plate(k, art, mode, moves, tap) }
         }
     }
 }

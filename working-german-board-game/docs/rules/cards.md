@@ -159,7 +159,7 @@ that strength in your supply and a free corner on your roads, you may put it the
 #### Envoy (2)
 > Lift any road with a loose end; if it was yours, you may lay it again.
 
-A loose end is one with no other road or building of that road's owner. If the road was yours, you may lay one road
+A loose end is one with no other road, building or knight of that road's owner. If the road was yours, you may lay one road
 free, straight away.
 
 #### Plot (2)
