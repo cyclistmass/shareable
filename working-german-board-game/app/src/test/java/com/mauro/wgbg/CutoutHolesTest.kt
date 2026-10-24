@@ -101,7 +101,7 @@ class CutoutHolesTest {
         assertTrue("dodgeHolesEnd(holes).padding(top = 104.dp" in game, "the view bars")
         assertTrue("dodgeHolesEnd(holes).padding(top = 60.dp, end = 8.dp)," in game, "Settings")
         val build = File("src/main/java/com/mauro/wgbg/BuildMenu.kt").readText()
-        assertTrue(Regex("""dodgeHolesEnd\(holes, PLATE_HOLE_MARGIN\)""").findAll(build).count() >= 2 && "horizontalAlignment = androidx.compose.ui.Alignment.End" in build)
+        assertTrue(Regex("""dodgeHolesEnd\(holes, plateHoleMargin\(size\)\)""").findAll(build).count() >= 2 && "horizontalAlignment = androidx.compose.ui.Alignment.End" in build)
         val play = File("src/main/java/com/mauro/wgbg/Play.kt").readText()
         assertTrue(Regex("""dodgeHolesEnd\(holes\)""").findAll(play).count() >= 2)
         val strip = File("src/main/java/com/mauro/wgbg/BoardHud.kt").readText()

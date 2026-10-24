@@ -50,6 +50,14 @@ class TurnPlateTest {
         assertFalse(buildMenuReaches(true, 443.dp, TURN_PLATE))
         assertTrue(buildMenuReaches(true, 411.dp, TURN_PLATE))
         assertEquals(34.5.dp, BUILD_PLATE)
+        // Where the column doesn't fit it shrinks, so the last plate never runs off the screen (CI's 320 dp tall phone).
+        assertEquals(BUILD_PLATE, buildPlateFor(true, 443.dp))
+        assertEquals(BUILD_PLATE, buildPlateFor(false, 320.dp))
+        for (h in listOf(320.dp, 360.dp, 411.dp)) {
+            val p = buildPlateFor(true, h)
+            val kinds = shownKinds(true)
+            assertTrue(BUILD_MENU_TOP + p * kinds.size + 3.dp * (kinds.size - 1) + 8.dp * kinds.count { it.track >= 0 } <= h - 8.dp, "$h: $p")
+        }
         assertTrue("Row(Modifier.dodgeHolesEnd(holes).padding(end = if (clear) BUILD_PLATE + 10.dp else 0.dp)" in src("Play.kt"))
     }
 
