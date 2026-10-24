@@ -51,6 +51,8 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
 /** A plate's size on screen: half the pass-2 mockups' (Mauro, 2026-10-22: "half size"), then 15% up (0.3.6: "scale them
  * 15%"); one column still clears the Roll plate on a 443 dp phone (Pixel 10 Pro XL). */
 val BUILD_PLATE = 34.5.dp
+/** A plate steps this far clear of a camera hole: its 48 dp touch area reaches past the plate, and that clears it too. */
+internal val PLATE_HOLE_MARGIN = 4.dp + (48.dp - BUILD_PLATE) / 2
 
 /**
  * The plates the row shows: every one for the ruleset, raised when it can be done now and engraved when it can't
@@ -131,10 +133,10 @@ fun BuildMenu(chivalry: Boolean, legal: List<Action>, mode: BuildKind?, onPick: 
             val tap = { plateTap(k, moves, mode)?.let(onPick); Unit }
             // Painted plates when they're in the build; the drawn icon on a brass plate until then.
             val art = res.getIdentifier("plate_${k.art}_${if (moves.isNotEmpty()) "on" else "off"}", "drawable", pkg)
-            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            if (k.track >= 0) Column(Modifier.dodgeHolesEnd(holes, PLATE_HOLE_MARGIN), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Plate(k, art, mode, moves, tap)
                 LevelDots(level(k.track), TRACK_COLORS[k.track], Modifier.testTag("build-${k.name.lowercase()}-level"))
-            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes)) { Plate(k, art, mode, moves, tap) }
+            } else androidx.compose.foundation.layout.Box(Modifier.dodgeHolesEnd(holes, PLATE_HOLE_MARGIN)) { Plate(k, art, mode, moves, tap) }
         }
     }
 }

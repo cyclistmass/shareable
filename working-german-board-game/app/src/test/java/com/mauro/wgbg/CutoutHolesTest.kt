@@ -101,10 +101,22 @@ class CutoutHolesTest {
         assertTrue("dodgeHolesEnd(holes).padding(top = 104.dp" in game, "the view bars")
         assertTrue("dodgeHolesEnd(holes).padding(top = 60.dp, end = 8.dp)," in game, "Settings")
         val build = File("src/main/java/com/mauro/wgbg/BuildMenu.kt").readText()
-        assertTrue(Regex("""dodgeHolesEnd\(holes\)""").findAll(build).count() >= 2 && "horizontalAlignment = androidx.compose.ui.Alignment.End" in build)
+        assertTrue(Regex("""dodgeHolesEnd\(holes, PLATE_HOLE_MARGIN\)""").findAll(build).count() >= 2 && "horizontalAlignment = androidx.compose.ui.Alignment.End" in build)
         val play = File("src/main/java/com/mauro/wgbg/Play.kt").readText()
         assertTrue(Regex("""dodgeHolesEnd\(holes\)""").findAll(play).count() >= 2)
         val strip = File("src/main/java/com/mauro/wgbg/BoardHud.kt").readText()
         assertTrue("dodge.track).padding(start = step)" in strip && "nameColumn(step)" in strip)
+    }
+
+    @Test
+    fun `a build plate's touch area clears the hole, and a wide top-right notch pushes the prompt over`() {
+        // The plate is smaller than the 48 dp touch target, so it keeps half the difference more clear (CI layout-cutout, 0.3.6).
+        assertEquals(4.dp + (48.dp - BUILD_PLATE) / 2, PLATE_HOLE_MARGIN)
+        // A 320 dp-wide phone at density 1 with a 120 px notch at the top right: the prompt keeps 120 dp + 8 clear.
+        assertEquals(120f, topRightHoleDp(listOf(Rect(200f, 0f, 320f, 40f)), 320f, 1f))
+        // The same notch on a density 2 phone is 60 dp; a hole on the left or low down is not this one's business.
+        assertEquals(60f, topRightHoleDp(listOf(Rect(520f, 0f, 640f, 40f)), 640f, 2f))
+        assertEquals(0f, topRightHoleDp(listOf(Rect(0f, 0f, 120f, 40f), Rect(200f, 400f, 320f, 440f)), 320f, 1f))
+        assertEquals(0f, topRightHoleDp(emptyList(), 320f, 1f))
     }
 }

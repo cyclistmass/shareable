@@ -127,13 +127,18 @@ def faults(xml_text, holes=(), players=None):
         if why:
             out.append(f"{last + 1}p: last player's row not fully visible: " + ", ".join(why))
     # Nothing to read or tap under the camera; the board (most of the screen) runs under it on purpose.
+    labelled = lambda n: n.get("text") or n.get("content-desc") or n.get("resource-id")
     if holes and screen:
         area = (screen[2] - screen[0]) * (screen[3] - screen[1])
         for n in root.iter("node"):
             b = box(n)
             if not b or b[2] <= b[0] or b[3] <= b[1] or (b[2] - b[0]) * (b[3] - b[1]) > area / 2:
                 continue
-            if not (n.get("text") or n.get("content-desc") or n.get("resource-id")):
+            if not labelled(n):
+                continue
+            # A frame that spans the hole on purpose (the player strip steps only its rows round it) is judged
+            # by what it holds: only the innermost labelled things count.
+            if any(labelled(d) for d in n.iter() if d is not n):
                 continue
             for h in holes:
                 if crosses(b, h):
