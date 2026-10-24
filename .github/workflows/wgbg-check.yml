@@ -45,6 +45,7 @@ jobs:
              {"shard":"reach","minutes":30},{"shard":"online","minutes":30},
              {"shard":"friends-base","minutes":60},{"shard":"friends-chivalry","minutes":75},
              {"shard":"layout-base","minutes":60},{"shard":"layout-chivalry","minutes":60},
+             {"shard":"layout-cutout","minutes":60,"target":"google_apis"},
              {"shard":"names","minutes":30},{"shard":"colours","minutes":30},{"shard":"update","minutes":30}]
         run: |
           want=$(printf '%s\n' "$MESSAGE" | sed -n 's/^SHARDS: *//p' | tail -1 | tr -s ' ,' '  ')
@@ -104,9 +105,9 @@ jobs:
           npm install --global firebase-tools@15.33.0
           firebase emulators:exec --only firestore --project demo-wgbg "npm --prefix firebase/rules-test test"
 
-  # Every device step release_check ran on our two lanes plus every per-push shard, one emulator per shard: 16 shards
-  # plus apk, unit and rules make 19 jobs (and the quick pick), within the 20 free concurrent jobs. SHARDS (see pick)
-  # runs fewer. No layout-cutout: aosp_atd has no cutout overlays (docs/testing/improvements.md).
+  # Every device step release_check ran on our two lanes plus every per-push shard, one emulator per shard: 17 shards
+  # plus apk, unit and rules make 20 jobs (and the quick pick), the 20 free concurrent jobs. SHARDS (see pick) runs
+  # fewer. layout-cutout boots google_apis (aosp_atd has no cutout overlays; docs/testing/improvements.md).
   device:
     needs: pick
     if: needs.pick.outputs.shards != '[]'
