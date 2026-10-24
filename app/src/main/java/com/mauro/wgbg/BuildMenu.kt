@@ -48,8 +48,9 @@ enum class BuildKind(val kind: ActionKind, val icon: MoveIcon, val label: String
     }
 }
 
-/** A plate's size on screen: half the pass-2 mockups' (Mauro, 2026-10-22: "half size"), so one column fits. */
-val BUILD_PLATE = 30.dp
+/** A plate's size on screen: half the pass-2 mockups' (Mauro, 2026-10-22: "half size"), then 15% up (0.3.6: "scale them
+ * 15%"); one column still clears the Roll plate on a 443 dp phone (Pixel 10 Pro XL). */
+val BUILD_PLATE = 34.5.dp
 
 /**
  * The plates the row shows: every one for the ruleset, raised when it can be done now and engraved when it can't
