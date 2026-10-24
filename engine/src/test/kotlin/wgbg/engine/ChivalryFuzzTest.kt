@@ -67,7 +67,7 @@ class ChivalryFuzzTest {
         println("chivalry phases: " + Phase.entries.joinToString { "$it=${phases[it] ?: 0}" })
         println("chivalry progress plays: " + Progress.NAMES.indices.joinToString { "${Progress.NAMES[it]}=${cards[it]}" })
         coverage.print()
-        assertEquals(1000, wins + draws)
+        assertEquals(1000 * testScale, wins + draws)
         assertTrue(wins > 400, "random games should often finish")
         val unused = setOf<ActionKind>(
             ActionType.BUY_DEVELOPMENT_CARD, ActionType.PLAY_KNIGHT_CARD, ActionType.PLAY_YEAR_OF_PLENTY,
