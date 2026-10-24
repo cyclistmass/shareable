@@ -76,13 +76,23 @@ internal fun rememberHoleDodge(holes: List<Rect>, margin: Dp = 4.dp, end: Boolea
 }
 
 /** The row moved right of any camera hole level with it. */
-internal fun Modifier.dodgeHoles(holes: List<Rect>): Modifier = if (holes.isEmpty()) this else composed {
-    val dodge = rememberHoleDodge(holes)
+internal fun Modifier.dodgeHoles(holes: List<Rect>, margin: Dp = 4.dp): Modifier = if (holes.isEmpty()) this else composed {
+    val dodge = rememberHoleDodge(holes, margin)
     dodge.track.padding(start = with(LocalDensity.current) { dodge.indentPx.toDp() })
 }
 
-/** Something on the right edge moved left of any camera hole level with it; it keeps its right edge, so it stays flush. */
-internal fun Modifier.dodgeHolesEnd(holes: List<Rect>): Modifier = if (holes.isEmpty()) this else composed {
-    val dodge = rememberHoleDodge(holes, end = true)
+/**
+ * Something on the right edge moved left of any camera hole level with it; it keeps its right edge, so it stays flush.
+ * A plate smaller than the 48 dp touch target passes a [margin] of half the difference more, so its touch area clears too.
+ */
+internal fun Modifier.dodgeHolesEnd(holes: List<Rect>, margin: Dp = 4.dp): Modifier = if (holes.isEmpty()) this else composed {
+    val dodge = rememberHoleDodge(holes, margin, end = true)
     dodge.track.padding(end = with(LocalDensity.current) { dodge.indentPx.toDp() })
 }
+
+/**
+ * How far in from the right edge (dp) a camera hole near the top of the screen reaches, for what is centred along the
+ * top (the turn prompt): 0 with none there. On a small phone a notch can be wider than the room kept for the buttons.
+ */
+internal fun topRightHoleDp(holes: List<Rect>, widthPx: Float, density: Float, topDp: Float = 120f): Float =
+    holes.filter { it.top < topDp * density && it.right >= widthPx - 1f }.maxOfOrNull { (widthPx - it.left) / density } ?: 0f

@@ -527,7 +527,8 @@ fun TurnPrompt(text: String, modifier: Modifier = Modifier) {
  * left of the Menu button. With the box's TopCenter, the uneven padding centres them in the band and keeps them inside it.
  * Centred on the whole screen, a long prompt ran over the first player's name on a 640 dp screen (0.3.4).
  */
-internal fun Modifier.rightOfPanel(panel: androidx.compose.ui.unit.Dp) = padding(start = promptStart(panel), end = PROMPT_END)
+internal fun Modifier.rightOfPanel(panel: androidx.compose.ui.unit.Dp, holeEnd: androidx.compose.ui.unit.Dp = 0.dp) =
+    padding(start = promptStart(panel), end = maxOf(PROMPT_END, holeEnd + 8.dp))  // clear of a notch wider than the buttons' room (0.3.6)
 internal fun promptStart(panel: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp = if (panel <= 0.dp) 376.dp else panel + 16.dp
 internal val PROMPT_END = 112.dp
 
