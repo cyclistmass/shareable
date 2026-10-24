@@ -546,7 +546,7 @@ class SoundSettings(private val store: FloatStore) {
         const val DEFAULT_RAIDERS_STEPS = 3
         val RAIDERS_STEPS_RANGE = 1..10
         fun songKey(song: Song) = "song-on:" + song.title
-        /** The set list (#17, #58), our own recordings; more shanties to come. */
+        /** The set list (#17, #58), our own recordings (0.3.6: seven more shanties). */
         val SONGS: List<Song> = listOf(
             Song("Drunken Sailor", R.raw.tune_drunken_sailor),
             Song("Carnival of Venice", R.raw.tune_carnival_of_venice),
@@ -559,6 +559,13 @@ class SoundSettings(private val store: FloatStore) {
             Song("Rio Grande", R.raw.tune_rio_grande),
             Song("Shenandoah", R.raw.tune_shenandoah),
             Song("Wellerman", R.raw.tune_wellerman),
+            Song("Santiana", R.raw.tune_santiana),
+            Song("The Leaving of Liverpool", R.raw.tune_the_leaving_of_liverpool),
+            Song("Bully in the Alley", R.raw.tune_bully_in_the_alley),
+            Song("Sally Brown", R.raw.tune_sally_brown),
+            Song("Roll the Old Chariot", R.raw.tune_roll_the_old_chariot),
+            Song("A-Roving", R.raw.tune_a_roving),
+            Song("John Kanaka", R.raw.tune_john_kanaka),
         )
     }
 }

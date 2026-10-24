@@ -205,4 +205,17 @@ class EnvSettingsTest {
         EnvSettings(store).apply { autoNoSeconds = 10; reset() }
         assertEquals(EnvSettings.AUTO_NO_DEFAULT, EnvSettings(store).autoNoSeconds)
     }
+    @Test
+    fun `every tune file is in the set list once, credited with its melody source, and distinct`() {
+        val raw = java.io.File("src/main/res/raw").list()!!.filter { it.startsWith("tune_") }.map { it.substringBefore('.') }.sorted()
+        val kt = java.io.File("src/main/java/com/mauro/wgbg/EnvSettings.kt").readText()
+        val listed = Regex("""R\.raw\.(tune_\w+)""").findAll(kt).map { it.groupValues[1] }.toList()
+        assertEquals(raw, listed.sorted(), "res/raw tunes and SONGS differ")
+        assertEquals(listed.size, SoundSettings.SONGS.size)
+        assertEquals(SoundSettings.SONGS.size, SoundSettings.SONGS.map { it.title }.toSet().size, "two songs share a title")
+        val credits = java.io.File("../CREDITS.md").readText()
+        for (name in raw) assertEquals(true, "res/raw/$name.ogg" in credits, "$name not in CREDITS.md")
+        val sizes = raw.map { java.io.File("src/main/res/raw/$it.ogg").readBytes().contentHashCode() }
+        assertEquals(raw.size, sizes.toSet().size, "two tunes are the same file")
+    }
 }
