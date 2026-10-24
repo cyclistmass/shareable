@@ -650,6 +650,15 @@ internal fun onlineProblem(e: Throwable): String {
  * lands, #7); the menu can switch to watching the bots. Age of Chivalry is watch-only until its
  * screens exist (#4).
  */
+/**
+ * Runs [content] as its own composable lambda instead of inline in the caller's. The game screen's Box content grew past
+ * what ART's verifier accepts in a non-debuggable build (0.3.6-pre1's release APK crashed on launch with a VerifyError
+ * in WatchGameScreen's lambda; debug builds verify differently, so only the release check's update job caught it), so
+ * its big children (board canvas, HUD, Menu panel) each run in their own method. It adds no layout node.
+ */
+@Composable
+private fun Apart(content: @Composable () -> Unit) = content()
+
 @Composable
 fun WatchGameScreen(
     modifier: Modifier = Modifier,
@@ -1083,6 +1092,7 @@ fun WatchGameScreen(
     var stripBottom by remember { mutableStateOf(0f) }
     var stripWidth by remember { mutableStateOf(0f) }
     var screenHeight by remember { mutableStateOf(0f) }
+    var screenWidth by remember { mutableStateOf(0f) }
     val turnHudHeight = with(LocalDensity.current) {
         // The dice sit right under the player list and the history takes the rest of the side (Mauro: "raise it up").
         turnHudHeight(screenHeight.toDp(), stripBottom.toDp())
@@ -1270,7 +1280,7 @@ fun WatchGameScreen(
             }
         }
         LaunchedEffect(env.liveBoard) { if (env.liveBoard) liveFailure = null }
-        Canvas(
+        Apart { Canvas(
             Modifier.fillMaxSize()
                 .onSizeChanged { boardSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .onGloballyPositioned { boardOrigin = it.positionInWindow() }
@@ -1474,14 +1484,14 @@ fun WatchGameScreen(
                 if (!targets.isEmpty) drawTargets(state.board, targets, camera, targetPulse(sea.time), targetGlow(me), pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
                 if (!chosenTargets.isEmpty) drawTargets(state.board, chosenTargets, camera, 1f, Color.White, pieceOn = { pieceAt(state, it) }, knightOn = { knightAt(state, it) })
             }
-        }
+        } }
         // The HUD keeps clear of the camera cutout (0.3.4: the lens sat on the dice); the board runs under it.
         // The side panel and the right-hand controls run flush to the edges and only what is level with the hole steps
         // round it (0.3.6: players asked for the blank strip back); Look & art keeps the whole strip clear.
         // Every HUD size is measured in here.
-        Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
+        Apart { Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
             WindowInsets.displayCutout.only(WindowInsetsSides.Vertical)))
-            .onGloballyPositioned { screenHeight = it.size.height.toFloat() }) {
+            .onGloballyPositioned { screenHeight = it.size.height.toFloat(); screenWidth = it.size.width.toFloat() }) {
           if (inventory) Row(Modifier.align(Alignment.TopCenter).padding(top = 60.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
               for (obj in ArtObject.entries) BrassButton(obj.label + ": " + env.art[obj].label, "swap-" + obj.name.lowercase(), Modifier.height(32.dp)) { env.art = env.art.cycle(obj) }
           }
@@ -1543,19 +1553,21 @@ fun WatchGameScreen(
           // The game state is mutated in place, so these get `tick` to redraw after every move.
           // The side panel's width: the prompt, the notices and the hand keep clear of it.
           val panelDp = with(LocalDensity.current) { stripWidth.toDp() }
+          // A notch at the top right wider than the buttons' room pushes the centred prompt and notices left of it.
+          val holeEnd = topRightHoleDp(holes, screenWidth, LocalDensity.current.density).dp
           if (!inventory) PlayerStrip(state, me, names, tick, Modifier.align(Alignment.TopStart).padding(8.dp)
               .heightIn(max = stripMaxHeight(with(LocalDensity.current) { screenHeight.toDp() }))
               .onGloballyPositioned { stripBottom = it.boundsInParent().bottom; stripWidth = it.size.width.toFloat() },
               roll = tick.let { tracker.current?.takeIf { it.rolled } ?: tracker.last?.takeIf { it.rolled } }, framed = false, cameos = cameos, holes = holes)
           if (net != null && !inventory) onlineView?.let { v ->
-              Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+              Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp, holeEnd).padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                   OnlineConnectionStatus(v)
               }
           }
           if (me >= 0 && !inventory && !state.isOver && pending.isEmpty()) tick.let {
               // Another player's card or bandit cost you something: say who, with what card and why, until OK.
               tracker.hits.lastOrNull { it.victim == me && it.seq > seenHit }?.let { hit ->
-                  Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 64.dp)
+                  Column(Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp, holeEnd).padding(top = 64.dp)
                       .widthIn(max = 460.dp).chest().testTag("hit-notice"),
                       horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                       Text("${names[hit.by]} ${hit.cause}", color = Color(0xFFF1D58A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1565,7 +1577,7 @@ fun WatchGameScreen(
                   }
               }
               if (!state.isOver) TurnPrompt(tapHint ?: buildMode?.boardHint ?: knightPick?.let { KNIGHT_PICK_HINT } ?: prompt(state, legal, names),
-                  Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp).padding(top = 8.dp))
+                  Modifier.align(Alignment.TopCenter).rightOfPanel(panelDp, holeEnd).padding(top = 8.dp))
               // The hand row steps aside while a card sheet (a 7's discard, a card to pick) covers the bottom centre.
               val cardSheet = legal.any { it.type == ActionType.DISCARD || it.type == wgbg.engine.ChivalryActionType.CHOOSE_CARD } || cardPick(state, legal, names) != null
               if (!tradeOpen && !tradeNeedsMe(state, me) && !cardSheet) HandRow(state, me, tick,
@@ -1648,11 +1660,11 @@ fun WatchGameScreen(
                       playAgainLabel = if (online != null && room?.host != online.uid) "Join rematch" else "Play again")
               }
           }
-        }
+        } }
       }
         // The Menu panel keeps clear of the camera hole: on the right it steps round it, flush otherwise (0.3.6); Look & art
         // keeps the whole strip clear.
-        Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
+        Apart { Box(Modifier.fillMaxSize().then(if (inventory) Modifier.displayCutoutPadding() else Modifier.windowInsetsPadding(
             WindowInsets.displayCutout.only(WindowInsetsSides.Left + WindowInsetsSides.Vertical)))) {
           if (panelOpen) CompositionLocalProvider(LocalContentColor provides Color(0xFFEDE6D8)) {
               Column(
@@ -1683,7 +1695,7 @@ fun WatchGameScreen(
                   if (online != null) Text("Online · room ${online.id}", fontWeight = FontWeight.Bold, modifier = Modifier.testTag("menu-room"))
               }
           }
-        }
+        } }
       }
       // Every button, banner and dialog over the board keeps clear of the camera cutout (0.3.4). The right-edge buttons
       // (Menu, the build row, the view bars, Settings) run flush and step round only the hole (0.3.6); a full-screen
@@ -1693,7 +1705,7 @@ fun WatchGameScreen(
         // Debug autoplay must never be invisible: a bot playing your seat looked like a desync in a playtest.
         if (autoplay || autoSetup) Text(if (autoplay) "AUTOPLAY (debug): a bot plays your seat" else "AUTOSETUP (debug)",
             color = Color(0xFFFFB4A0), fontSize = 12.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 120.dp).dodgeHolesEnd(holes).background(Color(0xCC2A1B10), RoundedCornerShape(8.dp))
                 .padding(horizontal = 8.dp, vertical = 3.dp).testTag("debug-badge"))
         // Look & art has no game Menu (#91), only its Settings to show and hide.
         MenuButton(if (panelOpen || settingsOpen) "Hide" else if (lookAndArt) "Settings" else "Menu", "menu-toggle", Modifier.align(Alignment.TopEnd).dodgeHolesEnd(holes).padding(8.dp)) {
